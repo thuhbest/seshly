@@ -22,17 +22,12 @@ class LoginPageController {
       // 🔑 Firebase sign-in
       await _authService.signIn(email, password);
 
-      // 🧠 IMPORTANT: allow Flutter Web to clean DOM
+      // Allow Flutter Web to clean DOM
       await Future.delayed(const Duration(milliseconds: 120));
 
       if (!context.mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
 
-      // ✅ Navigate to Home (replace stack)
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const HomePageScreen(),
-        ),
-      );
     } catch (e) {
       if (!context.mounted) return;
 
