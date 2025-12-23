@@ -13,7 +13,7 @@ class SeshTabBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E243A).withOpacity(0.5),
+        color: const Color(0xFF1E243A).withValues(alpha: 0.5), // Using withValues()
         borderRadius: BorderRadius.circular(15),
       ),
       child: Row(
@@ -27,12 +27,12 @@ class SeshTabBar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected ? const Color(0xFF1E243A) : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
-                border: isSelected ? Border.all(color: Colors.white10) : null,
+                border: isSelected ? Border.all(color: Colors.white.withValues(alpha: 0.1)) : null, // Using withValues()
               ),
               child: Text(
                 tab,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.white54,
+                  color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.54), // Using withValues()
                   fontWeight: FontWeight.bold,
                 ),
               ),
