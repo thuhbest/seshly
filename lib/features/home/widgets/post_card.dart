@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../view/question_detail_view.dart'; // Import QuestionDetailView
+import 'package:seshly/features/tutors/view/find_tutor_view.dart'; // Import FindTutorView
 
 class PostCard extends StatelessWidget {
   final String subject;
@@ -59,39 +60,97 @@ class PostCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _actionIcon(Icons.thumb_up_alt_outlined, likes.toString()),
-              // Comment row wrapped in GestureDetector
-              GestureDetector(
+              // Like button with pressing effect
+              ActionIconButton(
+                icon: Icons.thumb_up_alt_outlined,
+                label: likes.toString(),
+                onTap: () {
+                  // Handle like action
+                  print('Liked the post');
+                },
+              ),
+              // Comment button with pressing effect
+              ActionIconButton(
+                icon: Icons.chat_bubble_outline,
+                label: comments.toString(),
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => const QuestionDetailView()),
                   );
                 },
-                child: Row(
-                  children: [
-                    const Icon(Icons.chat_bubble_outline, size: 18, color: Color(0x88FFFFFF)), // Equivalent to Colors.white54
-                    const SizedBox(width: 4),
-                    Text(comments.toString(), style: const TextStyle(color: Color(0x88FFFFFF))), // Equivalent to Colors.white54
-                  ],
-                ),
               ),
-              _actionIcon(Icons.person_add_alt_1_outlined, "Tutor", color: tealAccent),
-              const Icon(Icons.repeat, color: Color(0x88FFFFFF), size: 20), // Equivalent to Colors.white54
+              // Find Tutor button with pressing effect - Updated to navigate to FindTutorView
+              ActionIconButton(
+                icon: Icons.person_add_alt_1_outlined,
+                label: "Tutor",
+                color: tealAccent,
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FindTutorView()));
+                },
+              ),
+              // Share button with pressing effect
+              ActionIconButton(
+                icon: Icons.repeat,
+                label: "",
+                onTap: () {
+                  // Handle share action
+                  print('Share tapped');
+                },
+              ),
             ],
           )
         ],
       ),
     );
   }
+}
 
-  Widget _actionIcon(IconData icon, String label, {Color color = const Color(0x88FFFFFF)}) { // Equivalent to Colors.white54
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 5),
-        Text(label, style: TextStyle(color: color)),
-      ],
+/// A dedicated button for post actions with pressing effect
+class ActionIconButton extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const ActionIconButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.color = const Color(0x88FFFFFF), // Default to Colors.white54 equivalent
+    required this.onTap,
+  });
+
+  @override
+  State<ActionIconButton> createState() => _ActionIconButtonState();
+}
+
+class _ActionIconButtonState extends State<ActionIconButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // Animation scale: 1.0 is normal, 0.9 is shrunk
+    final double scale = _isPressed ? 0.9 : 1.0;
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: scale,
+        duration: const Duration(milliseconds: 100),
+        child: Row(
+          children: [
+            Icon(widget.icon, color: widget.color, size: 20),
+            if (widget.label.isNotEmpty) ...[
+              const SizedBox(width: 5),
+              Text(widget.label, style: TextStyle(color: widget.color)),
+            ]
+          ],
+        ),
+      ),
     );
   }
 }

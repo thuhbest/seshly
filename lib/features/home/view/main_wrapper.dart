@@ -10,8 +10,11 @@ import 'package:seshly/features/friends/view/friends_view.dart';
 // 2. Import CalendarView
 import 'package:seshly/features/calendar/view/calendar_view.dart';
 
-//3. Import profile and settings view
+// 3. Import profile and settings view
 import 'package:seshly/features/profile/view/profile_view.dart';
+
+// 4. Import FindTutorView
+import 'package:seshly/features/tutors/view/find_tutor_view.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});
@@ -29,12 +32,11 @@ class _MainWrapperState extends State<MainWrapper> {
     const SeshView(), // Index 1: Sesh AI
     const FriendsView(), // Index 2: Real Friends Screen
     const CalendarView(), // Index 3: Real Calendar Screen
-    const ProfileView() //Index 4: Real profile and settings screen
+    const ProfileView() // Index 4: Real profile and settings screen
   ];
 
   @override
   Widget build(BuildContext context) {
-    const Color tealAccent = Color(0xFF00C09E);
     const Color backgroundColor = Color(0xFF0F142B);
 
     return Scaffold(
@@ -44,11 +46,13 @@ class _MainWrapperState extends State<MainWrapper> {
         index: _currentIndex,
         children: _pages,
       ),
-      // FloatingActionButton logic
+      // FloatingActionButton logic - Updated to navigate to FindTutorView
       floatingActionButton: _currentIndex == 0 
       ? FloatingActionButton(
-          backgroundColor: tealAccent,
-          onPressed: () => debugPrint("Add Post/Tutor Pressed"),
+          backgroundColor: const Color(0xFF00C09E),
+          onPressed: () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const FindTutorView()));
+          },
           child: const Icon(Icons.person_add_alt_1, color: Colors.white),
         )
       : null,

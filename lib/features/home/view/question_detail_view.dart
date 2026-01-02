@@ -10,7 +10,7 @@ class QuestionDetailView extends StatefulWidget {
 }
 
 class _ScrollBehavior extends ScrollBehavior {
-  @override
+  // REMOVE @override annotation since buildViewportChrome doesn't exist in the parent class
   Widget buildViewportChrome(BuildContext context, Widget child, AxisDirection axisDirection) => child;
 }
 
@@ -21,7 +21,6 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
   @override
   Widget build(BuildContext context) {
     const Color backgroundColor = Color(0xFF0F142B);
-    const Color tealAccent = Color(0xFF00C09E);
     const Color cardColor = Color(0xFF1E243A);
 
     return Scaffold(
@@ -94,7 +93,7 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: cardColor.withValues(alpha: 0.5),
+                        color: cardColor.withValues(alpha: 128), // 0.5 * 255 = 128
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -154,7 +153,7 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
       padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 10),
       decoration: BoxDecoration(
         color: const Color(0xFF1E243A),
-        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 13))), // 0.05 * 255 = 13
       ),
       child: Row(
         children: [
@@ -166,7 +165,7 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
                 hintText: "Add a comment...",
                 hintStyle: const TextStyle(color: Colors.white38),
                 filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.05),
+                fillColor: Colors.white.withValues(alpha: 13), // 0.05 * 255 = 13
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none),
               ),
@@ -186,14 +185,14 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
   Widget _headerCircleButton(IconData icon) {
     return Container(
       margin: const EdgeInsets.only(left: 8),
-      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), shape: BoxShape.circle),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 13), shape: BoxShape.circle), // 0.05 * 255 = 13
       child: IconButton(icon: Icon(icon, color: const Color(0xFF00C09E), size: 20), onPressed: () {}),
     );
   }
 
   Widget _avatar(String text) {
     return CircleAvatar(
-      backgroundColor: const Color(0xFF00C09E).withValues(alpha: 0.1),
+      backgroundColor: const Color(0xFF00C09E).withValues(alpha: 25), // 0.1 * 255 = 25
       child: Text(text, style: const TextStyle(color: Color(0xFF00C09E), fontWeight: FontWeight.bold)),
     );
   }
@@ -201,7 +200,7 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
   Widget _tag(String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 13), borderRadius: BorderRadius.circular(20)), // 0.05 * 255 = 13
       child: Text(label, style: const TextStyle(color: Color(0xFF00C09E), fontSize: 11, fontWeight: FontWeight.bold)),
     );
   }
@@ -215,7 +214,7 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
           decoration: BoxDecoration(
             color: isSelected ? const Color(0xFF1E243A) : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
-            border: isSelected ? Border.all(color: Colors.white.withValues(alpha: 0.1)) : null,
+            border: isSelected ? Border.all(color: Colors.white.withValues(alpha: 25)) : null, // 0.1 * 255 = 25
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
