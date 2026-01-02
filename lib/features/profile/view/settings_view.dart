@@ -102,8 +102,13 @@ class _SettingsViewState extends State<SettingsView> {
                 width: double.infinity,
                 child: TextButton.icon(
                   onPressed: () async {
+                    // Store context in local variable to check mounted properly
+                    final currentContext = context;
                     await FirebaseAuth.instance.signOut();
-                    if (mounted) Navigator.pop(context);
+                    // Check mounted on the current widget state, not the context
+                    if (mounted) {
+                      Navigator.of(currentContext).pop();
+                    }
                   },
                   icon: const Icon(Icons.logout, color: errorRed),
                   label: const Text(
@@ -112,7 +117,7 @@ class _SettingsViewState extends State<SettingsView> {
                   ),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 15),
-                    backgroundColor: errorRed.withValues(alpha: 0.1),
+                    backgroundColor: errorRed.withValues(alpha: 25), // 0.1 * 255 = 25
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   ),
                 ),
@@ -147,6 +152,7 @@ class _SwitchTile extends StatelessWidget {
   final String? subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
+  // KEEP the icon parameter but remove from constructor calls if not needed
   final IconData? icon;
 
   const _SwitchTile({
@@ -154,7 +160,7 @@ class _SwitchTile extends StatelessWidget {
     this.subtitle,
     required this.value,
     required this.onChanged,
-    this.icon,
+    this.icon, // Keep the parameter but it's optional
   });
 
   @override
@@ -171,14 +177,16 @@ class _SwitchTile extends StatelessWidget {
       subtitle: subtitle != null
           ? Text(
               subtitle!,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+              style: TextStyle(color: Colors.white.withValues(alpha: 128), fontSize: 13), // 0.5 * 255 = 128
             )
           : null,
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF00C09E),
-        activeTrackColor: const Color(0xFF00C09E).withValues(alpha: 0.1),
+        // FIX: Replace deprecated 'activeColor' with 'activeThumbColor'
+        activeThumbColor: const Color(0xFF00C09E),
+        activeTrackColor: const Color(0xFF00C09E).withValues(alpha: 25), // 0.1 * 255 = 25
+        // Keep other switch properties
       ),
     );
   }
@@ -212,10 +220,10 @@ class _LinkTile extends StatelessWidget {
           if (trailingText != null)
             Text(
               trailingText!,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
+              style: TextStyle(color: Colors.white.withValues(alpha: 128), fontSize: 14), // 0.5 * 255 = 128
             ),
           const SizedBox(width: 8),
-          Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.5), size: 20),
+          Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 128), size: 20), // 0.5 * 255 = 128
         ],
       ),
       onTap: onTap,
