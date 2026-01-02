@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../widgets/sesh_tab_bar.dart';
 import '../widgets/sesh_feature_card.dart';
 import '../widgets/sesh_input_box.dart';
-import '../widgets/vault_view.dart'; 
+import '../view/vault_view.dart';
+import '../view/archive_view.dart';
+import '../view/progress_view.dart'; // Import ProgressView
 
 class SeshView extends StatefulWidget {
   const SeshView({super.key});
@@ -58,38 +60,56 @@ class _SeshViewState extends State<SeshView> {
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                child: _selectedTab == "Vault" 
-                  ? const VaultView()
-                  : Column(
-                      children: [
-                        const SeshFeatureCard(
-                          title: "Snap & Study",
-                          description: "Take photos of diagrams and get AI explanations",
-                          buttonText: "Take Photo",
-                          icon: Icons.camera_alt_outlined,
-                        ),
-                        const SeshFeatureCard(
-                          title: "Smart Notes",
-                          description: "Convert your notes into organized study guides",
-                          buttonText: "Create Notes",
-                          icon: Icons.description_outlined,
-                        ),
-                        const SeshFeatureCard(
-                          title: "Practice Quiz",
-                          description: "Generate custom quizzes from your study material",
-                          buttonText: "Start Quiz",
-                          icon: Icons.track_changes_outlined,
-                        ),
-                        const SizedBox(height: 20),
-                        const SeshInputBox(),
-                        const SizedBox(height: 40),
-                      ],
-                    ),
+                child: _buildActiveView(),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildActiveView() {
+    switch (_selectedTab) {
+      case "AI Assist":
+        return Column(
+          children: [
+            const SeshFeatureCard(
+              title: "Snap & Study",
+              description: "Take photos of diagrams and get AI explanations",
+              buttonText: "Take Photo",
+              icon: Icons.camera_alt_outlined,
+            ),
+            const SeshFeatureCard(
+              title: "Smart Notes",
+              description: "Convert your notes into organized study guides",
+              buttonText: "Create Notes",
+              icon: Icons.description_outlined,
+            ),
+            const SeshFeatureCard(
+              title: "Practice Quiz",
+              description: "Generate custom quizzes from your study material",
+              buttonText: "Start Quiz",
+              icon: Icons.track_changes_outlined,
+            ),
+            const SizedBox(height: 20),
+            const SeshInputBox(),
+            const SizedBox(height: 40),
+          ],
+        );
+      case "Vault":
+        return const VaultView();
+      case "Archive":
+        return const ArchiveView();
+      case "Progress":
+        return const ProgressView(); // Updated to use ProgressView
+      default:
+        return const Center(
+          child: Text(
+            "AI Assist Coming Soon", 
+            style: TextStyle(color: Colors.white38)
+          ),
+        );
+    }
   }
 }
