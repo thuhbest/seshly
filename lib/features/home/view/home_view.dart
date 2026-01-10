@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/post_card.dart';
 import '../widgets/category_selector.dart';
 import '../controllers/home_controller.dart';
@@ -16,11 +18,48 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   late HomeController _homeController;
+  final ScrollController _scrollController = ScrollController();
+  bool _isHeaderVisible = true;
 
   @override
   void initState() {
     super.initState();
     _homeController = HomeController(context);
+    
+    // 🔥 Listen to scroll to hide/show the "What are you stuck on" button
+    _scrollController.addListener(() {
+      if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
+        if (_isHeaderVisible) setState(() => _isHeaderVisible = false);
+      } else if (_scrollController.position.userScrollDirection == ScrollDirection.forward) {
+        if (!_isHeaderVisible) setState(() => _isHeaderVisible = true);
+      }
+    });
+  }
+
+  // 🔥 REFRESH LOGIC: Similar to social media home buttons
+  Future<void> _refreshPosts() async {
+    setState(() {
+      // Re-trigger the controller to fetch fresh data
+      _homeController.updateCategory(_homeController.selectedCategory, setState);
+    });
+    // Optional: Scroll to top when refreshing
+    _scrollController.animateTo(0, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+  }
+
+  String _getTimeAgo(Timestamp? timestamp) {
+    if (timestamp == null) return "Just now";
+    final now = DateTime.now();
+    final difference = now.difference(timestamp.toDate());
+    if (difference.inDays > 0) return "${difference.inDays}d ago";
+    if (difference.inHours > 0) return "${difference.inHours}h ago";
+    if (difference.inMinutes > 0) return "${difference.inMinutes}m ago";
+    return "Just now";
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -29,105 +68,103 @@ class _HomeViewState extends State<HomeView> {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 20),
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Home",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+            // 🔥 HEADER SECTION (Always Visible)
+            GestureDetector(
+              onTap: _refreshPosts, // Clicking "Home" refreshes posts
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Home", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                      Text("Discover academic questions", style: TextStyle(color: Colors.white54)),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      HeaderIconButton(
+                        icon: Icons.shopping_basket_outlined,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceView())),
                       ),
-                    ),
-                    Text(
-                      "Discover academic questions",
-                      style: TextStyle(color: Colors.white54),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    // Marketplace Button with Pressed Effect
-                    HeaderIconButton(
-                      icon: Icons.shopping_basket_outlined,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const MarketplaceView()),
-                        );
-                      },
-                    ),
-                    // Notifications Button with Pressed Effect
-                    HeaderIconButton(
-                      icon: Icons.notifications_none,
-                      count: "5",
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const NotificationsView()),
-                        );
-                      },
-                    ),
-                    // SeshLock Button with Pressed Effect
-                    HeaderIconButton(
-                      icon: Icons.lock_outline,
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => const SeshLockDialog(),
-                        );
-                      },
-                    ),
-                  ],
-                )
-              ],
+                      HeaderIconButton(
+                        icon: Icons.notifications_none,
+                        count: "5",
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsView())),
+                      ),
+                      HeaderIconButton(
+                        icon: Icons.lock_outline,
+                        onTap: () => showDialog(context: context, builder: (_) => const SeshLockDialog()),
+                      ),
+                    ],
+                  )
+                ],
+              ),
             ),
-            const SizedBox(height: 25),
-            // Search Bar Placeholder with Pressed Effect
-            SearchPlaceholderButton(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const NewQuestionView()),
-                );
-              },
+
+            // 🔥 DISAPPEARING SEARCH BUTTON
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 300),
+              crossFadeState: _isHeaderVisible ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+              secondChild: const SizedBox(width: double.infinity), // Hidden state
+              firstChild: Column(
+                children: [
+                  const SizedBox(height: 25),
+                  SearchPlaceholderButton(
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NewQuestionView())),
+                  ),
+                ],
+              ),
             ),
+
             const SizedBox(height: 20),
             CategorySelector(
               selectedCategory: _homeController.selectedCategory,
-              onCategorySelected: (category) =>
-                  _homeController.updateCategory(category, setState),
+              onCategorySelected: (category) => _homeController.updateCategory(category, setState),
             ),
             const SizedBox(height: 25),
+            
+            // 🔥 POSTS LIST
             Expanded(
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                children: const [
-                  PostCard(
-                    subject: "Mathematics",
-                    time: "5m ago",
-                    question: "How do I solve quadratic equations using the quadratic formula?",
-                    author: "Thuhbest",
-                    likes: 24,
-                    comments: 12,
-                  ),
-                  PostCard(
-                    subject: "Physics",
-                    time: "15m ago",
-                    question: "Can someone explain the difference between kinetic and potential energy?",
-                    author: "Tinswaole",
-                    likes: 16,
-                    comments: 8,
-                  ),
-                ],
+              child: RefreshIndicator(
+                color: const Color(0xFF00C09E),
+                backgroundColor: const Color(0xFF1E243A),
+                onRefresh: _refreshPosts,
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _homeController.getRankedPosts(), 
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: Color(0xFF00C09E)));
+                    }
+                    final posts = snapshot.data ?? [];
+                    if (posts.isEmpty) {
+                      return const Center(child: Text("No posts found", style: TextStyle(color: Colors.white38)));
+                    }
+
+                    return ListView.builder(
+                      controller: _scrollController, // Attach controller
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: posts.length,
+                      itemBuilder: (context, index) {
+                        final data = posts[index];
+                        return PostCard(
+                          postId: data['id'],
+                          authorId: data['authorId'] ?? "",
+                          subject: data['subject'] ?? "General",
+                          time: _getTimeAgo(data['createdAt']),
+                          question: data['question'] ?? "",
+                          author: data['author'] ?? "Anonymous",
+                          likes: data['likes'] ?? 0,
+                          comments: data['comments'] ?? 0,
+                          attachmentUrl: data['attachmentUrl'], 
+                          link: data['link'], 
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -137,7 +174,6 @@ class _HomeViewState extends State<HomeView> {
   }
 }
 
-/// A dedicated button for the header that shrinks when pressed
 class HeaderIconButton extends StatefulWidget {
   final IconData icon;
   final String? count;
@@ -159,7 +195,6 @@ class _HeaderIconButtonState extends State<HeaderIconButton> {
 
   @override
   Widget build(BuildContext context) {
-    // Animation scale: 1.0 is normal, 0.9 is shrunk
     final double scale = _isPressed ? 0.9 : 1.0;
 
     return GestureDetector(
@@ -176,7 +211,6 @@ class _HeaderIconButtonState extends State<HeaderIconButton> {
               margin: const EdgeInsets.only(left: 10),
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                // Visual feedback: Brighten background slightly when pressed
                 color: _isPressed 
                     ? Colors.white.withValues(alpha: 0.2) 
                     : Colors.white.withValues(alpha: 0.1),
@@ -215,13 +249,12 @@ class _HeaderIconButtonState extends State<HeaderIconButton> {
   }
 }
 
-/// A search placeholder button with pressed effect
 class SearchPlaceholderButton extends StatefulWidget {
   final VoidCallback onTap;
 
   const SearchPlaceholderButton({
     super.key,
-    required this.onTap,
+    required this.onTap,  // Fixed: Added required onTap parameter
   });
 
   @override
@@ -233,7 +266,6 @@ class _SearchPlaceholderButtonState extends State<SearchPlaceholderButton> {
 
   @override
   Widget build(BuildContext context) {
-    // Animation scale: 1.0 is normal, 0.95 is shrunk
     final double scale = _isPressed ? 0.95 : 1.0;
 
     return GestureDetector(
@@ -253,7 +285,7 @@ class _SearchPlaceholderButtonState extends State<SearchPlaceholderButton> {
             ),
             borderRadius: BorderRadius.circular(15),
             color: _isPressed 
-                ? Colors.white.withValues(alpha: 0.1) // Brighter when pressed
+                ? Colors.white.withValues(alpha: 0.1) 
                 : Colors.white.withValues(alpha: 0.05),
           ),
           child: const Center(

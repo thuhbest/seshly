@@ -5,6 +5,7 @@ import '../friend/widgets/friend_card.dart';
 import '../mentor/widgets/mentor_card.dart';
 import '../mentor/widgets/goals_card.dart';
 import '../messages/view/messages_view.dart';
+import '../messages/view/chat_room_view.dart'; // 🔥 Added for navigation
 import '../widgets/leaderboard_card.dart';
 import '../widgets/friend_requests_dialog.dart';
 
@@ -58,7 +59,6 @@ class _FriendsViewState extends State<FriendsView> {
     }
   }
 
-  // 🔥 RESTORED YOUR ORIGINAL SEARCH LOGIC EXACTLY
   void _performSearch(String query) {
     if (query.isEmpty) {
       setState(() {
@@ -73,11 +73,9 @@ class _FriendsViewState extends State<FriendsView> {
       final lowercaseQuery = query.toLowerCase();
       final uppercaseQuery = query.toUpperCase();
 
-      // Check if the query looks like a Student Number (contains numbers)
       bool isPotentialStudentNumber = RegExp(r'[0-9]').hasMatch(query);
 
       if (isPotentialStudentNumber) {
-        // High priority on Student Number search
         _searchResults = FirebaseFirestore.instance
             .collection('users')
             .where('studentNumber', isGreaterThanOrEqualTo: uppercaseQuery)
@@ -85,7 +83,6 @@ class _FriendsViewState extends State<FriendsView> {
             .limit(20)
             .snapshots();
       } else {
-        // High priority on Name search
         _searchResults = FirebaseFirestore.instance
             .collection('users')
             .where('fullNameLowercase', isGreaterThanOrEqualTo: lowercaseQuery)
@@ -141,9 +138,51 @@ class _FriendsViewState extends State<FriendsView> {
     });
   }
 
+  // Helper to open a chat with a specific friend
+  Future<void> _openChat(String friendId, String friendName) async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return;
+
+    // Search for existing chat
+    final query = await FirebaseFirestore.instance
+        .collection('chats')
+        .where('participants', arrayContains: currentUserId)
+        .get();
+
+    String? existingChatId;
+    for (var doc in query.docs) {
+      List participants = doc['participants'];
+      if (participants.contains(friendId) && participants.length == 2) {
+        existingChatId = doc.id;
+        break;
+      }
+    }
+
+    if (!mounted) return;
+    if (existingChatId != null) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => ChatRoomView(chatId: existingChatId!, chatTitle: friendName, isGroup: false),
+      ));
+    } else {
+      // Create new chat document if it doesn't exist
+      final newChat = await FirebaseFirestore.instance.collection('chats').add({
+        'participants': [currentUserId, friendId],
+        'participantNames': {currentUserId: 'Me', friendId: friendName}, // Replace 'Me' with actual name logic
+        'lastMessage': '',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'isGroup': false,
+        'unreadCounts': {currentUserId: 0, friendId: 0}, // 🔥 Initialize unread counts
+      });
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => ChatRoomView(chatId: newChat.id, chatTitle: friendName, isGroup: false),
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const Color cardColor = Color(0xFF1E243A);
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
     return SafeArea(
       child: Padding(
@@ -173,9 +212,28 @@ class _FriendsViewState extends State<FriendsView> {
                       },
                       child: _headerBadgeIcon(Icons.person_add_outlined, _friendRequestCount.toString()),
                     ),
-                    ScaleButton(
-                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MessagesView())),
-                      child: _headerBadgeIcon(Icons.chat_bubble_outline, "3"),
+                    // 🔥 UPDATED: Logic to show real sum of UNREAD messages
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('chats')
+                          .where('participants', arrayContains: currentUserId)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        int totalUnread = 0;
+                        if (snapshot.hasData) {
+                          for (var doc in snapshot.data!.docs) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            // Sum up the unread counts assigned specifically to the current user
+                            if (data['unreadCounts'] != null && data['unreadCounts'][currentUserId] != null) {
+                              totalUnread += (data['unreadCounts'][currentUserId] as int);
+                            }
+                          }
+                        }
+                        return ScaleButton(
+                          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MessagesView())),
+                          child: _headerBadgeIcon(Icons.chat_bubble_outline, totalUnread.toString()),
+                        );
+                      },
                     ),
                   ],
                 )
@@ -298,12 +356,16 @@ class _FriendsViewState extends State<FriendsView> {
               builder: (context, friendSnap) {
                 if (!friendSnap.hasData) return const SizedBox.shrink();
                 final data = friendSnap.data!.data() as Map<String, dynamic>;
+                String friendName = data['fullName'] ?? 'Student';
+                
                 return FriendCard(
-                  name: data['fullName'] ?? 'Student',
+                  name: friendName,
                   id: data['studentNumber'] ?? '',
                   year: data['levelOfStudy'] ?? '',
                   streak: (data['streak'] ?? 0).toString(),
                   mins: (data['seshMinutes'] ?? 0).toString(),
+                  // 🔥 UPDATED: Click on message icon/button in card opens chat
+                  onMessage: () => _openChat(friendId, friendName),
                 );
               },
             );
