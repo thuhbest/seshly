@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/post_card.dart';
 import '../widgets/category_selector.dart';
 import '../controllers/home_controller.dart';
-import '../widgets/sesh_lock_dialog.dart'; 
+import '../widgets/sesh_focus_dialog.dart'; 
 import '../VIEW/notifications_view.dart'; 
 import '../VIEW/marketplace_view.dart'; 
 import '../VIEW/new_question_view.dart';
@@ -96,7 +96,7 @@ class _HomeViewState extends State<HomeView> {
                       ),
                       HeaderIconButton(
                         icon: Icons.lock_outline,
-                        onTap: () => showDialog(context: context, builder: (_) => const SeshLockDialog()),
+                        onTap: () => showDialog(context: context, builder: (_) => const SeshFocusDialog()),
                       ),
                     ],
                   )
