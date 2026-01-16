@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart'; // 🔥 Required for your .svg files
 import '../controller/sign_up_controller.dart';
-import '../../login/view/login_page_view.dart'; // To reuse DelayedObscureTextField
+import '../../login/view/login_page_view.dart';
 
 class SignUpView extends StatefulWidget {
   const SignUpView({super.key});
@@ -30,14 +31,14 @@ class _SignUpViewState extends State<SignUpView> {
     'University of Johannesburg': '@student.uj.ac.za',
   };
 
-  // 🔥 ADDED: Level of Study options
+  // 🔥 Level of Study options
   final List<String> _studyLevels = [
     '1st', '2nd', '3rd', '4th', '5th', '6th', 'finally', 
     'Honors', 'Masters', 'PHD', 'High school'
   ];
 
   String? _selectedUniversity;
-  String? _selectedLevel; // 🔥 ADDED: State for selected level
+  String? _selectedLevel; 
 
   late SignUpController controller;
   bool _isLoading = false;
@@ -66,7 +67,6 @@ class _SignUpViewState extends State<SignUpView> {
       return;
     }
 
-    // 🔥 ADDED: Validate Level of Study
     if (_selectedLevel == null || _selectedLevel!.isEmpty) {
       setState(() => _signUpError = 'Please select your level of study');
       return;
@@ -91,7 +91,7 @@ class _SignUpViewState extends State<SignUpView> {
         fullName: _nameController.text.trim(),
         studentNumber: _studentNumController.text.trim(),
         university: _selectedUniversity!,
-        levelOfStudy: _selectedLevel!, // 🔥 ADDED: Passed to controller
+        levelOfStudy: _selectedLevel!, 
       );
     } catch (e) {
       setState(() {
@@ -149,13 +149,11 @@ class _SignUpViewState extends State<SignUpView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
-            Container(
-              width: 70, height: 70,
-              decoration: BoxDecoration(
-                color: primaryColor,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: const Center(child: Icon(Icons.all_inclusive, color: Colors.white, size: 40)),
+            // 🔥 OFFICIAL LOGO REPLACEMENT (ONLY CHANGE MADE HERE)
+            SvgPicture.asset(
+              'assets/images/seshly_logo_full.svg',
+              height: 100,
+              semanticsLabel: 'Seshly Logo',
             ),
             const SizedBox(height: 10),
             const Text('Seshly', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w500, color: Colors.white)),
@@ -192,7 +190,6 @@ class _SignUpViewState extends State<SignUpView> {
                   ),
                   const SizedBox(height: 15),
 
-                  // 🔥 ADDED: Level of Study Field
                   _buildLabel('Level of Study'),
                   _buildDropdown(
                     value: _selectedLevel,
@@ -289,7 +286,6 @@ class _SignUpViewState extends State<SignUpView> {
     ),
   );
 
-  // 🔄 REFACTORED: Reusable Dropdown for University and Level of Study
   Widget _buildDropdown({
     required String? value,
     required List<String> items,

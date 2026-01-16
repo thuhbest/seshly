@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart'; 
 import '../controllers/start_page_controller.dart';
 
 // Dummy screen to navigate to
@@ -37,22 +38,11 @@ class StartPageView extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              // 1. App Logo / Icon
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: primaryColor,
-                  borderRadius: BorderRadius.circular(20), // Slightly rounded corners
-                ),
-                child: const Center(
-                  // COMMENT: Replace this with your actual logo image widget
-                  child: Icon(
-                    Icons.all_inclusive, // Placeholder icon that resembles the logo
-                    color: Colors.white,
-                    size: 60,
-                  ),
-                ),
+              // 1. App Logo / Icon (ONLY CHANGE MADE HERE)
+              SvgPicture.asset(
+                'assets/images/seshly_logo_full.svg',
+                height: 120, // Adjusted height for visibility
+                semanticsLabel: 'Seshly Logo',
               ),
               const SizedBox(height: 30),
 
