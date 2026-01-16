@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart'; 
 import '../controllers/login_page_controller.dart';
 import '../view/forgot_password_screen.dart'; // KEEP THIS IMPORT
 
@@ -428,35 +429,11 @@ class _LoginPageViewState extends State<LoginPageView> {
           children: [
             const SizedBox(height: 10),
 
-            /// 🔹 ICON (PRESERVED)
-            Container(
-              width: 70,
-              height: 70,
-              decoration: BoxDecoration(
-                color: primaryColor,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: const Icon(
-                Icons.all_inclusive,
-                color: Colors.white,
-                size: 40,
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            /// 🔹 BRANDING (PRESERVED)
-            const Text(
-              'Seshly',
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
-              ),
-            ),
-            const Text(
-              'Powered by AutoXyrium',
-              style: TextStyle(fontSize: 12, color: Colors.white70),
+            /// 🔹 OFFICIAL LOGO (ONLY CHANGE)
+            SvgPicture.asset(
+              'assets/images/seshly_logo_full.svg',
+              height: 120,
+              semanticsLabel: 'Seshly Logo',
             ),
 
             const SizedBox(height: 20),
@@ -501,7 +478,7 @@ class _LoginPageViewState extends State<LoginPageView> {
                     fieldColor: inputFieldColor,
                   ),
 
-                  /// 🔹 ERROR MESSAGE (NEW, INLINE)
+                  /// 🔹 ERROR MESSAGE
                   if (_authError != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 10),
@@ -526,7 +503,6 @@ class _LoginPageViewState extends State<LoginPageView> {
                                 await Future.delayed(
                                     const Duration(milliseconds: 80));
                                 if (!mounted) return;
-                                // FIXED: Navigate directly from here instead of using controller
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) => const ForgotPasswordScreen(),
@@ -546,7 +522,7 @@ class _LoginPageViewState extends State<LoginPageView> {
 
             const SizedBox(height: 20),
 
-            /// 🔹 SIGN IN BUTTON WITH VISIBLE LOADING SPINNER (FIXED)
+            /// 🔹 SIGN IN BUTTON
             SizedBox(
               width: double.infinity,
               height: 50,
