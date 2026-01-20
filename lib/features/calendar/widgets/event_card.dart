@@ -45,8 +45,7 @@ class EventCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                    if (tag != null) 
-                      Text(tag!, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                    if (tag != null) Text(tag!, style: const TextStyle(color: Colors.white54, fontSize: 12)),
                   ],
                 ),
                 const SizedBox(height: 8),
