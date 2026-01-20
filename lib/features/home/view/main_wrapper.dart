@@ -25,15 +25,27 @@ class MainWrapper extends StatefulWidget {
 
 class _MainWrapperState extends State<MainWrapper> {
   int _currentIndex = 0;
+  final ValueNotifier<int> _homeRefreshTick = ValueNotifier<int>(0);
+  late final List<Widget> _pages;
 
-  // This list now includes your real FriendsView at Index 2
-  final List<Widget> _pages = [
-    const HomeView(), // Index 0: Home
-    const SeshView(), // Index 1: Sesh AI
-    const FriendsView(), // Index 2: Real Friends Screen
-    const CalendarView(), // Index 3: Real Calendar Screen
-    const ProfileView() // Index 4: Real profile and settings screen
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // This list now includes your real FriendsView at Index 2
+    _pages = [
+      HomeView(refreshSignal: _homeRefreshTick), // Index 0: Home
+      const SeshView(), // Index 1: Sesh AI
+      const FriendsView(), // Index 2: Real Friends Screen
+      const CalendarView(), // Index 3: Real Calendar Screen
+      const ProfileView() // Index 4: Real profile and settings screen
+    ];
+  }
+
+  @override
+  void dispose() {
+    _homeRefreshTick.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,9 +71,14 @@ class _MainWrapperState extends State<MainWrapper> {
       bottomNavigationBar: CustomBottomNav(
         currentIndex: _currentIndex,
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          if (index == 0) {
+            _homeRefreshTick.value++;
+          }
+          if (_currentIndex != index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          }
         },
       ),
     );

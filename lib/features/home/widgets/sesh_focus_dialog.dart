@@ -71,6 +71,93 @@ class _SeshFocusDialogState extends State<SeshFocusDialog> {
     );
   }
 
+  Widget _dialogHeader(String title, IconData icon) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: tealAccent.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+            border: Border.all(color: tealAccent.withValues(alpha: 0.3)),
+          ),
+          child: Icon(icon, color: tealAccent, size: 20),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _bulletPoint(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionButton(
+    String label, {
+    VoidCallback? onTap,
+    bool isOutlined = false,
+    Color? color,
+    Color? textColor,
+  }) {
+    final Color background = color ?? (isOutlined ? Colors.transparent : tealAccent);
+    final Color foreground = textColor ?? (isOutlined ? tealAccent : backgroundColor);
+    final BorderSide border = BorderSide(color: isOutlined ? tealAccent : Colors.transparent);
+
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.fromBorderSide(border),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(color: foreground, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ),
+    );
+  }
+
   // --- SCREEN 1: WARNING ---
   Widget _buildWarningScreen() {
     return Padding(
@@ -200,7 +287,7 @@ class _SeshFocusDialogState extends State<SeshFocusDialog> {
 
   void _startFocusSession() async {
   if (selectedMinutes == null) return;
-  
+
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) {
     Navigator.pop(context);
@@ -212,12 +299,14 @@ class _SeshFocusDialogState extends State<SeshFocusDialog> {
       .collection('users')
       .doc(user.uid)
       .get();
-  
+
   final data = doc.data();
   final currentPasses = data?['freeFocusPasses'] ?? 0;
-  
+
+  String resourceUsed = "Free Pass";
+
   if (currentPasses > 0) {
-    // User has free passes - use one and start session
+    // Use free pass
     await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -225,31 +314,15 @@ class _SeshFocusDialogState extends State<SeshFocusDialog> {
       'freeFocusPasses': FieldValue.increment(-1),
       'lastFocusSession': FieldValue.serverTimestamp(),
     });
-    
-    // Start the focus session
-    SeshFocusService.start(durationMinutes: selectedMinutes!);
-    
-    // Show success message
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: tealAccent,
-          content: Text(
-            "SeshFocus Initiated: $selectedMinutes Minutes",
-            style: TextStyle(color: backgroundColor, fontWeight: FontWeight.bold)
-          ),
-        ),
-      );
-    }
+    resourceUsed = "Free Pass";
   } else {
-    // No free passes - check XP or Sesh Minutes
     final userXP = data?['xp'] ?? 0;
     final seshMinutes = data?['seshMinutes'] ?? 0;
-    const xpCost = 50; // Example XP cost for emergency unlock
-    const minuteCost = 10; // Example Sesh Minutes cost
-    
+
+    const xpCost = 50;
+    const minuteCost = 10;
+
     if (userXP >= xpCost) {
-      // Use XP to start session
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -257,22 +330,8 @@ class _SeshFocusDialogState extends State<SeshFocusDialog> {
         'xp': FieldValue.increment(-xpCost),
         'lastFocusSession': FieldValue.serverTimestamp(),
       });
-      
-      SeshFocusService.start(durationMinutes: selectedMinutes!);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: tealAccent,
-            content: Text(
-              "Session started using $xpCost XP",
-              style: TextStyle(color: backgroundColor, fontWeight: FontWeight.bold)
-            ),
-          ),
-        );
-      }
+      resourceUsed = "$xpCost XP";
     } else if (seshMinutes >= minuteCost) {
-      // Use Sesh Minutes to start session
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -280,30 +339,19 @@ class _SeshFocusDialogState extends State<SeshFocusDialog> {
         'seshMinutes': FieldValue.increment(-minuteCost),
         'lastFocusSession': FieldValue.serverTimestamp(),
       });
-      
-      SeshFocusService.start(durationMinutes: selectedMinutes!);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: tealAccent,
-            content: Text(
-              "Session started using $minuteCost Sesh Minutes",
-              style: TextStyle(color: backgroundColor, fontWeight: FontWeight.bold)
-            ),
-          ),
-        );
-      }
+      resourceUsed = "$minuteCost Sesh Minutes";
     } else {
-      // Not enough resources
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             backgroundColor: Colors.red,
-            content: const Text(
+            content: Text(
               "No free passes available. Need 50 XP or 10 Sesh Minutes",
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         );
@@ -311,8 +359,8 @@ class _SeshFocusDialogState extends State<SeshFocusDialog> {
       return;
     }
   }
-  
-  // Log the focus session
+
+  // Log focus session
   await FirebaseFirestore.instance
       .collection('focusSessions')
       .add({
@@ -320,49 +368,54 @@ class _SeshFocusDialogState extends State<SeshFocusDialog> {
     'duration': selectedMinutes,
     'timestamp': FieldValue.serverTimestamp(),
     'usedPass': currentPasses > 0,
+    'resourceUsed': resourceUsed,
   });
-  
-  Navigator.pop(context);
-}
 
-  // --- HELPERS ---
-  Widget _dialogHeader(String title, IconData icon) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const SizedBox(width: 24),
-        Row(children: [Icon(icon, color: tealAccent, size: 28), const SizedBox(width: 10), Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20))]),
-        GestureDetector(onTap: () => Navigator.pop(context), child: const Icon(Icons.close, color: Colors.white38, size: 20)),
-      ],
-    );
-  }
+  // Start focus service (pins on Android via method channel)
+  try {
+    await SeshFocusService.start(selectedMinutes!);
 
-  Widget _actionButton(String label, {bool isOutlined = false, VoidCallback? onTap, Color? color, Color? textColor}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: isOutlined ? Colors.transparent : (color ?? tealAccent),
-          borderRadius: BorderRadius.circular(14),
-          border: isOutlined ? Border.all(color: Colors.white10) : null,
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: tealAccent,
+          content: Text(
+            "🔒 SeshFocus Locked ($selectedMinutes min) - Used: $resourceUsed",
+            style: TextStyle(
+              color: backgroundColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          duration: const Duration(seconds: 3),
         ),
-        child: Center(child: Text(label, style: TextStyle(color: textColor ?? (isOutlined ? Colors.white : backgroundColor), fontWeight: FontWeight.bold, fontSize: 16))),
-      ),
-    );
+      );
+    }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.orange,
+          content: Text(
+            "SeshFocus Started ($selectedMinutes min) - Manual lock recommended",
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      );
+    }
   }
 
-  Widget _bulletPoint(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("⚡ ", style: TextStyle(color: tealAccent, fontSize: 12)), 
-          Expanded(child: Text(text, style: const TextStyle(color: Colors.white70, fontSize: 13)))
-        ],
-      ),
-    );
-  }
+  if (!mounted) return;
+
+  // Close dialog
+  Navigator.pop(context);
+
+  // 🚨 REQUIRED FIX — FORCE BLOCKING SCREEN
+  Navigator.of(context).pushNamedAndRemoveUntil(
+    '/seshFocusActive',
+    (_) => false,
+  );
+}
 }
