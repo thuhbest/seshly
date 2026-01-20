@@ -2,10 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart'; 
 import '../controllers/login_page_controller.dart';
-import '../view/forgot_password_screen.dart'; // KEEP THIS IMPORT
+import '../view/forgot_password_screen.dart';
 
 /// ===============================
-/// Delayed Obscure Password Field
+/// Reveal Password Field
 /// ===============================
 class DelayedObscureTextField extends StatefulWidget {
   final String hintText;
@@ -25,30 +25,54 @@ class DelayedObscureTextField extends StatefulWidget {
 }
 
 class _DelayedObscureTextFieldState extends State<DelayedObscureTextField> {
-  Timer? _timer;
+  static const Duration _tapRevealDuration = Duration(seconds: 1);
+  static const Duration _holdThreshold = Duration(milliseconds: 500);
+
+  Timer? _revealTimer;
+  DateTime? _pressStart;
   bool _obscureText = true;
 
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_onTextChanged);
+  void _setObscure(bool value) {
+    if (_obscureText == value) return;
+    setState(() => _obscureText = value);
   }
 
-  void _onTextChanged() {
-    _timer?.cancel();
+  void _handleEyeDown(TapDownDetails details) {
+    _pressStart = DateTime.now();
+    _revealTimer?.cancel();
+    _setObscure(false);
+  }
 
-    setState(() => _obscureText = false);
+  void _handleEyeUp(TapUpDetails details) {
+    final start = _pressStart;
+    _pressStart = null;
+    if (start == null) {
+      _setObscure(true);
+      return;
+    }
 
-    _timer = Timer(const Duration(milliseconds: 1000), () {
+    final heldFor = DateTime.now().difference(start);
+    if (heldFor >= _holdThreshold) {
+      _setObscure(true);
+      return;
+    }
+
+    _revealTimer?.cancel();
+    _revealTimer = Timer(_tapRevealDuration, () {
       if (!mounted) return;
-      setState(() => _obscureText = true);
+      _setObscure(true);
     });
+  }
+
+  void _handleEyeCancel() {
+    _pressStart = null;
+    _revealTimer?.cancel();
+    _setObscure(true);
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
-    widget.controller.removeListener(_onTextChanged);
+    _revealTimer?.cancel();
     super.dispose();
   }
 
@@ -63,12 +87,25 @@ class _DelayedObscureTextFieldState extends State<DelayedObscureTextField> {
       child: TextField(
         controller: widget.controller,
         obscureText: _obscureText,
+        enableSuggestions: false,
+        autocorrect: false,
         style: const TextStyle(color: Colors.white, fontSize: 16),
         decoration: InputDecoration(
           hintText: widget.hintText,
           hintStyle: const TextStyle(color: Colors.white54),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 15),
+          suffixIcon: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: _handleEyeDown,
+            onTapUp: _handleEyeUp,
+            onTapCancel: _handleEyeCancel,
+            child: Icon(
+              _obscureText ? Icons.visibility_off : Icons.visibility,
+              color: Colors.white54,
+              size: 20,
+            ),
+          ),
         ),
       ),
     );
@@ -429,14 +466,56 @@ class _LoginPageViewState extends State<LoginPageView> {
           children: [
             const SizedBox(height: 10),
 
-            /// 🔹 OFFICIAL LOGO (ONLY CHANGE)
+            /// 🔹 OFFICIAL LOGO
             SvgPicture.asset(
               'assets/images/seshly_logo_full.svg',
               height: 120,
               semanticsLabel: 'Seshly Logo',
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
+
+            /// 🔹 BRANDING
+            const Text(
+              'Seshly',
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+            
+            /// 🔹 POWERED BY
+            RichText(
+              text: const TextSpan(
+                style: TextStyle(fontSize: 12, color: Colors.white70),
+                children: [
+                  TextSpan(text: 'Powered by '),
+                  TextSpan(
+                    text: 'AutoXyrium',
+                    style: TextStyle(color: primaryColor),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            /// 🔹 TAGLINE
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                '"AI as your teacher, not your academic slave"',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white70,
+                  fontStyle: FontStyle.italic,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+
+            const SizedBox(height: 25),
 
             Align(
               alignment: Alignment.centerLeft,
@@ -451,25 +530,30 @@ class _LoginPageViewState extends State<LoginPageView> {
                       color: Colors.white,
                     ),
                   ),
+                  const Text(
+                    'Sign in to continue your learning journey',
+                    style: TextStyle(fontSize: 16, color: Colors.white70),
+                  ),
 
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 25),
 
                   const Text(
                     'Student Email',
-                    style: TextStyle(color: Colors.white70),
+                    style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 5),
                   _buildInputField(
                     controller: _emailController,
                     hintText: 'Enter your email',
                     fieldColor: inputFieldColor,
+                    prefixIcon: Icons.email_outlined,
                   ),
 
                   const SizedBox(height: 15),
 
                   const Text(
                     'Password',
-                    style: TextStyle(color: Colors.white70),
+                    style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 5),
                   DelayedObscureTextField(
@@ -583,7 +667,7 @@ class _LoginPageViewState extends State<LoginPageView> {
               ),
             ),
 
-            const SizedBox(height: 15),
+            const SizedBox(height: 20),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -697,7 +781,7 @@ class _LoginPageViewState extends State<LoginPageView> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 30),
           ],
         ),
       ),
@@ -708,6 +792,7 @@ class _LoginPageViewState extends State<LoginPageView> {
     required TextEditingController controller,
     required String hintText,
     required Color fieldColor,
+    IconData? prefixIcon,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -720,7 +805,8 @@ class _LoginPageViewState extends State<LoginPageView> {
         style: const TextStyle(color: Colors.white, fontSize: 16),
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: const TextStyle(color: Colors.white54),
+          hintStyle: const TextStyle(color: Colors.white38),
+          prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.white54, size: 20) : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 15),
         ),

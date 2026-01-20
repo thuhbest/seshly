@@ -1,21 +1,37 @@
-// ignore_for_file: unused_local_variable
-
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class CalendarGrid extends StatelessWidget {
   final int selectedDay;
   final Function(int) onDaySelected;
 
+  // Backend-driven:
+  final DateTime month; // first day of month
+  final Map<int, List<Color>> indicators; // day -> colors (max 2)
+
   const CalendarGrid({
-    super.key, 
-    required this.selectedDay, 
-    required this.onDaySelected
+    super.key,
+    required this.selectedDay,
+    required this.onDaySelected,
+    required this.month,
+    required this.indicators,
   });
 
   @override
   Widget build(BuildContext context) {
     const Color tealAccent = Color(0xFF00C09E);
     final List<String> weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    final firstDay = DateTime(month.year, month.month, 1);
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+
+    // Convert to Sunday-based index for grid (Sun=0..Sat=6)
+    final firstWeekdaySundayBased = (firstDay.weekday % 7); // Mon=1..Sun=7 -> Sun=0
+    // Your old layout had an offset; this replaces it correctly.
+    final leadingEmpty = firstWeekdaySundayBased;
+
+    // Fixed 35 cells like your UI. (Some months need 42, but your design uses 35)
+    const totalCells = 35;
 
     return Column(
       children: [
@@ -27,29 +43,27 @@ class CalendarGrid extends StatelessWidget {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: 35,
+          itemCount: totalCells,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 7,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
           ),
           itemBuilder: (context, index) {
-            int day = index - 2; 
-            if (day < 1 || day > 31) return const SizedBox();
+            final day = index - leadingEmpty + 1;
+            if (day < 1 || day > daysInMonth) return const SizedBox();
 
-            bool isSelected = day == selectedDay; // Highlight selected day
-            bool hasExam = day == 15;
-            bool hasClass = day == 15 || day == 18;
+            final isSelected = day == selectedDay;
+            final colors = indicators[day] ?? const <Color>[];
 
             return GestureDetector(
-              onTap: () => onDaySelected(day), // Update state on tap
+              onTap: () => onDaySelected(day),
               child: Container(
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E243A).withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(10),
-                  // Border changes based on selection
                   border: Border.all(
-                    color: isSelected ? tealAccent : Colors.white.withValues(alpha: 0.05), 
+                    color: isSelected ? tealAccent : Colors.white.withValues(alpha: 0.05),
                     width: isSelected ? 2.0 : 1.0,
                   ),
                 ),
@@ -64,19 +78,29 @@ class CalendarGrid extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    if (day == 15) ...[
-                      _indicator(Colors.red),
-                      _indicator(Colors.blue),
-                    ] else if (day == 18)
-                      _indicator(Colors.blue),
+                    for (final c in colors) _indicator(c),
                   ],
                 ),
               ),
             );
           },
         ),
+        // (No visible UI change; this is just a safeguard if month doesn't fit 35 cells.)
+        if (_needsSixWeeks(firstDay, daysInMonth))
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(
+              DateFormat('MMMM').format(month),
+              style: const TextStyle(color: Colors.transparent, fontSize: 1),
+            ),
+          ),
       ],
     );
+  }
+
+  bool _needsSixWeeks(DateTime firstDay, int daysInMonth) {
+    final leading = (firstDay.weekday % 7);
+    return (leading + daysInMonth) > 35;
   }
 
   Widget _indicator(Color color) {
