@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/post_card.dart';
@@ -10,7 +11,12 @@ import '../VIEW/marketplace_view.dart';
 import '../VIEW/new_question_view.dart';
 
 class HomeView extends StatefulWidget {
-  const HomeView({super.key});
+  final ValueListenable<int>? refreshSignal;
+
+  const HomeView({
+    super.key,
+    this.refreshSignal,
+  });
 
   @override
   State<HomeView> createState() => _HomeViewState();
@@ -25,6 +31,7 @@ class _HomeViewState extends State<HomeView> {
   void initState() {
     super.initState();
     _homeController = HomeController(context);
+    widget.refreshSignal?.addListener(_handleExternalRefresh);
     
     // 🔥 Listen to scroll to hide/show the "What are you stuck on" button
     _scrollController.addListener(() {
@@ -37,13 +44,20 @@ class _HomeViewState extends State<HomeView> {
   }
 
   // 🔥 REFRESH LOGIC: Similar to social media home buttons
+  void _handleExternalRefresh() {
+    if (!mounted) return;
+    _refreshPosts();
+  }
+
   Future<void> _refreshPosts() async {
     setState(() {
       // Re-trigger the controller to fetch fresh data
       _homeController.updateCategory(_homeController.selectedCategory, setState);
     });
     // Optional: Scroll to top when refreshing
-    _scrollController.animateTo(0, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+    if (_scrollController.hasClients) {
+      await _scrollController.animateTo(0, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+    }
   }
 
   String _getTimeAgo(Timestamp? timestamp) {
@@ -58,8 +72,18 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   void dispose() {
+    widget.refreshSignal?.removeListener(_handleExternalRefresh);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(HomeView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshSignal != widget.refreshSignal) {
+      oldWidget.refreshSignal?.removeListener(_handleExternalRefresh);
+      widget.refreshSignal?.addListener(_handleExternalRefresh);
+    }
   }
 
   @override
@@ -140,12 +164,19 @@ class _HomeViewState extends State<HomeView> {
                     }
                     final posts = snapshot.data ?? [];
                     if (posts.isEmpty) {
-                      return const Center(child: Text("No posts found", style: TextStyle(color: Colors.white38)));
+                      return ListView(
+                        controller: _scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: const [
+                          SizedBox(height: 140),
+                          Center(child: Text("No posts found", style: TextStyle(color: Colors.white38))),
+                        ],
+                      );
                     }
 
                     return ListView.builder(
                       controller: _scrollController, // Attach controller
-                      physics: const BouncingScrollPhysics(),
+                      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                       itemCount: posts.length,
                       itemBuilder: (context, index) {
                         final data = posts[index];

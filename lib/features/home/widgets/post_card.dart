@@ -223,11 +223,20 @@ class _PostCardState extends State<PostCard> {
   @override
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
+    final questionText = widget.question.trim();
+    final bool canExpand = questionText.length > 140;
+    final Color chipBackground = tealAccent.withValues(alpha: 0.1);
+    final Color chipBorder = tealAccent.withValues(alpha: 0.25);
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: cardColor,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E243A), Color(0xFF171C30)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.2), 
@@ -247,8 +256,9 @@ class _PostCardState extends State<PostCard> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: tealAccent.withValues(alpha: 0.1), 
-                    borderRadius: BorderRadius.circular(12)
+                    color: chipBackground, 
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: chipBorder),
                   ),
                   child: Text(widget.subject, 
                     style: TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 12)),
@@ -273,14 +283,32 @@ class _PostCardState extends State<PostCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 GestureDetector(
-                  onTap: () => setState(() => _isExpanded = !_isExpanded),
+                  onTap: canExpand ? () => setState(() => _isExpanded = !_isExpanded) : null,
                   child: Text(
-                    widget.question,
+                    questionText,
                     maxLines: _isExpanded ? null : 3,
                     overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
                   ),
                 ),
+                if (canExpand) ...[
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () => setState(() => _isExpanded = !_isExpanded),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        _isExpanded ? 'Show less' : '...more',
+                        style: TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 
                 // 🔥 FIXED AUTHOR BUTTON: isolated animation and static "by "
@@ -296,6 +324,9 @@ class _PostCardState extends State<PostCard> {
                     ),
                     _AuthorButton(
                       name: widget.author,
+                      accentColor: tealAccent,
+                      accentFill: chipBackground,
+                      accentBorder: chipBorder,
                       onTap: () {
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileView()));
                       },
@@ -332,22 +363,26 @@ class _PostCardState extends State<PostCard> {
                   icon: _hasReacted ? Icons.auto_awesome : Icons.auto_awesome_outlined, 
                   label: "Helpful (${widget.likes})", 
                   color: _hasReacted ? tealAccent : Colors.white54, 
+                  backgroundColor: chipBackground,
                   onTap: _handleHelpful
                 ),
                 ActionIconButton(
                   icon: Icons.chat_bubble_rounded, 
                   label: widget.comments.toString(), 
+                  backgroundColor: chipBackground,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestionDetailView()))
                 ),
                 ActionIconButton(
                   icon: Icons.person_search_rounded, 
                   label: "Tutor", 
                   color: tealAccent, 
+                  backgroundColor: chipBackground,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FindTutorView()))
                 ),
                 ActionIconButton(
-                  icon: Icons.share_rounded, 
-                  label: "", 
+                  icon: Icons.repeat, 
+                  label: "Repost", 
+                  backgroundColor: chipBackground,
                   onTap: _showShareOptions
                 ),
               ],
@@ -370,7 +405,16 @@ class _PostCardState extends State<PostCard> {
 class _AuthorButton extends StatefulWidget {
   final String name;
   final VoidCallback onTap;
-  const _AuthorButton({required this.name, required this.onTap});
+  final Color accentColor;
+  final Color accentFill;
+  final Color accentBorder;
+  const _AuthorButton({
+    required this.name,
+    required this.onTap,
+    required this.accentColor,
+    required this.accentFill,
+    required this.accentBorder,
+  });
 
   @override
   State<_AuthorButton> createState() => _AuthorButtonState();
@@ -388,13 +432,20 @@ class _AuthorButtonState extends State<_AuthorButton> {
       child: AnimatedScale(
         scale: _isPressed ? 0.95 : 1.0,
         duration: const Duration(milliseconds: 100),
-        child: Text(
-          widget.name,
-          style: const TextStyle(
-            color: Colors.white70, // High visibility color as per screenshot
-            fontSize: 13,
-            fontStyle: FontStyle.italic,
-            fontWeight: FontWeight.bold,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: widget.accentFill,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: widget.accentBorder),
+          ),
+          child: Text(
+            widget.name,
+            style: TextStyle(
+              color: widget.accentColor,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
@@ -465,6 +516,7 @@ class ActionIconButton extends StatefulWidget {
   final IconData icon;
   final String label;
   final Color color;
+  final Color? backgroundColor;
   final VoidCallback onTap;
 
   const ActionIconButton({
@@ -472,6 +524,7 @@ class ActionIconButton extends StatefulWidget {
     required this.icon,
     required this.label,
     this.color = Colors.white54,
+    this.backgroundColor,
     required this.onTap,
   });
 
@@ -495,7 +548,7 @@ class _ActionIconButtonState extends State<ActionIconButton> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: widget.color.withValues(alpha: 25), // Adjusted for proper screenshot match (0.1 * 255)
+            color: widget.backgroundColor ?? widget.color.withValues(alpha: 25), // Adjusted for proper screenshot match (0.1 * 255)
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(

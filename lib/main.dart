@@ -3,8 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
-
-// Your feature imports
+import 'package:seshly/features/seshfocus/sesh_focus_active_screen.dart';
 import 'package:seshly/features/startpage/views/start_page_view.dart';
 import 'package:seshly/features/home/view/main_wrapper.dart';
 
@@ -43,6 +42,7 @@ class MyApp extends StatelessWidget {
       ),
       // AuthWrapper acts as the gatekeeper for the session
       home: const AuthWrapper(),
+      routes: { '/seshFocusActive': (_) => const SeshFocusActiveScreen(), },
     );
   }
 }
