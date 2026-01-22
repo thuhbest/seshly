@@ -160,6 +160,8 @@ class _ProfileViewState extends State<ProfileView> {
                       _buildBioSection(userData['bio'] ?? ""),
                       const SizedBox(height: 30),
                       _buildActivityActionButtons(user!.uid),
+                      const SizedBox(height: 20),
+                      _buildXpCard(userData),
                       const SizedBox(height: 30),
                       const Text("Student Stats", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 15),
@@ -237,6 +239,58 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
+  Widget _buildXpCard(Map<String, dynamic> userData) {
+    final int xp = (userData['xp'] as num?)?.toInt() ?? 0;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            tealAccent.withValues(alpha: 0.15),
+            cardColor.withValues(alpha: 0.6),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: tealAccent.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.auto_awesome_rounded, color: tealAccent, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Total XP", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(height: 4),
+                Text(
+                  "$xp XP",
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "Earn XP from questions, answers, vault uploads, focus sessions, and achievement bonuses.",
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11, height: 1.3),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActivityActionButtons(String uid) {
     return Row(
       children: [
@@ -249,6 +303,7 @@ class _ProfileViewState extends State<ProfileView> {
 
   // 🔥 ACHIEVEMENT GRID Logic restored here
   Widget _buildAchievementGrid(Map<String, dynamic> data) {
+    final int bestStreak = (data['streakBest'] as int?) ?? (data['streak'] as int?) ?? 0;
     return GridView.count(
       shrinkWrap: true, 
       physics: const NeverScrollableScrollPhysics(),
@@ -261,7 +316,7 @@ class _ProfileViewState extends State<ProfileView> {
         AchievementCard(icon: Icons.cloud_upload_outlined, title: "Vault Contributor", desc: "${data['vaultUploads'] ?? 0} documents shared", isUnlocked: (data['vaultUploads'] ?? 0) > 0),
         AchievementCard(icon: Icons.storefront_outlined, title: "Market Master", desc: "Sold ${data['marketSales'] ?? 0} items", isUnlocked: (data['marketSales'] ?? 0) > 0),
         AchievementCard(icon: Icons.timer_outlined, title: "Focus Titan", desc: "${data['seshFocusHours'] ?? 0} hrs in SeshFocus", isUnlocked: (data['seshFocusHours'] ?? 0) > 0),
-        AchievementCard(icon: Icons.local_fire_department_outlined, title: "Streak Legend", desc: "Streak: ${data['streak'] ?? 0} days", isUnlocked: (data['streak'] ?? 0) > 0),
+        AchievementCard(icon: Icons.local_fire_department_outlined, title: "Streak Legend", desc: "Best streak: $bestStreak days", isUnlocked: bestStreak > 0),
         AchievementCard(icon: Icons.bolt_outlined, title: "Power User", desc: "${data['seshMinutes'] ?? 0} SeshMinutes used", isUnlocked: (data['seshMinutes'] ?? 0) > 0),
       ],
     );

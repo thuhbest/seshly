@@ -21,10 +21,10 @@ class StatsGrid extends StatelessWidget {
               .snapshots(),
           builder: (context, postSnapshot) {
             return StreamBuilder<QuerySnapshot>(
-              // Stream 3: Real-time answers count (from previous code)
+              // Stream 3: Real-time answers count (comments)
               stream: FirebaseFirestore.instance
-                  .collection('answers')
-                  .where('authorId', isEqualTo: userId)
+                  .collectionGroup('comments')
+                  .where('userId', isEqualTo: userId)
                   .snapshots(),
               builder: (context, answersSnapshot) {
                 // Null safety check to prevent Red Screen
@@ -35,7 +35,7 @@ class StatsGrid extends StatelessWidget {
                 // 🔥 Fetching your exact Firebase fields with proper fallbacks
                 final int streak = userData['streak'] ?? 0;
                 final int seshMinutes = userData['seshMinutes'] ?? 0;
-                final int replies = userData['totalReplies'] ?? answerCount; // Use either totalReplies or answerCount
+                final int replies = answerCount;
                 final int points = userData['points'] ?? 0; // From previous code
 
                 return GridView.count(

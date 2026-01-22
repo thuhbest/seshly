@@ -8,10 +8,19 @@ class AuthService {
   // ADD THIS MISSING SIGN IN METHOD
   Future<UserCredential> signIn(String email, String password) async {
     try {
-      return await _auth.signInWithEmailAndPassword(
+      final result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+      final user = result.user;
+      if (user != null) {
+        try {
+          await updateDailyStreak(user.uid);
+        } catch (_) {
+          // Ignore streak update failures so sign-in still succeeds.
+        }
+      }
+      return result;
     } on FirebaseAuthException {
       // Re-throw the exception so it can be caught by the controller
       rethrow;
@@ -54,7 +63,9 @@ class AuthService {
           'isDisabled': false,
           'createdAt': FieldValue.serverTimestamp(),
           'seshMinutes': 0,
-          'streak': 0,
+          'streak': 1,
+          'streakBest': 1,
+          'lastLoginAt': FieldValue.serverTimestamp(),
           'year': year,
           'major': '', 
           'id': studentNumber,
@@ -66,6 +77,49 @@ class AuthService {
     } catch (e) {
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
+  }
+
+  Future<void> updateDailyStreak(String userId) async {
+    final userRef = _db.collection('users').doc(userId);
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(userRef);
+      if (!snapshot.exists) return;
+      final data = snapshot.data() as Map<String, dynamic>? ?? {};
+      final Timestamp? lastLoginAt = data['lastLoginAt'] as Timestamp?;
+      final int currentStreak = (data['streak'] as int?) ?? 0;
+      final int bestStreak = (data['streakBest'] as int?) ?? currentStreak;
+
+      final DateTime now = DateTime.now();
+      final DateTime today = DateTime(now.year, now.month, now.day);
+
+      int nextStreak = currentStreak;
+      if (lastLoginAt == null) {
+        nextStreak = currentStreak > 0 ? currentStreak : 1;
+      } else {
+        final DateTime lastLogin = lastLoginAt.toDate();
+        final DateTime lastDay = DateTime(lastLogin.year, lastLogin.month, lastLogin.day);
+        final int diffDays = today.difference(lastDay).inDays;
+
+        if (diffDays == 0) {
+          nextStreak = currentStreak == 0 ? 1 : currentStreak;
+        } else if (diffDays == 1) {
+          nextStreak = currentStreak + 1;
+        } else if (diffDays > 1) {
+          nextStreak = 1;
+        }
+      }
+
+      int nextBest = bestStreak;
+      if (nextStreak > bestStreak) {
+        nextBest = nextStreak;
+      }
+
+      transaction.update(userRef, {
+        'streak': nextStreak,
+        'streakBest': nextBest,
+        'lastLoginAt': FieldValue.serverTimestamp(),
+      });
+    });
   }
 
   Future<void> updateUserProfile({

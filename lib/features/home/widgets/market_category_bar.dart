@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
-class MarketCategoryBar extends StatefulWidget {
-  const MarketCategoryBar({super.key});
+class MarketCategoryBar extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onSelected;
+  final List<String> categories;
 
-  @override
-  State<MarketCategoryBar> createState() => _MarketCategoryBarState();
-}
-
-class _MarketCategoryBarState extends State<MarketCategoryBar> {
-  String selected = "All Items";
-  final List<String> categories = ["All Items", "Notes", "Tech", "Bags", "Stationery"];
+  const MarketCategoryBar({
+    super.key,
+    required this.selected,
+    required this.onSelected,
+    this.categories = const ["All Items", "Notes", "Tech", "Bags", "Stationery", "Other"],
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -18,9 +19,9 @@ class _MarketCategoryBarState extends State<MarketCategoryBar> {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: categories.map((cat) {
-          bool isSelected = selected == cat;
+          final bool isSelected = selected == cat;
           return GestureDetector(
-            onTap: () => setState(() => selected = cat),
+            onTap: () => onSelected(cat),
             child: Container(
               margin: const EdgeInsets.only(right: 12),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),

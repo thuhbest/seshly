@@ -8,6 +8,7 @@ class MessageTile extends StatelessWidget {
   final bool isGroup;
   final int groupSize;
   final bool isOnline;
+  final String? presenceLabel;
 
   const MessageTile({
     super.key,
@@ -18,6 +19,7 @@ class MessageTile extends StatelessWidget {
     this.isGroup = false,
     this.groupSize = 0,
     this.isOnline = false,
+    this.presenceLabel,
   });
 
   @override
@@ -43,7 +45,7 @@ class MessageTile extends StatelessWidget {
                 child: isGroup 
                     ? const Icon(Icons.groups_rounded, color: tealAccent, size: 24)
                     : Text(
-                        title.substring(0, 1),
+                        title.isNotEmpty ? title.substring(0, 1) : "?",
                         style: const TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 18),
                       ),
               ),
@@ -84,6 +86,30 @@ class MessageTile extends StatelessWidget {
                     ]
                   ],
                 ),
+                if (presenceLabel != null) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: isOnline ? Colors.green : Colors.white24,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        presenceLabel!,
+                        style: TextStyle(
+                          color: isOnline ? tealAccent : Colors.white38,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   subtitle,

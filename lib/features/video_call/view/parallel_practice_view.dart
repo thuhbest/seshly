@@ -23,6 +23,7 @@ class _ParallelPracticeViewState extends State<ParallelPracticeView> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isWide = MediaQuery.of(context).size.width >= 900;
     return Scaffold(
       backgroundColor: backgroundColor,
       body: Column(
@@ -32,17 +33,18 @@ class _ParallelPracticeViewState extends State<ParallelPracticeView> {
             child: Row(
               children: [
                 Expanded(child: _buildMainCanvas()),
-                if (_isRailExpanded) const RightRail(),
+                if (_isRailExpanded && isWide) const RightRail(),
               ],
             ),
           ),
-          _buildBottomBar(),
+          _buildBottomBar(isWide),
         ],
       ),
     );
   }
 
   Widget _buildTopBar() {
+    final bool isWide = MediaQuery.of(context).size.width >= 900;
     return Container(
       height: 60,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -50,27 +52,43 @@ class _ParallelPracticeViewState extends State<ParallelPracticeView> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back_ios,
-                    color: Colors.white, size: 18)),
-              const Text("Calculus: Limits",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ],
+          Expanded(
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_ios,
+                      color: Colors.white, size: 18)),
+                const SizedBox(width: 6),
+                const Expanded(
+                  child: Text(
+                    "Calculus: Limits",
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
           ),
-          ModeSwitchPill(
-            currentMode: _currentMode,
-            onChanged: (mode) => setState(() => _currentMode = mode),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: ModeSwitchPill(
+                currentMode: _currentMode,
+                onChanged: (mode) => setState(() => _currentMode = mode),
+              ),
+            ),
           ),
-          Row(
-            children: [
-              _buildConnectionIndicator(),
-              const SizedBox(width: 15),
-              const Icon(Icons.settings_outlined, color: Colors.white70),
-            ],
-          ),
+          if (isWide)
+            Row(
+              children: [
+                _buildConnectionIndicator(),
+                const SizedBox(width: 15),
+                const Icon(Icons.settings_outlined, color: Colors.white70),
+              ],
+            )
+          else
+            _buildConnectionIndicator(),
         ],
       ),
     );
@@ -89,49 +107,52 @@ class _ParallelPracticeViewState extends State<ParallelPracticeView> {
     }
   }
 
-  Widget _buildBottomBar() {
+  Widget _buildBottomBar(bool isWide) {
     return Container(
       height: 80,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(color: cardColor),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.mic_none, color: Colors.white),
-              SizedBox(width: 20),
-              Icon(Icons.videocam_outlined, color: Colors.white),
-            ],
-          ),
-          _buildBoardToolbar(),
-          Row(
-            children: [
-              // Give Task Button
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00C09E)),
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) => const GiveTaskModal(),
-                  );
-                },
-                child: const Text("Give Task",
-                    style: TextStyle(color: Color(0xFF0F142B))),
-              ),
-              const SizedBox(width: 12),
-              // End Session Button
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                onPressed: _showEndSessionDialog,
-                child: const Text("End Session"),
-              ),
-            ],
-          ),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.mic_none, color: Colors.white),
+                SizedBox(width: 20),
+                Icon(Icons.videocam_outlined, color: Colors.white),
+              ],
+            ),
+            const SizedBox(width: 20),
+            if (isWide) _buildBoardToolbar(),
+            const SizedBox(width: 20),
+            Row(
+              children: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00C09E)),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => const GiveTaskModal(),
+                    );
+                  },
+                  child: const Text("Give Task",
+                      style: TextStyle(color: Color(0xFF0F142B))),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                  onPressed: _showEndSessionDialog,
+                  child: const Text("End Session"),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

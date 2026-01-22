@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../friend/widgets/friend_card.dart';
-import '../mentor/widgets/mentor_card.dart';
-import '../mentor/widgets/goals_card.dart';
+import '../mentor/view/mentorship_hub.dart';
 import '../messages/view/messages_view.dart';
 import '../messages/view/chat_room_view.dart'; // 🔥 Added for navigation
 import '../widgets/leaderboard_card.dart';
@@ -303,7 +302,7 @@ class _FriendsViewState extends State<FriendsView> {
   Widget _buildActiveTab() {
     switch (_selectedTab) {
       case 1:
-        return SingleChildScrollView(physics: const BouncingScrollPhysics(), child: _buildMentorshipTab());
+        return _buildMentorshipTab();
       case 2:
         return _buildLeaderboardTab();
       default:
@@ -420,56 +419,7 @@ class _FriendsViewState extends State<FriendsView> {
   }
 
   Widget _buildMentorshipTab() {
-    return Column(
-      children: [
-        _buildMoodSelector(),
-        const SizedBox(height: 20),
-        const MentorCard(name: "Thimna", year: "3rd Year", major: "Computer Science"),
-        const SizedBox(height: 20),
-        const GoalsCard(),
-      ],
-    );
-  }
-
-  Widget _buildMoodSelector() {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: const Color(0xFF00C09E).withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: const Color(0xFF00C09E).withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.favorite_border, color: Color(0xFF00C09E), size: 18),
-              SizedBox(width: 8),
-              Text("How are you feeling this week?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 15),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _moodItem(Icons.sentiment_very_dissatisfied, "Struggling", Colors.redAccent),
-              _moodItem(Icons.sentiment_neutral, "Okay", Colors.white54),
-              _moodItem(Icons.sentiment_very_satisfied, "Good", const Color(0xFF00C09E)),
-            ],
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _moodItem(IconData icon, String label, Color color) {
-    return Column(
-      children: [
-        Icon(icon, color: color),
-        const SizedBox(height: 8),
-        Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
-      ],
-    );
+    return MentorshipHub(onMessageUser: _openChat);
   }
 
   Widget _headerBadgeIcon(IconData icon, String count) {

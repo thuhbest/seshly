@@ -359,12 +359,11 @@ class _CalendarViewState extends State<CalendarView> {
                           initialTime: startTime,
                           builder: (pickerContext, child) => Theme(
                             data: Theme.of(pickerContext).copyWith(
-                              dialogBackgroundColor: backgroundColor,
                               colorScheme: const ColorScheme.dark(
                                 primary: tealAccent,
                                 surface: backgroundColor,
                                 onSurface: Colors.white,
-                              ),
+                              ), dialogTheme: DialogThemeData(backgroundColor: backgroundColor),
                             ),
                             child: child!,
                           ),
@@ -383,12 +382,11 @@ class _CalendarViewState extends State<CalendarView> {
                           initialTime: endTime,
                           builder: (pickerContext, child) => Theme(
                             data: Theme.of(pickerContext).copyWith(
-                              dialogBackgroundColor: backgroundColor,
                               colorScheme: const ColorScheme.dark(
                                 primary: tealAccent,
                                 surface: backgroundColor,
                                 onSurface: Colors.white,
-                              ),
+                              ), dialogTheme: DialogThemeData(backgroundColor: backgroundColor),
                             ),
                             child: child!,
                           ),

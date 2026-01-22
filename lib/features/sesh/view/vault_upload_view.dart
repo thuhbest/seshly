@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -19,35 +20,54 @@ class _VaultUploadViewState extends State<VaultUploadView> {
   
   String _selectedType = "Past Paper";
   File? _selectedFile;
+  Uint8List? _selectedBytes;
+  String? _selectedFileName;
   bool _isUploading = false;
 
   Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
+      withData: true,
     );
     if (result != null) {
-      setState(() => _selectedFile = File(result.files.single.path!));
+      final picked = result.files.single;
+      setState(() {
+        _selectedFileName = picked.name;
+        _selectedBytes = picked.bytes;
+        _selectedFile = picked.path != null ? File(picked.path!) : null;
+      });
     }
   }
 
   Future<void> _handleUpload() async {
-    if (!_formKey.currentState!.validate() || _selectedFile == null) {
+    if (!_formKey.currentState!.validate() || (_selectedFile == null && _selectedBytes == null)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a PDF and fill all fields")));
       return;
     }
 
     setState(() => _isUploading = true);
     final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("You need to be logged in to upload.")));
+        setState(() => _isUploading = false);
+      }
+      return;
+    }
 
     try {
-      final fileName = "vault/${DateTime.now().millisecondsSinceEpoch}.pdf";
+      final fileName = "vault/${user.uid}_${DateTime.now().millisecondsSinceEpoch}.pdf";
       final ref = FirebaseStorage.instance.ref().child(fileName);
-      await ref.putFile(_selectedFile!);
+      if (_selectedBytes != null) {
+        await ref.putData(_selectedBytes!, SettableMetadata(contentType: 'application/pdf'));
+      } else {
+        await ref.putFile(_selectedFile!);
+      }
       final url = await ref.getDownloadURL();
 
       await FirebaseFirestore.instance.collection('vault').add({
-        'userId': user!.uid,
+        'userId': user.uid,
         'subject': _subjectController.text.trim().toUpperCase(),
         'year': _yearController.text.trim(),
         'type': _selectedType,
@@ -69,6 +89,9 @@ class _VaultUploadViewState extends State<VaultUploadView> {
   Widget build(BuildContext context) {
     const Color tealAccent = Color(0xFF00C09E);
     const Color cardColor = Color(0xFF1E243A);
+    final bool hasFile = _selectedFile != null || _selectedBytes != null;
+    final String fileLabel = _selectedFileName ??
+        (_selectedFile?.path.split(RegExp(r'[\\/]+')).last ?? "");
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F142B),
@@ -85,16 +108,16 @@ class _VaultUploadViewState extends State<VaultUploadView> {
                 decoration: BoxDecoration(
                   color: cardColor, 
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _selectedFile != null ? tealAccent : Colors.white12),
+                  border: Border.all(color: hasFile ? tealAccent : Colors.white12),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.picture_as_pdf_rounded, color: _selectedFile != null ? tealAccent : Colors.white24, size: 48),
+                    Icon(Icons.picture_as_pdf_rounded, color: hasFile ? tealAccent : Colors.white24, size: 48),
                     const SizedBox(height: 12),
                     Text(
-                      _selectedFile == null ? "Tap to select PDF" : "File: ${_selectedFile!.path.split('/').last}",
-                      style: TextStyle(color: _selectedFile != null ? Colors.white : Colors.white24, fontSize: 14),
+                      hasFile ? "File: $fileLabel" : "Tap to select PDF",
+                      style: TextStyle(color: hasFile ? Colors.white : Colors.white24, fontSize: 14),
                     ),
                   ],
                 ),
