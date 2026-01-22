@@ -181,7 +181,7 @@ class _GiveTaskModalState extends State<GiveTaskModal> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: tealAccent,
+            activeThumbColor: tealAccent,
             activeTrackColor: tealAccent.withValues(alpha: 50),
           ),
         ],

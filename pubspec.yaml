@@ -70,6 +70,7 @@ dependencies:
   file_picker: ^8.0.0
   crypto: ^3.0.3
   syncfusion_flutter_pdf: ^26.2.14
+  syncfusion_flutter_pdfviewer: ^26.2.14
 
 dev_dependencies:
   flutter_test:

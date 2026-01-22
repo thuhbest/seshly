@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'vault_upload_view.dart';
-import '../widgets/contribution_stats.dart';
 
 class VaultView extends StatefulWidget {
   const VaultView({super.key});
@@ -154,7 +153,7 @@ class _VaultViewState extends State<VaultView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(data['subject'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                Text("${data['type']} • ${data['year']}", style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                Text("${data['type']} | ${data['year']}", style: const TextStyle(color: Colors.white38, fontSize: 12)),
               ],
             ),
           ),

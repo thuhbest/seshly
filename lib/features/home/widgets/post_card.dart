@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
@@ -88,7 +87,7 @@ class _PostCardState extends State<PostCard> {
   void _showDeleteConfirmation() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text("Delete Post?", style: TextStyle(color: Colors.white)),
@@ -98,17 +97,16 @@ class _PostCardState extends State<PostCard> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text("Cancel", style: TextStyle(color: Colors.white38)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () async {
               await FirebaseFirestore.instance.collection('posts').doc(widget.postId).delete();
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Post deleted")));
-              }
+              if (!mounted) return;
+              Navigator.of(context, rootNavigator: true).pop();
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Post deleted")));
             },
             child: const Text("Delete Forever", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
@@ -123,7 +121,7 @@ class _PostCardState extends State<PostCard> {
       context: context,
       backgroundColor: cardColor,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) => Padding(
+      builder: (sheetContext) => Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -142,10 +140,9 @@ class _PostCardState extends State<PostCard> {
                   'createdAt': FieldValue.serverTimestamp(),
                   'status': 'pending',
                 });
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Report submitted. Thank you.")));
-                }
+                if (!mounted) return;
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Report submitted. Thank you.")));
               },
             )),
           ],
@@ -159,7 +156,7 @@ class _PostCardState extends State<PostCard> {
       context: context,
       backgroundColor: cardColor,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) => Container(
+      builder: (sheetContext) => Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -169,7 +166,7 @@ class _PostCardState extends State<PostCard> {
               title: const Text("Copy Text", style: TextStyle(color: Colors.white)),
               onTap: () {
                 Clipboard.setData(ClipboardData(text: widget.question));
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Text copied to clipboard")));
               },
             ),
@@ -178,10 +175,11 @@ class _PostCardState extends State<PostCard> {
                 leading: Icon(Icons.download_rounded, color: tealAccent),
                 title: Text(_isVideo ? "Save Video to Gallery" : "Save Image to Gallery", style: const TextStyle(color: Colors.white)),
                 onTap: () async {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   var file = await DefaultCacheManager().getSingleFile(widget.attachmentUrl!);
                   await ImageGallerySaver.saveFile(file.path);
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saved to gallery!")));
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saved to gallery!")));
                 },
               ),
             ListTile(
@@ -189,7 +187,7 @@ class _PostCardState extends State<PostCard> {
               title: const Text("Share to Apps", style: TextStyle(color: Colors.white)),
               onTap: () {
                 Share.share("${widget.question}\n\nShared from Seshly");
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
               },
             ),
           ],
@@ -370,7 +368,7 @@ class _PostCardState extends State<PostCard> {
                   icon: Icons.chat_bubble_rounded, 
                   label: widget.comments.toString(), 
                   backgroundColor: chipBackground,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestionDetailView()))
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => QuestionDetailView(postId: widget.postId)))
                 ),
                 ActionIconButton(
                   icon: Icons.person_search_rounded, 

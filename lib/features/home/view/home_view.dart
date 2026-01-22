@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:seshly/services/sesh_focus_service.dart';
 import '../widgets/post_card.dart';
 import '../widgets/category_selector.dart';
 import '../controllers/home_controller.dart';
@@ -26,6 +28,7 @@ class _HomeViewState extends State<HomeView> {
   late HomeController _homeController;
   final ScrollController _scrollController = ScrollController();
   bool _isHeaderVisible = true;
+  bool _isStoppingFocus = false;
 
   @override
   void initState() {
@@ -70,6 +73,65 @@ class _HomeViewState extends State<HomeView> {
     return "Just now";
   }
 
+  Future<void> _stopExpiredFocus() async {
+    if (_isStoppingFocus) return;
+    _isStoppingFocus = true;
+    try {
+      await SeshFocusService.stop();
+    } catch (_) {
+      // Ignore failures; we'll retry on next snapshot update.
+    } finally {
+      _isStoppingFocus = false;
+    }
+  }
+
+  Widget _buildFocusButton() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return HeaderIconButton(
+        icon: Icons.lock_outline,
+        onTap: () => showDialog(context: context, builder: (_) => const SeshFocusDialog()),
+      );
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() as Map<String, dynamic>? ?? {};
+        final bool isActiveFlag = data['seshFocusActive'] == true;
+        final Timestamp? endsAt = data['seshFocusEndsAt'] as Timestamp?;
+
+        bool isActive = isActiveFlag;
+        if (endsAt != null) {
+          final DateTime now = DateTime.now();
+          if (endsAt.toDate().isAfter(now)) {
+            isActive = true;
+          } else if (isActiveFlag) {
+            isActive = false;
+            // ignore: unawaited_futures
+            _stopExpiredFocus();
+          }
+        }
+
+        final Color iconColor = isActive ? Colors.redAccent : const Color(0xFF00C09E);
+        final Color backgroundColor = isActive
+            ? Colors.redAccent.withValues(alpha: 0.15)
+            : Colors.white.withValues(alpha: 0.1);
+        final Color pressedBackgroundColor = isActive
+            ? Colors.redAccent.withValues(alpha: 0.25)
+            : Colors.white.withValues(alpha: 0.2);
+
+        return HeaderIconButton(
+          icon: isActive ? Icons.lock_rounded : Icons.lock_outline,
+          iconColor: iconColor,
+          backgroundColor: backgroundColor,
+          pressedBackgroundColor: pressedBackgroundColor,
+          onTap: () => showDialog(context: context, builder: (_) => const SeshFocusDialog()),
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     widget.refreshSignal?.removeListener(_handleExternalRefresh);
@@ -88,6 +150,7 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -113,15 +176,29 @@ class _HomeViewState extends State<HomeView> {
                         icon: Icons.shopping_basket_outlined,
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceView())),
                       ),
-                      HeaderIconButton(
-                        icon: Icons.notifications_none,
-                        count: "5",
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsView())),
-                      ),
-                      HeaderIconButton(
-                        icon: Icons.lock_outline,
-                        onTap: () => showDialog(context: context, builder: (_) => const SeshFocusDialog()),
-                      ),
+                      if (currentUserId == null)
+                        HeaderIconButton(
+                          icon: Icons.notifications_none,
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsView())),
+                        )
+                      else
+                        StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(currentUserId)
+                              .collection('notifications')
+                              .where('isRead', isEqualTo: false)
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            final unreadCount = snapshot.data?.docs.length ?? 0;
+                            return HeaderIconButton(
+                              icon: Icons.notifications_none,
+                              count: unreadCount > 0 ? unreadCount.toString() : null,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsView())),
+                            );
+                          },
+                        ),
+                      _buildFocusButton(),
                     ],
                   )
                 ],
@@ -209,12 +286,18 @@ class HeaderIconButton extends StatefulWidget {
   final IconData icon;
   final String? count;
   final VoidCallback onTap;
+  final Color? iconColor;
+  final Color? backgroundColor;
+  final Color? pressedBackgroundColor;
 
   const HeaderIconButton({
     super.key,
     required this.icon,
     this.count,
     required this.onTap,
+    this.iconColor,
+    this.backgroundColor,
+    this.pressedBackgroundColor,
   });
 
   @override
@@ -227,6 +310,9 @@ class _HeaderIconButtonState extends State<HeaderIconButton> {
   @override
   Widget build(BuildContext context) {
     final double scale = _isPressed ? 0.9 : 1.0;
+    final Color baseBackground = widget.backgroundColor ?? Colors.white.withValues(alpha: 0.1);
+    final Color pressedBackground = widget.pressedBackgroundColor ?? Colors.white.withValues(alpha: 0.2);
+    final Color iconColor = widget.iconColor ?? const Color(0xFF00C09E);
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
@@ -242,14 +328,12 @@ class _HeaderIconButtonState extends State<HeaderIconButton> {
               margin: const EdgeInsets.only(left: 10),
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: _isPressed 
-                    ? Colors.white.withValues(alpha: 0.2) 
-                    : Colors.white.withValues(alpha: 0.1),
+                color: _isPressed ? pressedBackground : baseBackground,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 widget.icon,
-                color: const Color(0xFF00C09E),
+                color: iconColor,
                 size: 22,
               ),
             ),

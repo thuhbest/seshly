@@ -6,7 +6,7 @@ class SeshTabBar extends StatelessWidget {
 
   const SeshTabBar({super.key, required this.selectedTab, required this.onTabChanged});
 
-  final List<String> tabs = const ["AI Assist", "Vault", "Archive", "Progress"];
+  final List<String> tabs = const ["AI Assist", "Vault", "Archive"];
 
   @override
   Widget build(BuildContext context) {

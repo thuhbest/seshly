@@ -296,7 +296,7 @@ class _SignUpViewState extends State<SignUpView> {
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12.0),
       child: DropdownButtonFormField<String>(
-        value: value,
+        initialValue: value,
         onChanged: onChanged,
         style: const TextStyle(color: Colors.white, fontSize: 16),
         dropdownColor: inputFieldColor,

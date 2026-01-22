@@ -174,7 +174,7 @@ String _weeklySignature(
   String location,
   String type,
 ) {
-  return '${weekday}_${startHour}:${startMinute}_${endHour}:${endMinute}_${title.toLowerCase()}_${location.toLowerCase()}_${type.toLowerCase()}';
+  return '${weekday}_$startHour:${startMinute}_$endHour:${endMinute}_${title.toLowerCase()}_${location.toLowerCase()}_${type.toLowerCase()}';
 }
 
 List<_WeeklyItem> _weeklyItemsFromMaps(List<dynamic>? rawItems) {

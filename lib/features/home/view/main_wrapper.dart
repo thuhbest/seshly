@@ -3,6 +3,9 @@ import 'package:seshly/features/home/view/home_view.dart';
 import 'package:seshly/features/sesh/view/sesh_view.dart';
 import 'package:seshly/features/home/widgets/custom_bottome_nav.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:seshly/services/auth_service.dart';
+import 'package:seshly/services/notification_service.dart';
 
 // 1. Import the FriendsView
 import 'package:seshly/features/friends/view/friends_view.dart';
@@ -23,14 +26,18 @@ class MainWrapper extends StatefulWidget {
   State<MainWrapper> createState() => _MainWrapperState();
 }
 
-class _MainWrapperState extends State<MainWrapper> {
+class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
   int _currentIndex = 0;
   final ValueNotifier<int> _homeRefreshTick = ValueNotifier<int>(0);
+  final AuthService _authService = AuthService();
+  final NotificationService _notificationService = NotificationService();
   late final List<Widget> _pages;
+  bool _notificationsInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // This list now includes your real FriendsView at Index 2
     _pages = [
       HomeView(refreshSignal: _homeRefreshTick), // Index 0: Home
@@ -39,10 +46,64 @@ class _MainWrapperState extends State<MainWrapper> {
       const CalendarView(), // Index 3: Real Calendar Screen
       const ProfileView() // Index 4: Real profile and settings screen
     ];
+    // ignore: unawaited_futures
+    _updateDailyStreak();
+    // ignore: unawaited_futures
+    _initNotifications();
+    // ignore: unawaited_futures
+    _setPresence(isOnline: true);
+  }
+
+  Future<void> _updateDailyStreak() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      await _authService.updateDailyStreak(user.uid);
+    } catch (_) {
+      // Avoid blocking the UI if streak update fails.
+    }
+  }
+
+  Future<void> _initNotifications() async {
+    if (_notificationsInitialized) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    _notificationsInitialized = true;
+    try {
+      await _notificationService.initForUser(user);
+    } catch (_) {
+      // Ignore notification init failures to avoid blocking the app shell.
+    }
+  }
+
+  Future<void> _setPresence({required bool isOnline}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      'isOnline': isOnline,
+      'lastSeenAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // ignore: unawaited_futures
+      _setPresence(isOnline: true);
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      // ignore: unawaited_futures
+      _setPresence(isOnline: false);
+    }
+    super.didChangeAppLifecycleState(state);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // ignore: unawaited_futures
+    _setPresence(isOnline: false);
     _homeRefreshTick.dispose();
     super.dispose();
   }
