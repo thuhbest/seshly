@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart'; // 🔥 Required for your .svg files
 import '../controller/sign_up_controller.dart';
 import '../../login/view/login_page_view.dart';
+import 'package:seshly/widgets/responsive.dart';
 
 class SignUpView extends StatefulWidget {
   const SignUpView({super.key});
@@ -43,11 +44,13 @@ class _SignUpViewState extends State<SignUpView> {
   late SignUpController controller;
   bool _isLoading = false;
   String? _signUpError;
+  bool _isPasswordStrong = false;
 
   @override
   void initState() {
     super.initState();
     controller = SignUpController(context);
+    _passController.addListener(_handlePasswordChange);
   }
 
   @override
@@ -57,6 +60,13 @@ class _SignUpViewState extends State<SignUpView> {
     _emailController.dispose();
     _passController.dispose();
     super.dispose();
+  }
+
+  void _handlePasswordChange() {
+    final isStrong = _isStrongPassword(_passController.text.trim());
+    if (isStrong != _isPasswordStrong) {
+      setState(() => _isPasswordStrong = isStrong);
+    }
   }
 
   Future<void> _handleSignUp() async {
@@ -78,6 +88,12 @@ class _SignUpViewState extends State<SignUpView> {
       setState(() => _signUpError = emailError);
       return;
     }
+    final password = _passController.text.trim();
+    final passwordError = _validatePassword(password);
+    if (passwordError != null) {
+      setState(() => _signUpError = passwordError);
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -87,7 +103,7 @@ class _SignUpViewState extends State<SignUpView> {
     try {
       await controller.signUp(
         email: email,
-        password: _passController.text.trim(),
+        password: password,
         fullName: _nameController.text.trim(),
         studentNumber: _studentNumController.text.trim(),
         university: _selectedUniversity!,
@@ -118,6 +134,23 @@ class _SignUpViewState extends State<SignUpView> {
     return null;
   }
 
+  bool _isStrongPassword(String password) {
+    if (password.length < 8) return false;
+    final hasUpper = RegExp(r'[A-Z]').hasMatch(password);
+    final hasLower = RegExp(r'[a-z]').hasMatch(password);
+    final hasNumber = RegExp(r'\d').hasMatch(password);
+    final hasSymbol = RegExp(r'[!@#\$%\^&\*\(\)_\+\-=\[\]\{\};:"\\|,.<>\/?`~]').hasMatch(password);
+    return hasUpper && hasLower && hasNumber && hasSymbol;
+  }
+
+  String? _validatePassword(String password) {
+    if (password.isEmpty) return 'Please enter a password';
+    if (!_isStrongPassword(password)) {
+      return 'Use 8+ chars with upper, lower, number, and symbol.';
+    }
+    return null;
+  }
+
   String _extractErrorMessage(String error) {
     if (error.contains(':')) {
       final parts = error.split(':');
@@ -144,9 +177,11 @@ class _SignUpViewState extends State<SignUpView> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 10.0),
-        child: Column(
+      body: ResponsiveCenter(
+        maxWidth: 540,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+        child: SingleChildScrollView(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
             // 🔥 OFFICIAL LOGO REPLACEMENT (ONLY CHANGE MADE HERE)
@@ -223,6 +258,18 @@ class _SignUpViewState extends State<SignUpView> {
                     hintText: 'Create a password',
                     fieldColor: inputFieldColor,
                   ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6, left: 4),
+                    child: Text(
+                      _isPasswordStrong
+                          ? 'Strong password.'
+                          : 'Use 8+ chars with upper, lower, number, and symbol.',
+                      style: TextStyle(
+                        color: _isPasswordStrong ? primaryColor : Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
 
                   if (_signUpError != null)
                     Padding(
@@ -265,6 +312,7 @@ class _SignUpViewState extends State<SignUpView> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

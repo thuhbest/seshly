@@ -5,6 +5,7 @@ import 'mentorship_admin_view.dart';
 import 'mentorship_profile_sheet.dart';
 import 'mentee_mentorship_view.dart';
 import 'mentor_dashboard_view.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class MentorshipHub extends StatefulWidget {
   final void Function(String userId, String userName) onMessageUser;
@@ -48,12 +49,22 @@ class _MentorshipHubState extends State<MentorshipHub> {
                   if (isAdmin)
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => Navigator.push(
+                      child: PressableScale(
+                        onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => const MentorshipAdminView()),
                         ),
-                        child: const Text("Admin insights", style: TextStyle(color: Color(0xFF00C09E))),
+                        borderRadius: BorderRadius.circular(10),
+                        pressedScale: 0.96,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00C09E).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFF00C09E).withValues(alpha: 0.35)),
+                          ),
+                          child: const Text("Admin insights", style: TextStyle(color: Color(0xFF00C09E), fontWeight: FontWeight.bold)),
+                        ),
                       ),
                     ),
                   if (!hasProfile)
@@ -121,9 +132,19 @@ class _MentorshipHubState extends State<MentorshipHub> {
               style: TextStyle(color: Colors.white54, fontSize: 12),
             ),
           ),
-          TextButton(
-            onPressed: onTap,
-            child: const Text('Enable', style: TextStyle(color: Color(0xFF00C09E))),
+          PressableScale(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(10),
+            pressedScale: 0.96,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00C09E).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF00C09E).withValues(alpha: 0.35)),
+              ),
+              child: const Text('Enable', style: TextStyle(color: Color(0xFF00C09E), fontWeight: FontWeight.bold)),
+            ),
           ),
         ],
       ),

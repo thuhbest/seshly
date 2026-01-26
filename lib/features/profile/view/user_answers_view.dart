@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
+import 'package:seshly/widgets/responsive.dart';
 
 class UserAnswersView extends StatelessWidget {
   final String userId;
@@ -64,8 +66,14 @@ class UserAnswersView extends StatelessWidget {
             );
           }
 
+          final basePadding = pagePadding(context);
           return ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            padding: EdgeInsets.only(
+              left: basePadding.left,
+              right: basePadding.right,
+              top: 10,
+              bottom: 10,
+            ),
             physics: const BouncingScrollPhysics(),
             itemCount: docs.length,
             itemBuilder: (context, index) {
@@ -123,10 +131,12 @@ class UserAnswersView extends StatelessWidget {
                     const Divider(color: Colors.white10, thickness: 0.5),
                     const SizedBox(height: 8),
                     // Button to view the original post if needed
-                    GestureDetector(
+                    PressableScale(
                       onTap: () {
                         // Logic to find parent post and navigate
                       },
+                      borderRadius: BorderRadius.circular(10),
+                      pressedScale: 0.96,
                       child: Row(
                         children: [
                           Icon(Icons.link_rounded, color: tealAccent.withValues(alpha: 0.5), size: 16),

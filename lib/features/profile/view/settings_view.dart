@@ -3,10 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:seshly/services/notification_service.dart';
 import '../widgets/settings_group.dart';
-import '../widgets/tutor_banner.dart';
 import 'edit_profile_view.dart';
-import 'tutor_application_view.dart';
-import 'tutor_stats_view.dart';
+import 'package:seshly/widgets/responsive.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -21,7 +19,7 @@ class _SettingsViewState extends State<SettingsView> {
   bool studyReminders = true;
   bool _loadingPrefs = true;
   final Color tealAccent = const Color(0xFF00C09E);
-  final Color logoutColor = const Color(0xFF007A66);
+  final Color logoutColor = const Color(0xFF00C09E);
   final Color backgroundColor = const Color(0xFF0F142B);
   final NotificationService _notificationService = NotificationService();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -48,7 +46,7 @@ class _SettingsViewState extends State<SettingsView> {
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: pagePadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -76,39 +74,6 @@ class _SettingsViewState extends State<SettingsView> {
                   ),
                 ],
               ),
-              const SizedBox(height: 25),
-              StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(FirebaseAuth.instance.currentUser?.uid)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  final data = snapshot.data?.data() as Map<String, dynamic>? ?? {};
-                  final tutorProfile = data['tutorProfile'] as Map<String, dynamic>? ?? {};
-                  final String status = (data['tutorStatus'] ?? tutorProfile['status'] ?? 'none').toString();
-                  final bool isTutor = status == 'approved' || status == 'active';
-                  final String title = isTutor ? "Tutor Stats" : "Apply as a Tutor";
-                  final String subtitle = isTutor
-                      ? "Track your tutoring performance"
-                      : status == 'pending'
-                          ? "Application pending review"
-                          : "Share your knowledge and earn";
-                  return TutorBanner(
-                    title: title,
-                    subtitle: subtitle,
-                    status: status == 'none' ? null : status,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => isTutor
-                            ? const TutorStatsView()
-                            : const TutorApplicationView(),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 25),
               const _SectionHeader(title: "Account"),
               SettingsGroup(
                 children: [
@@ -477,3 +442,5 @@ class _BuildDangerButton extends StatelessWidget {
     );
   }
 }
+
+

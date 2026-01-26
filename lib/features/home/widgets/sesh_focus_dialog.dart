@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:seshly/services/sesh_focus_service.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class SeshFocusDialog extends StatefulWidget {
   const SeshFocusDialog({super.key});
@@ -222,11 +223,13 @@ class _SeshFocusDialogState extends State<SeshFocusDialog> {
             runSpacing: 12,
             children: [30, 60, 90, 120].map((mins) {
               bool isSelected = selectedMinutes == mins;
-              return GestureDetector(
+              return PressableScale(
                 onTap: () => setState(() {
                   selectedMinutes = mins;
                   _customController.clear();
                 }),
+                borderRadius: BorderRadius.circular(12),
+                pressedScale: 0.96,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),

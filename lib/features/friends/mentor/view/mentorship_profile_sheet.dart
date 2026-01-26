@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 import '../services/mentorship_service.dart';
 
 class MentorshipProfileSheet extends StatefulWidget {
@@ -20,6 +21,7 @@ class MentorshipProfileSheet extends StatefulWidget {
 class _MentorshipProfileSheetState extends State<MentorshipProfileSheet> {
   final Color tealAccent = const Color(0xFF00C09E);
   final Color backgroundColor = const Color(0xFF0F142B);
+  final Color headerDividerColor = const Color(0x1FFFFFFF);
 
   late TextEditingController _facultyController;
   late TextEditingController _degreeController;
@@ -85,100 +87,141 @@ class _MentorshipProfileSheetState extends State<MentorshipProfileSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: ListView(
-        shrinkWrap: true,
-        children: [
-          const Text("Mentorship setup", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 16),
-          _sectionTitle("Role"),
-          Row(
-            children: [
-              _choiceChip("Mentee", _role == 'mentee', () => setState(() => _role = 'mentee')),
-              const SizedBox(width: 10),
-              _choiceChip("Mentor", _role == 'mentor', () => setState(() => _role = 'mentor')),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _sectionTitle("Academic context"),
-          _field("Faculty", _facultyController),
-          _field("Degree", _degreeController),
-          _field("Major / Course", _majorController),
-          const SizedBox(height: 16),
-          _sectionTitle("Background"),
-          Row(
-            children: [
-              _toggleChip("First-gen", _firstGen, (value) => setState(() => _firstGen = value)),
-              const SizedBox(width: 10),
-              _toggleChip("International", _international, (value) => setState(() => _international = value)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _dropdownRow(
-            label: "Funding status",
-            value: _fundingStatus,
-            options: const ['Self-funded', 'Bursary', 'NSFAS', 'Sponsored'],
-            onChanged: (value) => setState(() => _fundingStatus = value),
-          ),
-          const SizedBox(height: 16),
-          _sectionTitle("Career interests"),
-          _chipWrap(_careerOptions, _careerInterests),
-          const SizedBox(height: 16),
-          _sectionTitle("Personality"),
-          _chipWrap(_personalityOptions, _personalityTags),
-          if (_role == 'mentee') ...[
+    return SafeArea(
+      top: true,
+      bottom: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Row(
+              children: [
+                PressableScale(
+                  onTap: () => Navigator.pop(context),
+                  borderRadius: BorderRadius.circular(22),
+                  pressedScale: 0.95,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: tealAccent.withValues(alpha: 0.18),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: tealAccent.withValues(alpha: 0.4)),
+                    ),
+                    child: Icon(Icons.arrow_back, color: tealAccent),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        "Mentorship setup",
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        "Tell us about your goals and preferences.",
+                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Divider(height: 1, color: headerDividerColor),
             const SizedBox(height: 16),
-            _sectionTitle("Support signals"),
-            _chipWrap(_riskSignalOptions, _riskSignals),
-          ],
-          const SizedBox(height: 16),
-          _sectionTitle("Focus areas"),
-          _chipWrap(_focusOptions, _focusAreas),
-          const SizedBox(height: 16),
-          _sectionTitle("Availability"),
-          _chipWrap(_availabilityOptions, _availability),
-          if (_role == 'mentor') ...[
+            _sectionTitle("Role"),
+            Row(
+              children: [
+                _choiceChip("Mentee", _role == 'mentee', () => setState(() => _role = 'mentee')),
+                const SizedBox(width: 10),
+                _choiceChip("Mentor", _role == 'mentor', () => setState(() => _role = 'mentor')),
+              ],
+            ),
             const SizedBox(height: 16),
-            _sectionTitle("Mentor badge"),
+            _sectionTitle("Academic context"),
+            _field("Faculty", _facultyController),
+            _field("Degree", _degreeController),
+            _field("Major / Course", _majorController),
+            const SizedBox(height: 16),
+            _sectionTitle("Background"),
+            Row(
+              children: [
+                _toggleChip("First-gen", _firstGen, (value) => setState(() => _firstGen = value)),
+                const SizedBox(width: 10),
+                _toggleChip("International", _international, (value) => setState(() => _international = value)),
+              ],
+            ),
+            const SizedBox(height: 12),
             _dropdownRow(
-              label: "Badge",
-              value: _mentorBadge,
-              options: const ['Certified Mentor', 'Senior Mentor', 'Top Mentor'],
-              onChanged: (value) => setState(() => _mentorBadge = value),
+              label: "Funding status",
+              value: _fundingStatus,
+              options: const ['Self-funded', 'Bursary', 'NSFAS', 'Sponsored'],
+              onChanged: (value) => setState(() => _fundingStatus = value),
+            ),
+            const SizedBox(height: 16),
+            _sectionTitle("Career interests"),
+            _chipWrap(_careerOptions, _careerInterests),
+            const SizedBox(height: 16),
+            _sectionTitle("Personality"),
+            _chipWrap(_personalityOptions, _personalityTags),
+            if (_role == 'mentee') ...[
+              const SizedBox(height: 16),
+              _sectionTitle("Support signals"),
+              _chipWrap(_riskSignalOptions, _riskSignals),
+            ],
+            const SizedBox(height: 16),
+            _sectionTitle("Focus areas"),
+            _chipWrap(_focusOptions, _focusAreas),
+            const SizedBox(height: 16),
+            _sectionTitle("Availability"),
+            _chipWrap(_availabilityOptions, _availability),
+            if (_role == 'mentor') ...[
+              const SizedBox(height: 16),
+              _sectionTitle("Mentor badge"),
+              _dropdownRow(
+                label: "Badge",
+                value: _mentorBadge,
+                options: const ['Certified Mentor', 'Senior Mentor', 'Top Mentor'],
+                onChanged: (value) => setState(() => _mentorBadge = value),
+              ),
+            ],
+            const SizedBox(height: 16),
+            SwitchListTile(
+              value: _optIn,
+              onChanged: (value) => setState(() => _optIn = value),
+              activeThumbColor: tealAccent,
+              title: const Text("Opt into privacy-safe analytics", style: TextStyle(color: Colors.white)),
+              subtitle: const Text(
+                "Admins see trends only. No message content or names.",
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saveProfile,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: tealAccent,
+                  foregroundColor: backgroundColor,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text("Save mentorship profile", style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
           ],
-          const SizedBox(height: 16),
-          SwitchListTile(
-            value: _optIn,
-            onChanged: (value) => setState(() => _optIn = value),
-            activeColor: tealAccent,
-            title: const Text("Opt into privacy-safe analytics", style: TextStyle(color: Colors.white)),
-            subtitle: const Text(
-              "Admins see trends only. No message content or names.",
-              style: TextStyle(color: Colors.white54, fontSize: 12),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _saveProfile,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: tealAccent,
-                foregroundColor: backgroundColor,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              child: const Text("Save mentorship profile", style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -273,8 +316,10 @@ class _MentorshipProfileSheetState extends State<MentorshipProfileSheet> {
   }
 
   Widget _choiceChip(String label, bool selected, VoidCallback onTap) {
-    return GestureDetector(
+    return PressableScale(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      pressedScale: 0.96,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
@@ -291,8 +336,10 @@ class _MentorshipProfileSheetState extends State<MentorshipProfileSheet> {
   }
 
   Widget _toggleChip(String label, bool selected, void Function(bool) onToggle) {
-    return GestureDetector(
+    return PressableScale(
       onTap: () => onToggle(!selected),
+      borderRadius: BorderRadius.circular(12),
+      pressedScale: 0.96,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
@@ -311,7 +358,7 @@ class _MentorshipProfileSheetState extends State<MentorshipProfileSheet> {
       runSpacing: 8,
       children: options.map((label) {
         final isSelected = selected.contains(label);
-        return GestureDetector(
+        return PressableScale(
           onTap: () => setState(() {
             if (isSelected) {
               selected.remove(label);
@@ -319,6 +366,8 @@ class _MentorshipProfileSheetState extends State<MentorshipProfileSheet> {
               selected.add(label);
             }
           }),
+          borderRadius: BorderRadius.circular(10),
+          pressedScale: 0.96,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(

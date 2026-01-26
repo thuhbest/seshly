@@ -6,6 +6,7 @@ import '../models/calendar_event.dart';
 import '../services/timetable_pdf_importer.dart';
 import '../widgets/calendar_grid.dart';
 import '../widgets/event_card.dart';
+import 'package:seshly/widgets/responsive.dart';
 
 class CalendarView extends StatefulWidget {
   const CalendarView({super.key});
@@ -45,7 +46,7 @@ class _CalendarViewState extends State<CalendarView> {
       backgroundColor: backgroundColor,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: pagePadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -281,19 +282,6 @@ class _CalendarViewState extends State<CalendarView> {
   String _formatTimeRange(DateTime start, DateTime end) {
     final fmt = DateFormat('h:mm a');
     return '${fmt.format(start)} - ${fmt.format(end)}';
-  }
-
-  String _relativeTag(DateTime start) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final d = DateTime(start.year, start.month, start.day);
-    final diff = d.difference(today).inDays;
-
-    if (diff == 0) return 'Today';
-    if (diff == 1) return 'Tomorrow';
-    if (diff > 1) return 'In $diff days';
-    if (diff == -1) return 'Yesterday';
-    return '${diff.abs()} days ago';
   }
 
   Future<void> _scanAndImportPdf() async {
@@ -540,3 +528,5 @@ class _CalendarViewState extends State<CalendarView> {
     );
   }
 }
+
+

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart'; 
 import '../controllers/login_page_controller.dart';
 import '../view/forgot_password_screen.dart';
+import 'package:seshly/widgets/responsive.dart';
 
 /// ===============================
 /// Reveal Password Field
@@ -137,9 +138,11 @@ class TermsAndPrivacyScreen extends StatelessWidget {
           style: TextStyle(color: Colors.white),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        child: Column(
+      body: ResponsiveCenter(
+        maxWidth: 720,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        child: SingleChildScrollView(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Center(
@@ -336,6 +339,7 @@ class TermsAndPrivacyScreen extends StatelessWidget {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -451,17 +455,19 @@ class _LoginPageViewState extends State<LoginPageView> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () async {
-            FocusManager.instance.primaryFocus?.unfocus();
-            await Future.delayed(const Duration(milliseconds: 50));
-            if (!mounted) return;
-            Navigator.pop(context);
-          },
+            onPressed: () async {
+              FocusManager.instance.primaryFocus?.unfocus();
+              await Future.delayed(const Duration(milliseconds: 50));
+              if (!context.mounted) return;
+              Navigator.pop(context);
+            },
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
-        child: Column(
+      body: ResponsiveCenter(
+        maxWidth: 520,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+        child: SingleChildScrollView(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 10),
@@ -502,8 +508,8 @@ class _LoginPageViewState extends State<LoginPageView> {
             const SizedBox(height: 15),
 
             /// 🔹 TAGLINE
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
+            Padding(
+              padding: pagePadding(context),
               child: Text(
                 '"AI as your teacher, not your academic slave"',
                 style: TextStyle(
@@ -586,7 +592,7 @@ class _LoginPageViewState extends State<LoginPageView> {
                                 FocusManager.instance.primaryFocus?.unfocus();
                                 await Future.delayed(
                                     const Duration(milliseconds: 80));
-                                if (!mounted) return;
+                                if (!context.mounted) return;
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) => const ForgotPasswordScreen(),
@@ -785,6 +791,7 @@ class _LoginPageViewState extends State<LoginPageView> {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -814,3 +821,4 @@ class _LoginPageViewState extends State<LoginPageView> {
     );
   }
 }
+

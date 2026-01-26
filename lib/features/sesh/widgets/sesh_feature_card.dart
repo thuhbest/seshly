@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class SeshFeatureCard extends StatelessWidget {
   final String title;
@@ -60,20 +61,23 @@ class SeshFeatureCard extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(
-            onPressed: () {},
-            style: TextButton.styleFrom(
-              backgroundColor: Colors.white.withValues(alpha: 0.05),
+          PressableScale(
+            onTap: () {},
+            borderRadius: BorderRadius.circular(10),
+            pressedScale: 0.96,
+            child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-              shape: RoundedRectangleBorder(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
-            ),
-            child: Text(
-              buttonText,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+              child: Text(
+                buttonText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class AttachmentButton extends StatelessWidget {
   final IconData icon;
@@ -10,8 +11,10 @@ class AttachmentButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
+      child: PressableScale(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
+        pressedScale: 0.97,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 20),
           decoration: BoxDecoration(

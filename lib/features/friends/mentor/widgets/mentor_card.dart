@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class MentorCard extends StatelessWidget {
   final String name;
@@ -28,8 +29,9 @@ class MentorCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E243A),
+        color: const Color(0xFF1E243A).withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Column(
         children: [
@@ -107,8 +109,10 @@ class MentorCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              GestureDetector(
+              PressableScale(
                 onTap: onSchedule,
+                borderRadius: BorderRadius.circular(10),
+                pressedScale: 0.95,
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class MarketItemCard extends StatelessWidget {
   final String title;
@@ -24,8 +25,10 @@ class MarketItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     const Color tealAccent = Color(0xFF00C09E);
 
-    return GestureDetector(
+    return PressableScale(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      pressedScale: 0.98,
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFF1E243A).withValues(alpha: 0.5),
@@ -54,7 +57,6 @@ class MarketItemCard extends StatelessWidget {
                   ),
                 ),
               ),
-            
             Padding(
               padding: const EdgeInsets.all(15),
               child: Column(

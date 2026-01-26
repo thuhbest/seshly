@@ -36,7 +36,6 @@ class StatsGrid extends StatelessWidget {
                 final int streak = userData['streak'] ?? 0;
                 final int seshMinutes = userData['seshMinutes'] ?? 0;
                 final int replies = answerCount;
-                final int points = userData['points'] ?? 0; // From previous code
 
                 return GridView.count(
                   shrinkWrap: true,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class SessionWrapView extends StatefulWidget {
   const SessionWrapView({super.key});
@@ -205,8 +206,10 @@ class _SessionWrapViewState extends State<SessionWrapView> {
 
   Widget _buildStylePill(String label) {
     bool isSelected = _selectedStyle == label;
-    return GestureDetector(
+    return PressableScale(
       onTap: () => setState(() => _selectedStyle = label),
+      borderRadius: BorderRadius.circular(12),
+      pressedScale: 0.96,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

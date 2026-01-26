@@ -25,29 +25,55 @@ class MessageTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const Color tealAccent = Color(0xFF00C09E);
+    final bool hasUnread = unreadCount > 0;
+    final Color tileColor = hasUnread
+        ? tealAccent.withValues(alpha: 0.12)
+        : const Color(0xFF1E243A).withValues(alpha: 0.45);
+    final Color borderColor = hasUnread
+        ? tealAccent.withValues(alpha: 0.35)
+        : Colors.white.withValues(alpha: 0.05);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 5),
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+        color: tileColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
         children: [
           // Avatar Section
           Stack(
             children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: isGroup 
-                    ? tealAccent.withValues(alpha: 0.1) 
-                    : Colors.white.withValues(alpha: 0.05),
-                child: isGroup 
-                    ? const Icon(Icons.groups_rounded, color: tealAccent, size: 24)
-                    : Text(
-                        title.isNotEmpty ? title.substring(0, 1) : "?",
-                        style: const TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 18),
-                      ),
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: hasUnread ? tealAccent : Colors.white.withValues(alpha: 0.08),
+                    width: 2,
+                  ),
+                ),
+                child: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: isGroup
+                      ? tealAccent.withValues(alpha: 0.12)
+                      : Colors.white.withValues(alpha: 0.06),
+                  child: isGroup
+                      ? const Icon(Icons.groups_rounded, color: tealAccent, size: 22)
+                      : Text(
+                          title.isNotEmpty ? title.substring(0, 1) : "?",
+                          style: const TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 18),
+                        ),
+                ),
               ),
               if (isOnline)
                 Positioned(
@@ -57,7 +83,7 @@ class MessageTile extends StatelessWidget {
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: Colors.green,
+                      color: tealAccent,
                       shape: BoxShape.circle,
                       border: Border.all(color: const Color(0xFF0F142B), width: 2),
                     ),
@@ -94,7 +120,7 @@ class MessageTile extends StatelessWidget {
                         width: 6,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: isOnline ? Colors.green : Colors.white24,
+                          color: isOnline ? tealAccent : Colors.white24,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -116,8 +142,9 @@ class MessageTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: unreadCount > 0 ? Colors.white70 : Colors.white38,
-                    fontSize: 14,
+                    color: hasUnread ? Colors.white70 : Colors.white38,
+                    fontSize: 13,
+                    fontWeight: hasUnread ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
               ],
@@ -127,7 +154,14 @@ class MessageTile extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(time, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+              Text(
+                time,
+                style: TextStyle(
+                  color: hasUnread ? tealAccent : Colors.white38,
+                  fontSize: 11,
+                  fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
               const SizedBox(height: 8),
               if (unreadCount > 0)
                 Container(

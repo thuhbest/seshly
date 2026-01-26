@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../services/mentorship_service.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class MentorDashboardView extends StatefulWidget {
   final MentorshipService service;
@@ -20,6 +21,7 @@ class _MentorDashboardViewState extends State<MentorDashboardView> {
   final Color tealAccent = const Color(0xFF00C09E);
   final Color cardColor = const Color(0xFF1E243A);
   final Color backgroundColor = const Color(0xFF0F142B);
+  bool _isAssigning = false;
 
   String _formatDate(DateTime? date) {
     if (date == null) return 'Not scheduled';
@@ -113,6 +115,28 @@ class _MentorDashboardViewState extends State<MentorDashboardView> {
     );
   }
 
+  Future<void> _autoAssignMentee() async {
+    if (_isAssigning) return;
+    setState(() => _isAssigning = true);
+    try {
+      final mentorId = widget.service.currentUserId;
+      if (mentorId == null) return;
+      final requestId = await widget.service.autoAssignMentee(mentorId: mentorId);
+      if (!mounted) return;
+      if (requestId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No eligible mentees found right now.'), backgroundColor: Color(0xFF00C09E)),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Mentorship request sent. Awaiting mentee acceptance.'), backgroundColor: Color(0xFF00C09E)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isAssigning = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final mentorId = widget.service.currentUserId;
@@ -136,6 +160,8 @@ class _MentorDashboardViewState extends State<MentorDashboardView> {
             _mentorScoreCard(scores),
             const SizedBox(height: 16),
             _focusCard(theme),
+            const SizedBox(height: 16),
+            _assignmentCard(),
             const SizedBox(height: 16),
             Text('Assigned mentees', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
@@ -220,6 +246,40 @@ class _MentorDashboardViewState extends State<MentorDashboardView> {
     );
   }
 
+  Widget _assignmentCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('University assignments', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          const Text(
+            'Auto-assign a mentee based on faculty, year, and support needs. The mentee must accept.',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isAssigning ? null : _autoAssignMentee,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: tealAccent,
+                foregroundColor: backgroundColor,
+              ),
+              child: Text(_isAssigning ? 'Assigning...' : 'Auto-assign mentee'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _menteeCard(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
     final menteeId = (data['menteeId'] ?? '').toString();
@@ -292,9 +352,19 @@ class _MentorDashboardViewState extends State<MentorDashboardView> {
                 ),
               ),
               const SizedBox(width: 8),
-              TextButton(
-                onPressed: () => _logInteraction(doc.id),
-                child: const Text('Log interaction', style: TextStyle(color: Colors.white54)),
+              PressableScale(
+                onTap: () => _logInteraction(doc.id),
+                borderRadius: BorderRadius.circular(10),
+                pressedScale: 0.96,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  child: const Text('Log interaction', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                ),
               ),
               const SizedBox(width: 4),
               PopupMenuButton<String>(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class GoalsCard extends StatelessWidget {
   final List<Map<String, dynamic>> goals;
@@ -18,8 +19,9 @@ class GoalsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E243A),
+        color: const Color(0xFF1E243A).withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -34,9 +36,19 @@ class GoalsCard extends StatelessWidget {
                   Text("Monthly Goals", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ],
               ),
-              TextButton(
-                onPressed: onAddGoal,
-                child: const Text("+ Add Goal", style: TextStyle(color: Color(0xB3FFFFFF), fontSize: 12)),
+              PressableScale(
+                onTap: onAddGoal,
+                borderRadius: BorderRadius.circular(12),
+                pressedScale: 0.96,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  child: const Text("+ Add Goal", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                ),
               ),
             ],
           ),
@@ -115,9 +127,19 @@ class _GoalItem extends StatelessWidget {
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => onUpdate(goalId, progress, target),
-                child: const Text("Update", style: TextStyle(color: Color(0xB3FFFFFF), fontSize: 12)),
+              child: PressableScale(
+                onTap: () => onUpdate(goalId, progress, target),
+                borderRadius: BorderRadius.circular(10),
+                pressedScale: 0.96,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  child: const Text("Update", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                ),
               ),
             ),
           ],
