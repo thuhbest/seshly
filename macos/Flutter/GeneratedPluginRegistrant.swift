@@ -15,6 +15,7 @@ import firebase_core
 import firebase_messaging
 import firebase_storage
 import google_sign_in_ios
+import path_provider_foundation
 import record_darwin
 import speech_to_text_macos
 import syncfusion_pdfviewer_macos
