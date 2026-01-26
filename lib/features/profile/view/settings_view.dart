@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:seshly/services/notification_service.dart';
 import '../widgets/settings_group.dart';
-import '../widgets/tutor_banner.dart';
 import 'edit_profile_view.dart';
+import 'package:seshly/widgets/responsive.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -16,8 +17,18 @@ class _SettingsViewState extends State<SettingsView> {
   bool pushNotify = true;
   bool emailNotify = false;
   bool studyReminders = true;
+  bool _loadingPrefs = true;
   final Color tealAccent = const Color(0xFF00C09E);
+  final Color logoutColor = const Color(0xFF00C09E);
   final Color backgroundColor = const Color(0xFF0F142B);
+  final NotificationService _notificationService = NotificationService();
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationPrefs();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +46,7 @@ class _SettingsViewState extends State<SettingsView> {
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: pagePadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -43,14 +54,26 @@ class _SettingsViewState extends State<SettingsView> {
               const _SectionHeader(title: "Notifications"),
               SettingsGroup(
                 children: [
-                  _SwitchTile(title: "Push Notifications", subtitle: "Receive notifications on your device", value: pushNotify, onChanged: (val) => setState(() => pushNotify = val)),
-                  _SwitchTile(title: "Email Notifications", subtitle: "Get updates via email", value: emailNotify, onChanged: (val) => setState(() => emailNotify = val)),
-                  _SwitchTile(title: "Study Reminders", subtitle: "Reminders for classes and assignments", value: studyReminders, onChanged: (val) => setState(() => studyReminders = val)),
+                  _SwitchTile(
+                    title: "Push Notifications",
+                    subtitle: "Receive notifications on your device",
+                    value: pushNotify,
+                    onChanged: _loadingPrefs ? null : (val) => _updateNotificationPref('push', val),
+                  ),
+                  _SwitchTile(
+                    title: "Email Notifications",
+                    subtitle: "Get updates via email",
+                    value: emailNotify,
+                    onChanged: _loadingPrefs ? null : (val) => _updateNotificationPref('email', val),
+                  ),
+                  _SwitchTile(
+                    title: "Study Reminders",
+                    subtitle: "Reminders for classes and assignments",
+                    value: studyReminders,
+                    onChanged: _loadingPrefs ? null : (val) => _updateNotificationPref('studyReminders', val),
+                  ),
                 ],
               ),
-              const SizedBox(height: 25),
-              const TutorBanner(),
-              const SizedBox(height: 25),
               const _SectionHeader(title: "Account"),
               SettingsGroup(
                 children: [
@@ -76,7 +99,7 @@ class _SettingsViewState extends State<SettingsView> {
                   await FirebaseAuth.instance.signOut();
                   if (mounted) nav.pop();
                 },
-                color: tealAccent,
+                color: logoutColor,
                 label: "Log Out",
                 icon: Icons.logout_rounded,
               ),
@@ -86,6 +109,91 @@ class _SettingsViewState extends State<SettingsView> {
         ),
       ),
     );
+  }
+
+  Future<void> _loadNotificationPrefs() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _loadingPrefs = false);
+      return;
+    }
+
+    try {
+      final doc = await _db.collection('users').doc(user.uid).get();
+      final data = doc.data() ?? {};
+      final prefs = data['notificationPrefs'] as Map<String, dynamic>? ?? {};
+      if (mounted) {
+        setState(() {
+          pushNotify = prefs['push'] ?? pushNotify;
+          emailNotify = prefs['email'] ?? emailNotify;
+          studyReminders = prefs['studyReminders'] ?? studyReminders;
+          _loadingPrefs = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingPrefs = false);
+      }
+    }
+  }
+
+  bool _prefForKey(String key) {
+    switch (key) {
+      case 'push':
+        return pushNotify;
+      case 'email':
+        return emailNotify;
+      case 'studyReminders':
+        return studyReminders;
+      default:
+        return false;
+    }
+  }
+
+  void _applyPref(String key, bool value) {
+    switch (key) {
+      case 'push':
+        pushNotify = value;
+        break;
+      case 'email':
+        emailNotify = value;
+        break;
+      case 'studyReminders':
+        studyReminders = value;
+        break;
+    }
+  }
+
+  Future<void> _updateNotificationPref(String key, bool value) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final previous = _prefForKey(key);
+    setState(() => _applyPref(key, value));
+
+    try {
+      await _db.collection('users').doc(user.uid).set({
+        'notificationPrefs': {key: value},
+      }, SetOptions(merge: true));
+
+      if (key == 'push') {
+        if (value) {
+          await _notificationService.initForUser(user);
+        } else {
+          await _notificationService.disableForUser(user);
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _applyPref(key, previous));
+        _showSnack("Could not update notification settings.");
+      }
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showPrivacyPolicy(BuildContext context) {
@@ -214,8 +322,8 @@ class _SwitchTile extends StatelessWidget {
   final String title;
   final String? subtitle;
   final bool value;
-  final ValueChanged<bool> onChanged;
-  const _SwitchTile({required this.title, this.subtitle, required this.value, required this.onChanged});
+  final ValueChanged<bool>? onChanged;
+  const _SwitchTile({required this.title, this.subtitle, required this.value, this.onChanged});
   @override
   Widget build(BuildContext context) {
     return ListTile(
@@ -274,6 +382,8 @@ class _BuildTactileButtonState extends State<_BuildTactileButton> {
   bool _isPressed = false;
   @override
   Widget build(BuildContext context) {
+    const Color foreground = Color(0xFF0F142B);
+    final Color fillColor = _isPressed ? widget.color.withValues(alpha: 220) : widget.color;
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
       onTapUp: (_) => setState(() => _isPressed = false),
@@ -286,16 +396,23 @@ class _BuildTactileButtonState extends State<_BuildTactileButton> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 15),
           decoration: BoxDecoration(
-            color: widget.color.withValues(alpha: 25), 
-            borderRadius: BorderRadius.circular(15), 
-            border: Border.all(color: widget.color.withValues(alpha: 50))
+            color: fillColor,
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: widget.color.withValues(alpha: 120)),
+            boxShadow: [
+              BoxShadow(
+                color: widget.color.withValues(alpha: 60),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center, 
             children: [
-              Icon(widget.icon, color: widget.color), 
+              Icon(widget.icon, color: foreground), 
               const SizedBox(width: 10), 
-              Text(widget.label, style: TextStyle(color: widget.color, fontWeight: FontWeight.bold, fontSize: 16))
+              Text(widget.label, style: const TextStyle(color: foreground, fontWeight: FontWeight.bold, fontSize: 16))
             ]
           ),
         ),
@@ -325,3 +442,5 @@ class _BuildDangerButton extends StatelessWidget {
     );
   }
 }
+
+

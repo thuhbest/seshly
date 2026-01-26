@@ -18,6 +18,12 @@ class _RightRailState extends State<RightRail> with SingleTickerProviderStateMix
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       width: 300,

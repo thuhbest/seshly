@@ -15,6 +15,6 @@ class StartPageController {
         builder: (context) => const LoginPageView(),
       ),
     );
-    print('Navigating to Login Screen...');
+    debugPrint('Navigating to Login Screen...');
   }
 }

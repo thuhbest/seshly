@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class CategorySelector extends StatelessWidget {
   final String selectedCategory;
@@ -11,7 +12,7 @@ class CategorySelector extends StatelessWidget {
   });
 
   final List<String> categories = const [
-    "All", "Math", "Physics", "Chemistry", "Computer Science", "Biology"
+    "All", "Mathematics", "Physics", "Chemistry", "Biology", "Computer Science", "Engineering"
   ];
 
   @override
@@ -22,9 +23,11 @@ class CategorySelector extends StatelessWidget {
       child: Row(
         children: categories.map((category) {
           bool isSelected = selectedCategory == category;
-          return GestureDetector(
+          return PressableScale(
             onTap: () => onCategorySelected(category),
-            child: Container(
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
               margin: const EdgeInsets.only(right: 10),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
               decoration: BoxDecoration(
@@ -32,12 +35,13 @@ class CategorySelector extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 border: isSelected ? null : Border.all(color: Colors.white10),
               ),
-              child: Text(
-                category,
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 180),
                 style: TextStyle(
-                  color: isSelected ? Colors.black : Colors.white70,
+                  color: isSelected ? const Color(0xFF0F142B) : Colors.white70,
                   fontWeight: FontWeight.bold,
                 ),
+                child: Text(category),
               ),
             ),
           );

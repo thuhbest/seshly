@@ -30,7 +30,7 @@ class SeshAIPanel extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-        Switch(value: value, onChanged: (v) {}, activeColor: teal),
+        Switch(value: value, onChanged: (v) {}, activeThumbColor: teal),
       ],
     );
   }

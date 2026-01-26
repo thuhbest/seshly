@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class PackageCard extends StatelessWidget {
-  final String minutes;
+  final int minutes;
   final String price;
   final String rateInfo;
   final String? saveAmount;

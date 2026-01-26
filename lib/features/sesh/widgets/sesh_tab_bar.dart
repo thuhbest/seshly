@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class SeshTabBar extends StatelessWidget {
   final String selectedTab;
@@ -6,7 +7,7 @@ class SeshTabBar extends StatelessWidget {
 
   const SeshTabBar({super.key, required this.selectedTab, required this.onTabChanged});
 
-  final List<String> tabs = const ["AI Assist", "Vault", "Archive", "Progress"];
+  final List<String> tabs = const ["AI Assist", "Vault", "Archive"];
 
   @override
   Widget build(BuildContext context) {
@@ -20,9 +21,12 @@ class SeshTabBar extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: tabs.map((tab) {
           bool isSelected = selectedTab == tab;
-          return GestureDetector(
+          return PressableScale(
             onTap: () => onTabChanged(tab),
-            child: Container(
+            borderRadius: BorderRadius.circular(12),
+            pressedScale: 0.96,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: isSelected ? const Color(0xFF1E243A) : Colors.transparent,

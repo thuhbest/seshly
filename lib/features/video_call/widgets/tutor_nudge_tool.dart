@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class TutorNudgeTool extends StatefulWidget {
   final String studentName;
@@ -26,7 +27,6 @@ class _TutorNudgeToolState extends State<TutorNudgeTool> {
     "Explain this part",
   ];
 
-  String? _selectedNudge;
   final bool _isAIGenerating = false;
 
   void _sendNudge(String message) {
@@ -129,8 +129,10 @@ class _TutorNudgeToolState extends State<TutorNudgeTool> {
             style: TextStyle(color: Colors.white, fontSize: 13, height: 1.4, fontStyle: FontStyle.italic),
           ),
           const SizedBox(height: 12),
-          GestureDetector(
+          PressableScale(
             onTap: () => _sendNudge("Check your integration constant"),
+            borderRadius: BorderRadius.circular(10),
+            pressedScale: 0.96,
             child: Container(
               alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(vertical: 10),
@@ -148,8 +150,10 @@ class _TutorNudgeToolState extends State<TutorNudgeTool> {
     return Wrap(
       spacing: 10,
       runSpacing: 10,
-      children: _quickNudges.map((nudge) => GestureDetector(
+      children: _quickNudges.map((nudge) => PressableScale(
         onTap: () => _sendNudge(nudge),
+        borderRadius: BorderRadius.circular(12),
+        pressedScale: 0.96,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
@@ -218,8 +222,10 @@ class _TactileActionBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return PressableScale(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(15),
+      pressedScale: 0.96,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(15)),

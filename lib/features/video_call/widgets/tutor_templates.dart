@@ -6,7 +6,6 @@ class TutorTemplates extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const Color tealAccent = Color(0xFF00C09E);
-    const Color cardColor = Color(0xFF1E243A);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

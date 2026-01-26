@@ -36,8 +36,8 @@ class SignUpController {
     }
 
     // 🔧 Validate password strength
-    if (password.length < 6) {
-      _showError('Password must be at least 6 characters long');
+    if (!_isStrongPassword(password)) {
+      _showError('Password must be 8+ chars with upper, lower, number, and symbol.');
       return;
     }
 
@@ -65,7 +65,7 @@ class SignUpController {
       final errorMessage = _mapFirebaseErrorToHumanMessage(e);
       _showError(errorMessage);
     } catch (e) {
-      print('⚠️ SignUpController generic error: $e');
+      debugPrint('SignUpController generic error: $e');
       _showError(_handleGenericError(e));
     }
   }
@@ -78,7 +78,7 @@ class SignUpController {
       case 'email-already-in-use':
         return 'This email is already registered. Please sign in instead or use a different email.';
       case 'weak-password':
-        return 'Password is too weak. Please use at least 6 characters with a mix of letters and numbers.';
+        return 'Password is too weak. Use 8+ chars with upper, lower, number, and symbol.';
       case 'invalid-email':
         return 'Please enter a valid university email address (e.g., name@university.ac.za).';
       case 'operation-not-allowed':
@@ -123,6 +123,15 @@ class SignUpController {
     }
     
     return 'Something went wrong during registration. Please try again.';
+  }
+
+  bool _isStrongPassword(String password) {
+    if (password.length < 8) return false;
+    final hasUpper = RegExp(r'[A-Z]').hasMatch(password);
+    final hasLower = RegExp(r'[a-z]').hasMatch(password);
+    final hasNumber = RegExp(r'\d').hasMatch(password);
+    final hasSymbol = RegExp(r'[!@#\$%\^&\*\(\)_\+\-=\[\]\{\};:"\\|,.<>\/?`~]').hasMatch(password);
+    return hasUpper && hasLower && hasNumber && hasSymbol;
   }
 
   /// ===============================

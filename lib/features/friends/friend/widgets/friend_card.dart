@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 class FriendCard extends StatelessWidget {
   final String name, id, year, streak, mins;
-  final VoidCallback onMessage; 
+  final bool isOnline;
+  final String presenceLabel;
+  final VoidCallback onMessage;
 
   const FriendCard({
     super.key,
@@ -11,6 +13,8 @@ class FriendCard extends StatelessWidget {
     required this.year,
     required this.streak,
     required this.mins,
+    required this.isOnline,
+    required this.presenceLabel,
     required this.onMessage,
   });
 
@@ -49,7 +53,7 @@ class FriendCard extends StatelessWidget {
                       width: 12,
                       height: 12,
                       decoration: BoxDecoration(
-                        color: tealAccent,
+                        color: isOnline ? tealAccent : Colors.white24,
                         shape: BoxShape.circle,
                         border: Border.all(color: scaffoldBg, width: 2),
                       ),
@@ -73,7 +77,7 @@ class FriendCard extends StatelessWidget {
                             fontSize: 16,
                           ),
                         ),
-                        _statusBadge("Online"),
+                        _statusBadge(presenceLabel, isOnline),
                       ],
                     ),
                     Text("$id • $year", style: const TextStyle(color: Colors.white54, fontSize: 12)),
@@ -118,16 +122,20 @@ class FriendCard extends StatelessWidget {
     );
   }
 
-  Widget _statusBadge(String text) {
+  Widget _statusBadge(String text, bool isOnline) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFF00C09E).withValues(alpha: 0.1),
+        color: (isOnline ? const Color(0xFF00C09E) : Colors.white24).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(5),
       ),
       child: Text(
         text,
-        style: const TextStyle(color: Color(0xFF00C09E), fontSize: 10, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: isOnline ? const Color(0xFF00C09E) : Colors.white54,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

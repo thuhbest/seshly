@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class ReviewComparisonTool extends StatefulWidget {
   const ReviewComparisonTool({super.key});
@@ -188,8 +189,10 @@ class _ReviewComparisonToolState extends State<ReviewComparisonTool> {
   }
 
   Widget _miniIconButton(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
+    return PressableScale(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      pressedScale: 0.9,
       child: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(color: cardColor.withValues(alpha: 200), shape: BoxShape.circle),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/package_card.dart';
 import '../widgets/payment_overlay.dart';
+import 'package:seshly/widgets/responsive.dart';
 
 class RechargeView extends StatelessWidget {
   const RechargeView({super.key});
@@ -29,86 +32,109 @@ class RechargeView extends StatelessWidget {
           ],
         ),
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- Current Balance Card (From Screenshot) ---
-            _buildBalanceCard(tealAccent),
-            const SizedBox(height: 30),
+      body: ResponsiveCenter(
+        maxWidth: 720,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // --- Current Balance Card ---
+              _buildBalanceSection(tealAccent),
+              const SizedBox(height: 30),
 
-            // --- Rates Info (From Screenshot) ---
-            _buildRatesInfo(),
-            const SizedBox(height: 35),
+              // --- Rates Info (From Screenshot) ---
+              _buildRatesInfo(),
+              const SizedBox(height: 35),
 
-            // --- Starter Packages ---
-            const _TierHeader(title: "Starter Packages", color: Colors.greenAccent),
-            PackageCard(
-              minutes: "30",
-              price: "R150",
-              rateInfo: "R5.00/min",
-              onBuy: () => _showPayment(context, "Starter 30", "R150"),
-            ),
-            const SizedBox(height: 15),
-            PackageCard(
-              minutes: "60",
-              price: "R280",
-              rateInfo: "R4.67/min",
-              saveAmount: "R20",
-              onBuy: () => _showPayment(context, "Starter 60", "R280"),
-            ),
+              // --- Starter Packages ---
+              const _TierHeader(title: "Starter Packages", color: Colors.greenAccent),
+              PackageCard(
+                minutes: 30,
+                price: "R150",
+                rateInfo: "R5.00/min",
+                onBuy: () => _showPayment(context, "Starter 30", "R150", 30),
+              ),
+              const SizedBox(height: 15),
+              PackageCard(
+                minutes: 60,
+                price: "R280",
+                rateInfo: "R4.67/min",
+                saveAmount: "R20",
+                onBuy: () => _showPayment(context, "Starter 60", "R280", 60),
+              ),
 
-            const SizedBox(height: 30),
+              const SizedBox(height: 30),
 
-            // --- Core Study Packages ---
-            const _TierHeader(title: "Core Study Packages", color: Colors.blueAccent),
-            PackageCard(
-              minutes: "120",
-              price: "R540",
-              rateInfo: "R4.50/min",
-              saveAmount: "R60",
-              isPopular: true,
-              onBuy: () => _showPayment(context, "Study 120", "R540"),
-            ),
-            const SizedBox(height: 15),
-            PackageCard(
-              minutes: "180",
-              price: "R780",
-              rateInfo: "R4.33/min",
-              saveAmount: "R120",
-              onBuy: () => _showPayment(context, "Study 180", "R780"),
-            ),
+              // --- Core Study Packages ---
+              const _TierHeader(title: "Core Study Packages", color: Colors.blueAccent),
+              PackageCard(
+                minutes: 120,
+                price: "R540",
+                rateInfo: "R4.50/min",
+                saveAmount: "R60",
+                isPopular: true,
+                onBuy: () => _showPayment(context, "Study 120", "R540", 120),
+              ),
+              const SizedBox(height: 15),
+              PackageCard(
+                minutes: 180,
+                price: "R780",
+                rateInfo: "R4.33/min",
+                saveAmount: "R120",
+                onBuy: () => _showPayment(context, "Study 180", "R780", 180),
+              ),
 
-            const SizedBox(height: 30),
+              const SizedBox(height: 30),
 
-            // --- Power User Packages ---
-            const _TierHeader(title: "Power User Packages", color: Colors.purpleAccent),
-            PackageCard(
-              minutes: "300",
-              price: "R1,250",
-              rateInfo: "R4.17/min",
-              saveAmount: "R250",
-              onBuy: () => _showPayment(context, "Focus 300", "R1,250"),
-            ),
-            const SizedBox(height: 40),
-          ],
+              // --- Power User Packages ---
+              const _TierHeader(title: "Power User Packages", color: Colors.purpleAccent),
+              PackageCard(
+                minutes: 300,
+                price: "R1,250",
+                rateInfo: "R4.17/min",
+                saveAmount: "R250",
+                onBuy: () => _showPayment(context, "Focus 300", "R1,250", 300),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _showPayment(BuildContext context, String packageName, String price) {
+  void _showPayment(BuildContext context, String packageName, String price, int minutes) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => PaymentOverlay(packageName: packageName, price: price),
+      builder: (context) => PaymentOverlay(
+        packageName: packageName,
+        price: price,
+        minutes: minutes,
+      ),
     );
   }
 
-  Widget _buildBalanceCard(Color teal) {
+  Widget _buildBalanceSection(Color teal) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return _buildBalanceCard(teal, 0, isGuest: true);
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() as Map<String, dynamic>? ?? {};
+        final int minutes = (data['seshMinutes'] as num?)?.toInt() ?? 0;
+        return _buildBalanceCard(teal, minutes);
+      },
+    );
+  }
+
+  Widget _buildBalanceCard(Color teal, int minutes, {bool isGuest = false}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 30),
@@ -117,12 +143,18 @@ class RechargeView extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: teal.withValues(alpha: 0.2)),
       ),
-      child: const Column(
+      child: Column(
         children: [
-          Text("Current Balance", style: TextStyle(color: Color(0xFF00C09E), fontWeight: FontWeight.bold)),
-          SizedBox(height: 10),
-          Text("450", style: TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.bold)),
-          Text("Sesh Minutes", style: TextStyle(color: Colors.white54, fontSize: 14)),
+          Text(
+            isGuest ? "Sign in to see balance" : "Current Balance",
+            style: const TextStyle(color: Color(0xFF00C09E), fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            isGuest ? "--" : minutes.toString(),
+            style: const TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.bold),
+          ),
+          const Text("Sesh Minutes", style: TextStyle(color: Colors.white54, fontSize: 14)),
         ],
       ),
     );
@@ -140,9 +172,9 @@ class RechargeView extends StatelessWidget {
         children: [
           Text("How Sesh Minutes Work", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
           SizedBox(height: 15),
-          Text("• 1.5x rate: 1 real minute = 1.5 Sesh minutes", style: TextStyle(color: Colors.white70, fontSize: 13)),
-          Text("• 2x rate: 1 real minute = 2 Sesh minutes", style: TextStyle(color: Colors.white70, fontSize: 13)),
-          Text("• 3x rate: 1 real minute = 3 Sesh minutes", style: TextStyle(color: Colors.white70, fontSize: 13)),
+          Text("- 1.5x rate: 1 real minute = 1.5 Sesh minutes", style: TextStyle(color: Colors.white70, fontSize: 13)),
+          Text("- 2x rate: 1 real minute = 2 Sesh minutes", style: TextStyle(color: Colors.white70, fontSize: 13)),
+          Text("- 3x rate: 1 real minute = 3 Sesh minutes", style: TextStyle(color: Colors.white70, fontSize: 13)),
         ],
       ),
     );

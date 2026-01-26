@@ -1,10 +1,11 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:seshly/widgets/responsive.dart';
+import 'package:seshly/utils/image_picker_util.dart';
 
 
 class NewQuestionView extends StatefulWidget {
@@ -17,11 +18,9 @@ class NewQuestionView extends StatefulWidget {
 class _NewQuestionViewState extends State<NewQuestionView> {
   final TextEditingController _questionController = TextEditingController();
   final TextEditingController _customSubjectController = TextEditingController();
-  final ImagePicker _picker = ImagePicker();
 
   String? selectedSubject;
-  XFile? _pickedFile;
-  Uint8List? _webImage;
+  Uint8List? _imageBytes;
   String? _linkAttachment; // 🔥 Stores the URL link
   bool isCustomSubject = false;
   bool isPosting = false;
@@ -104,24 +103,14 @@ class _NewQuestionViewState extends State<NewQuestionView> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-      if (kIsWeb && source == ImageSource.camera) {
-        _showError("Camera is not supported on web. Please select from gallery.");
+      if (source == ImageSource.camera && !supportsCameraPicker()) {
+        _showError("Camera is only supported on mobile. Please select from gallery.");
         return;
       }
 
-      final XFile? pickedFile = await _picker.pickImage(source: source, imageQuality: 70);
-
-      if (pickedFile == null) return;
-
-      if (kIsWeb) {
-        final bytes = await pickedFile.readAsBytes();
-        setState(() {
-          _pickedFile = pickedFile;
-          _webImage = bytes;
-        });
-      } else {
-        setState(() => _pickedFile = pickedFile);
-      }
+      final result = await pickImageBytes(source: source, imageQuality: 70);
+      if (result == null) return;
+      setState(() => _imageBytes = result.bytes);
     } catch (e) {
       debugPrint("Error picking image: $e");
     }
@@ -150,20 +139,15 @@ class _NewQuestionViewState extends State<NewQuestionView> {
 
       String? imageUrl;
 
-      if (_pickedFile != null) {
+      if (_imageBytes != null) {
         final storageRef = FirebaseStorage.instance
             .ref()
             .child('post_attachments')
             .child('${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
 
-        UploadTask uploadTask;
-        if (kIsWeb) {
-          uploadTask = storageRef.putData(_webImage!, SettableMetadata(contentType: 'image/jpeg'));
-        } else {
-          uploadTask = storageRef.putFile(File(_pickedFile!.path));
-        }
-
-        final TaskSnapshot snap = await uploadTask.timeout(const Duration(seconds: 20));
+        final TaskSnapshot snap = await storageRef
+            .putData(_imageBytes!, SettableMetadata(contentType: 'image/jpeg'))
+            .timeout(const Duration(seconds: 20));
         imageUrl = await snap.ref.getDownloadURL();
       }
 
@@ -222,11 +206,13 @@ class _NewQuestionViewState extends State<NewQuestionView> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: ResponsiveCenter(
+        padding: EdgeInsets.zero,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Container(
               decoration: BoxDecoration(
                 color: cardColor.withValues(alpha: 0.5),
@@ -250,21 +236,19 @@ class _NewQuestionViewState extends State<NewQuestionView> {
                     ),
                   ),
                   
-                  if (_pickedFile != null)
+                  if (_imageBytes != null)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                       child: Stack(
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(15),
-                            child: kIsWeb
-                                ? Image.memory(_webImage!, height: 200, width: double.infinity, fit: BoxFit.cover)
-                                : Image.file(File(_pickedFile!.path), height: 200, width: double.infinity, fit: BoxFit.cover),
+                            child: Image.memory(_imageBytes!, height: 200, width: double.infinity, fit: BoxFit.cover),
                           ),
                           Positioned(
                             right: 8, top: 8,
                             child: GestureDetector(
-                              onTap: () => setState(() { _pickedFile = null; _webImage = null; }),
+                              onTap: () => setState(() { _imageBytes = null; }),
                               child: Container(
                                 padding: const EdgeInsets.all(4),
                                 decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
@@ -347,7 +331,8 @@ class _NewQuestionViewState extends State<NewQuestionView> {
             ],
             const SizedBox(height: 40),
             _buildAIBox(tealAccent),
-          ],
+            ],
+          ),
         ),
       ),
     );
