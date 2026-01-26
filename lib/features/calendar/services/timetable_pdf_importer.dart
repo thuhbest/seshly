@@ -1,12 +1,21 @@
 import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../data/calendar_repository.dart';
 import '../models/calendar_event.dart';
+
+Future<Uint8List?> _readFileBytes(PlatformFile file) async {
+  if (file.bytes != null) return file.bytes;
+  final stream = file.readStream;
+  if (stream == null) return null;
+  final chunks = <int>[];
+  await for (final chunk in stream) {
+    chunks.addAll(chunk);
+  }
+  return Uint8List.fromList(chunks);
+}
 
 Map<String, Object?> _extractAndParsePdf(Uint8List bytes) {
   final text = _extractText(bytes);
@@ -222,17 +231,13 @@ class TimetablePdfImporter {
       type: FileType.custom,
       allowedExtensions: const ['pdf'],
       withData: true, // web/desktop often gives bytes, mobile sometimes not
+      withReadStream: true,
     );
 
     if (res == null || res.files.isEmpty) return 0;
     final file = res.files.first;
 
-    Uint8List? bytes = file.bytes;
-
-    // ✅ Correct fallback (mobile/desktop) when bytes is null:
-    if (bytes == null && file.path != null) {
-      bytes = await File(file.path!).readAsBytes();
-    }
+    final bytes = await _readFileBytes(file);
     if (bytes == null) return 0;
 
     final sha = sha1.convert(bytes).toString();
@@ -344,3 +349,5 @@ class _WeeklyItem {
   String get signature =>
       '${weekday}_${start.hour}:${start.minute}_${end.hour}:${end.minute}_${title.toLowerCase()}_${location.toLowerCase()}_${type.toLowerCase()}';
 }
+
+

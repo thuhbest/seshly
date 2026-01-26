@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/session_mode.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class StudentPracticeView extends StatefulWidget {
   const StudentPracticeView({super.key});
@@ -145,10 +146,12 @@ class _StudentPracticeViewState extends State<StudentPracticeView> {
     return Positioned(
       right: 30,
       bottom: 100,
-      child: GestureDetector(
+      child: PressableScale(
         onTap: () {
            // Logic: Open Sesh AI rate-limited hint modal
         },
+        borderRadius: BorderRadius.circular(999),
+        pressedScale: 0.92,
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(

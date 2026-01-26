@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'archive_folder_view.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class ArchiveView extends StatefulWidget {
   const ArchiveView({super.key});
@@ -142,8 +143,10 @@ class _ArchiveViewState extends State<ArchiveView> {
                     runSpacing: 10,
                     children: _folderIcons.entries.map((entry) {
                       final bool selected = selectedIcon == entry.key;
-                      return GestureDetector(
+                      return PressableScale(
                         onTap: () => setModalState(() => selectedIcon = entry.key),
+                        borderRadius: BorderRadius.circular(12),
+                        pressedScale: 0.985,
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
@@ -163,8 +166,10 @@ class _ArchiveViewState extends State<ArchiveView> {
                     spacing: 10,
                     children: _folderColors.map((colorValue) {
                       final bool selected = selectedColor == colorValue;
-                      return GestureDetector(
+                      return PressableScale(
                         onTap: () => setModalState(() => selectedColor = colorValue),
+                        borderRadius: BorderRadius.circular(999),
+                        pressedScale: 0.985,
                         child: Container(
                           width: 36,
                           height: 36,
@@ -196,8 +201,8 @@ class _ArchiveViewState extends State<ArchiveView> {
                             .collection('users')
                             .doc(user.uid)
                             .collection('note_folders');
-                        if (isEditing) {
-                          await doc!.reference.update({
+                        if (doc != null) {
+                          await doc.reference.update({
                             'title': name,
                             'icon': selectedIcon,
                             'color': selectedColor,
@@ -214,7 +219,8 @@ class _ArchiveViewState extends State<ArchiveView> {
                             'updatedAt': FieldValue.serverTimestamp(),
                           });
                         }
-                        if (mounted) Navigator.pop(context);
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: tealAccent,
@@ -247,10 +253,15 @@ class _ArchiveViewState extends State<ArchiveView> {
           style: TextStyle(color: Colors.white54),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(foregroundColor: Colors.white54),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -385,8 +396,8 @@ class _ArchiveViewState extends State<ArchiveView> {
                           ),
                         ),
                         PopupMenuButton<String>(
-                          color: backgroundColor,
-                          icon: const Icon(Icons.more_vert, color: Colors.white38),
+                          color: cardColor,
+                          icon: const Icon(Icons.more_vert, color: Colors.white70),
                           onSelected: (value) {
                             if (value == 'edit') {
                               _showFolderEditor(doc: doc);
@@ -395,15 +406,21 @@ class _ArchiveViewState extends State<ArchiveView> {
                             }
                           },
                           itemBuilder: (context) => [
-                            const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                            const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Edit', style: TextStyle(color: Colors.white)),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                            ),
                           ],
                         ),
                       ],
                     ),
                   ),
                 );
-              }).toList(),
+              }),
           ],
         );
       },
@@ -422,20 +439,12 @@ class ArchiveClickWrapper extends StatefulWidget {
 }
 
 class _ArchiveClickWrapperState extends State<ArchiveClickWrapper> {
-  bool _isPressed = false;
-
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
+    return PressableScale(
       onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _isPressed ? 0.96 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: widget.child,
-      ),
+      pressedScale: 0.992,
+      child: widget.child,
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/mentorship_service.dart';
 import '../widgets/goals_card.dart';
 import '../widgets/mentor_card.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class MenteeMentorshipView extends StatefulWidget {
   final MentorshipService service;
@@ -151,7 +152,7 @@ class _MenteeMentorshipViewState extends State<MenteeMentorshipView> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: goalType,
+                initialValue: goalType,
                 dropdownColor: backgroundColor,
                 decoration: InputDecoration(
                   filled: true,
@@ -276,7 +277,8 @@ class _MenteeMentorshipViewState extends State<MenteeMentorshipView> {
             final mentorshipDoc =
                 mentorshipSnap.data?.docs.isNotEmpty == true ? mentorshipSnap.data!.docs.first : null;
             final mentorship = mentorshipDoc?.data();
-            final hasMentorship = mentorshipDoc != null;
+            final mentorshipId = mentorshipDoc?.id;
+            final hasMentorship = mentorshipId != null;
             final focusTheme = (mentorship?['focusTheme'] ?? widget.service.focusThemeForMonth(DateTime.now())).toString();
             final riskScore = (mentorship?['riskScore'] as num?)?.toInt() ?? 0;
             final riskFlags = List<String>.from(mentorship?['riskFlags'] ?? []);
@@ -293,18 +295,18 @@ class _MenteeMentorshipViewState extends State<MenteeMentorshipView> {
                   nextCheckIn: nextCheckIn,
                 ),
                 const SizedBox(height: 16),
-                if (hasMentorship)
+                if (mentorshipId != null)
                   _assignedMentorSection(
                     mentorship: mentorship ?? {},
-                    mentorshipId: mentorshipDoc.id,
+                    mentorshipId: mentorshipId,
                   )
                 else
                   _emptyMentorCard(),
                 const SizedBox(height: 16),
-                _checkInCard(hasMentorship ? mentorshipDoc!.id : null),
+                _checkInCard(mentorshipId),
                 const SizedBox(height: 16),
-                if (hasMentorship)
-                  _goalsSection(mentorshipDoc!.id)
+                if (mentorshipId != null)
+                  _goalsSection(mentorshipId)
                 else
                   _infoCard(
                     title: 'Set goals once you have a mentor',
@@ -314,7 +316,16 @@ class _MenteeMentorshipViewState extends State<MenteeMentorshipView> {
                 _privacyCard(profile),
                 const SizedBox(height: 16),
                 if (!hasMentorship)
-                  _matchesSection(profile)
+                  StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: widget.service.watchPendingRequestsForMentee(userId),
+                    builder: (context, pendingSnap) {
+                      final pendingDoc = pendingSnap.data?.docs.isNotEmpty == true ? pendingSnap.data!.docs.first : null;
+                      if (pendingDoc != null) {
+                        return _pendingRequestCard(pendingDoc);
+                      }
+                      return _matchesSection(profile);
+                    },
+                  )
                 else
                   _riskFlagsSection(riskFlags),
               ],
@@ -322,6 +333,93 @@ class _MenteeMentorshipViewState extends State<MenteeMentorshipView> {
           },
         );
       },
+    );
+  }
+
+  Widget _pendingRequestCard(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    final mentorName = (data['mentorName'] ?? 'Mentor').toString();
+    final faculty = (data['faculty'] ?? '').toString();
+    final degree = (data['degree'] ?? '').toString();
+    final source = (data['requestSource'] ?? 'university').toString();
+    final matchScore = (data['matchScore'] as num?)?.toInt() ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Mentorship assignment', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(
+            'Assigned by ${source.isEmpty ? 'university' : source}.',
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          Text(mentorName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          if (faculty.isNotEmpty || degree.isNotEmpty)
+            Text(
+              [faculty, degree].where((item) => item.isNotEmpty).join(' • '),
+              style: const TextStyle(color: Colors.white38, fontSize: 11),
+            ),
+          if (matchScore > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('$matchScore% fit', style: TextStyle(color: tealAccent, fontSize: 11)),
+            ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await widget.service.acceptMentorshipRequest(mentorshipId: doc.id);
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Mentor accepted.'), backgroundColor: Color(0xFF00C09E)),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: tealAccent,
+                    foregroundColor: backgroundColor,
+                  ),
+                  child: const Text('Accept'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: PressableScale(
+                  onTap: () async {
+                    await widget.service.declineMentorshipRequest(mentorshipId: doc.id);
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Request declined.'), backgroundColor: Colors.orangeAccent),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  pressedScale: 0.96,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    ),
+                    child: const Center(
+                      child: Text('Decline', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -449,8 +547,10 @@ class _MenteeMentorshipViewState extends State<MenteeMentorshipView> {
     String? mentorshipId,
     String moodKey,
   ) {
-    return GestureDetector(
+    return PressableScale(
       onTap: mentorshipId == null ? null : () => _submitCheckIn(mentorshipId: mentorshipId, mood: moodKey),
+      borderRadius: BorderRadius.circular(12),
+      pressedScale: 0.94,
       child: Column(
         children: [
           Icon(icon, color: mentorshipId == null ? Colors.white24 : color),
@@ -534,9 +634,19 @@ class _MenteeMentorshipViewState extends State<MenteeMentorshipView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Smart mentor matches', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              TextButton(
-                onPressed: () => setState(() => _matchRefresh += 1),
-                child: const Text('Refresh', style: TextStyle(color: Colors.white54)),
+              PressableScale(
+                onTap: () => setState(() => _matchRefresh += 1),
+                borderRadius: BorderRadius.circular(10),
+                pressedScale: 0.96,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  child: const Text('Refresh', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                ),
               ),
             ],
           ),
@@ -652,9 +762,19 @@ class _MenteeMentorshipViewState extends State<MenteeMentorshipView> {
                 ),
               ),
               const SizedBox(width: 8),
-              TextButton(
-                onPressed: () => widget.onMessageUser(match.mentorId, name),
-                child: const Text('Message', style: TextStyle(color: Colors.white54)),
+              PressableScale(
+                onTap: () => widget.onMessageUser(match.mentorId, name),
+                borderRadius: BorderRadius.circular(10),
+                pressedScale: 0.96,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  child: const Text('Message', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                ),
               ),
             ],
           ),

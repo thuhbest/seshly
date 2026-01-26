@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/market_item_model.dart';
 import 'market_order_detail_view.dart';
+import 'package:seshly/widgets/responsive.dart';
 
 class MarketItemDetailView extends StatefulWidget {
   final String itemId;
@@ -14,6 +15,14 @@ class MarketItemDetailView extends StatefulWidget {
 
 class _MarketItemDetailViewState extends State<MarketItemDetailView> {
   bool _isOrdering = false;
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _ordersKey = GlobalKey();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   Future<void> _createOrder(MarketItem item) async {
     if (_isOrdering) return;
@@ -63,6 +72,12 @@ class _MarketItemDetailViewState extends State<MarketItemDetailView> {
         'itemTitle': item.title,
         'price': item.price,
         'currency': item.currency,
+        'sellerPrice': item.sellerPrice,
+        'platformFee': item.platformFee,
+        'priceIncludesFee': item.priceIncludesFee,
+        'listingType': item.listingType,
+        'fulfillment': item.fulfillment,
+        'itemCategory': item.category,
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -91,9 +106,33 @@ class _MarketItemDetailViewState extends State<MarketItemDetailView> {
     }
   }
 
+  String _formatPrice(String currency, int amount) {
+    if (currency == 'ZAR' || currency == 'R') {
+      return "R$amount";
+    }
+    return "$currency $amount";
+  }
+
   void _showSnack(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _scrollToOrders() {
+    final target = _ordersKey.currentContext;
+    if (target != null) {
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+    } else if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   @override
@@ -113,26 +152,34 @@ class _MarketItemDetailViewState extends State<MarketItemDetailView> {
         ),
         title: const Text("Item details", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('marketplace_items').doc(widget.itemId).snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: tealAccent));
-          }
-          if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-            return const Center(child: Text("Item not found", style: TextStyle(color: Colors.white54)));
-          }
+      body: ResponsiveCenter(
+        padding: EdgeInsets.zero,
+        child: StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance.collection('marketplace_items').doc(widget.itemId).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(color: tealAccent));
+            }
+            if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+              return const Center(child: Text("Item not found", style: TextStyle(color: Colors.white54)));
+            }
 
-          final item = MarketItem.fromDoc(snapshot.data!);
-          final userId = FirebaseAuth.instance.currentUser?.uid;
-          final bool isSeller = userId != null && userId == item.sellerId;
-          final bool isSold = item.status == 'sold';
+            final item = MarketItem.fromDoc(snapshot.data!);
+            final userId = FirebaseAuth.instance.currentUser?.uid;
+            final bool isSeller = userId != null && userId == item.sellerId;
+            final bool isSold = item.status == 'sold';
+            final bool isNotes = item.isNotesListing;
+            final int? sellerPrice = item.sellerPrice;
+            final int? platformFee = item.platformFee;
+            final int sellerEarns = sellerPrice ?? (item.price - (platformFee ?? 0)).clamp(0, item.price).toInt();
+            final int feeAmount = platformFee ?? (item.price - (sellerPrice ?? 0)).clamp(0, item.price).toInt();
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            return SingleChildScrollView(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 Container(
                   height: 220,
                   width: double.infinity,
@@ -189,6 +236,42 @@ class _MarketItemDetailViewState extends State<MarketItemDetailView> {
                 if (item.description.isNotEmpty)
                   Text(item.description, style: const TextStyle(color: Colors.white70, height: 1.5)),
                 const SizedBox(height: 20),
+                if (isNotes)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: cardColor.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Seshly notes delivery",
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          "We store the notes and release them after payment. Price includes a 10% Seshly fee.",
+                          style: TextStyle(color: Colors.white54, fontSize: 12),
+                        ),
+                        if (sellerPrice != null || platformFee != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            "Seller earns ${_formatPrice(item.currency, sellerEarns)}",
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                          Text(
+                            "Seshly fee ${_formatPrice(item.currency, feeAmount)}",
+                            style: const TextStyle(color: Colors.white38, fontSize: 12),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                if (isNotes) const SizedBox(height: 16),
                 if (isSold)
                   Container(
                     width: double.infinity,
@@ -216,15 +299,19 @@ class _MarketItemDetailViewState extends State<MarketItemDetailView> {
                     ),
                   )
                 else
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Center(
-                      child: Text("Your listing", style: TextStyle(color: Colors.white70)),
+                  GestureDetector(
+                    onTap: _scrollToOrders,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                      ),
+                      child: const Center(
+                        child: Text("Your listing - View orders", style: TextStyle(color: Colors.white70)),
+                      ),
                     ),
                   ),
                 const SizedBox(height: 20),
@@ -253,6 +340,7 @@ class _MarketItemDetailViewState extends State<MarketItemDetailView> {
                       if (relevantOrders.isEmpty) return const SizedBox.shrink();
 
                       return Column(
+                        key: _ordersKey,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
@@ -315,15 +403,16 @@ class _MarketItemDetailViewState extends State<MarketItemDetailView> {
                                 ],
                               ),
                             );
-                          }).toList(),
+                          }),
                         ],
                       );
                     },
                   ),
-              ],
-            ),
-          );
-        },
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

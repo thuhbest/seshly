@@ -63,6 +63,13 @@ class MentorshipService {
         .snapshots();
   }
 
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchPendingRequestsForMentee(String menteeId) {
+    return _mentorships
+        .where('menteeId', isEqualTo: menteeId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots();
+  }
+
   String _normalize(String? value) {
     return (value ?? '').toLowerCase().trim();
   }
@@ -273,6 +280,47 @@ class MentorshipService {
     return matches.take(limit).toList();
   }
 
+  Future<List<MentorMatch>> findMenteeMatches({
+    required Map<String, dynamic> mentorProfile,
+    int limit = 6,
+  }) async {
+    Query<Map<String, dynamic>> query = _profiles
+        .where('role', isEqualTo: 'mentee')
+        .where('status', isEqualTo: 'active');
+    final university = _normalize(mentorProfile['university']?.toString());
+    if (university.isNotEmpty) {
+      query = query.where('university', isEqualTo: mentorProfile['university']);
+    }
+
+    final snapshot = await query.limit(40).get();
+    final matches = <MentorMatch>[];
+    for (final doc in snapshot.docs) {
+      final menteeProfile = doc.data();
+      final menteeId = doc.id;
+      if (menteeId == currentUserId) continue;
+      final reasons = <String>[];
+      final score = _scoreMatch(menteeProfile, mentorProfile, reasons);
+      matches.add(MentorMatch(
+        mentorId: menteeId,
+        profile: menteeProfile,
+        score: score,
+        reasons: reasons,
+      ));
+    }
+
+    matches.sort((a, b) => b.score.compareTo(a.score));
+    return matches.take(limit).toList();
+  }
+
+  Future<bool> _hasActiveMentorship(String menteeId) async {
+    final existing = await _mentorships
+        .where('menteeId', isEqualTo: menteeId)
+        .where('status', whereIn: ['active', 'pending'])
+        .limit(1)
+        .get();
+    return existing.docs.isNotEmpty;
+  }
+
   Future<String?> createMentorship({
     required String mentorId,
     required String menteeId,
@@ -343,6 +391,121 @@ class MentorshipService {
     }, SetOptions(merge: true));
 
     return docRef.id;
+  }
+
+  Future<String?> createMentorshipRequest({
+    required String mentorId,
+    required String menteeId,
+    int matchScore = 0,
+    List<String> matchReasons = const [],
+    String requestSource = 'university',
+  }) async {
+    if (await _hasActiveMentorship(menteeId)) {
+      return null;
+    }
+
+    final mentorProfile = await getProfile(mentorId) ?? {};
+    final menteeProfile = await getProfile(menteeId) ?? {};
+    final menteeYear = menteeProfile['year'] ?? menteeProfile['levelOfStudy'];
+    final mentorYear = mentorProfile['year'] ?? mentorProfile['levelOfStudy'];
+
+    final mentorUser = await _db.collection('users').doc(mentorId).get();
+    final menteeUser = await _db.collection('users').doc(menteeId).get();
+    final mentorName = (mentorUser.data()?['fullName'] ?? 'Mentor').toString();
+    final menteeName = (menteeUser.data()?['fullName'] ?? 'Student').toString();
+
+    final focusTheme = focusThemeForMonth(DateTime.now());
+    final docRef = await _mentorships.add({
+      'mentorId': mentorId,
+      'menteeId': menteeId,
+      'mentorName': mentorName,
+      'menteeName': menteeName,
+      'menteeYear': menteeYear,
+      'mentorYear': mentorYear,
+      'menteeYearNumber': _yearToNumber(menteeYear?.toString()),
+      'mentorYearNumber': _yearToNumber(mentorYear?.toString()),
+      'participants': [mentorId, menteeId],
+      'status': 'pending',
+      'matchScore': matchScore,
+      'matchReasons': matchReasons,
+      'focusTheme': focusTheme,
+      'riskScore': 0,
+      'riskFlags': [],
+      'checkInStreak': 0,
+      'lastCheckInAt': null,
+      'lastInteractionAt': null,
+      'nextCheckInDueAt': Timestamp.fromDate(DateTime.now().add(const Duration(days: 7))),
+      'university': menteeProfile['university'] ?? mentorProfile['university'],
+      'faculty': menteeProfile['faculty'] ?? mentorProfile['faculty'],
+      'degree': menteeProfile['degree'] ?? mentorProfile['degree'],
+      'requestSource': requestSource,
+      'requestedBy': mentorId,
+      'requestedAt': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'privacy': {
+        'optIn': menteeProfile['optIn'] == true,
+        'anonymized': true,
+      },
+    });
+
+    return docRef.id;
+  }
+
+  Future<String?> autoAssignMentee({required String mentorId}) async {
+    final mentorProfile = await getProfile(mentorId) ?? {};
+    if (mentorProfile.isEmpty) {
+      return null;
+    }
+    final matches = await findMenteeMatches(mentorProfile: mentorProfile, limit: 12);
+    for (final match in matches) {
+      final menteeId = match.mentorId;
+      if (await _hasActiveMentorship(menteeId)) {
+        continue;
+      }
+      return createMentorshipRequest(
+        mentorId: mentorId,
+        menteeId: menteeId,
+        matchScore: match.score,
+        matchReasons: match.reasons,
+        requestSource: 'university',
+      );
+    }
+    return null;
+  }
+
+  Future<void> acceptMentorshipRequest({required String mentorshipId}) async {
+    final doc = await _mentorships.doc(mentorshipId).get();
+    final data = doc.data() ?? {};
+    final mentorId = (data['mentorId'] ?? '').toString();
+    final menteeId = (data['menteeId'] ?? '').toString();
+    if (mentorId.isEmpty || menteeId.isEmpty) return;
+
+    await _mentorships.doc(mentorshipId).update({
+      'status': 'active',
+      'acceptedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    await _profiles.doc(mentorId).set({
+      'activeMentorshipId': mentorshipId,
+      'status': 'active',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    await _profiles.doc(menteeId).set({
+      'activeMentorshipId': mentorshipId,
+      'status': 'active',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> declineMentorshipRequest({required String mentorshipId}) async {
+    await _mentorships.doc(mentorshipId).update({
+      'status': 'declined',
+      'declinedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> submitCheckIn({

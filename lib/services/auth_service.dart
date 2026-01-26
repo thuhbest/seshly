@@ -59,6 +59,7 @@ class AuthService {
           'university': university,
           'levelOfStudy': levelOfStudy,
           'email': email,
+          'emailLowercase': email.toLowerCase(),
           'emailVerified': false,
           'isDisabled': false,
           'createdAt': FieldValue.serverTimestamp(),
@@ -84,7 +85,7 @@ class AuthService {
     await _db.runTransaction((transaction) async {
       final snapshot = await transaction.get(userRef);
       if (!snapshot.exists) return;
-      final data = snapshot.data() as Map<String, dynamic>? ?? {};
+      final data = snapshot.data() ?? <String, dynamic>{};
       final Timestamp? lastLoginAt = data['lastLoginAt'] as Timestamp?;
       final int currentStreak = (data['streak'] as int?) ?? 0;
       final int bestStreak = (data['streakBest'] as int?) ?? currentStreak;
@@ -193,6 +194,7 @@ class AuthService {
         final data = user.data();
         final fullName = data['fullName'] as String?;
         final studentNumber = data['studentNumber'] as String?;
+        final email = data['email'] as String?;
         Map<String, dynamic> updates = {};
 
         if (fullName != null && !data.containsKey('fullNameLowercase')) {
@@ -200,6 +202,9 @@ class AuthService {
         }
         if (studentNumber != null && !data.containsKey('studentNumberLowercase')) {
           updates['studentNumberLowercase'] = studentNumber.toLowerCase();
+        }
+        if (email != null && !data.containsKey('emailLowercase')) {
+          updates['emailLowercase'] = email.toLowerCase();
         }
 
         if (updates.isNotEmpty) {

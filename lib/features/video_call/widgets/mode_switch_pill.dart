@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/session_mode.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class ModeSwitchPill extends StatelessWidget {
   final SessionMode currentMode;
@@ -28,8 +29,10 @@ class ModeSwitchPill extends StatelessWidget {
 
   Widget _buildTab(String label, SessionMode mode) {
     final bool isActive = currentMode == mode;
-    return GestureDetector(
+    return PressableScale(
       onTap: () => onChanged(mode),
+      borderRadius: BorderRadius.circular(20),
+      pressedScale: 0.96,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

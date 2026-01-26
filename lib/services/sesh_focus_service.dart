@@ -1,11 +1,13 @@
 import 'dart:async';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class SeshFocusService {
   static const _channel = MethodChannel('seshly/seshfocus');
+  static bool get _supportsPinning =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   static Future<void> start(int minutes) async {
     final uid = FirebaseAuth.instance.currentUser!.uid;
@@ -16,7 +18,7 @@ class SeshFocusService {
           Timestamp.fromDate(DateTime.now().add(Duration(minutes: minutes))),
     });
 
-    if (Platform.isAndroid) {
+    if (_supportsPinning) {
       await _channel.invokeMethod('startPinning', {
         'minutes': minutes,
       });
@@ -26,7 +28,7 @@ class SeshFocusService {
   static Future<void> stop() async {
     final uid = FirebaseAuth.instance.currentUser!.uid;
 
-    if (Platform.isAndroid) {
+    if (_supportsPinning) {
       await _channel.invokeMethod('stopPinning');
     }
 

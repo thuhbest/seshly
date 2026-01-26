@@ -1,10 +1,11 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:seshly/widgets/responsive.dart';
+import 'package:seshly/utils/image_picker_util.dart';
 
 class CreateListingView extends StatefulWidget {
   const CreateListingView({super.key});
@@ -17,13 +18,10 @@ class _CreateListingViewState extends State<CreateListingView> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
-  final ImagePicker _picker = ImagePicker();
-
   String _selectedCategory = "Notes";
   bool _isDigital = true;
   bool _isSubmitting = false;
-  XFile? _pickedFile;
-  Uint8List? _webImage;
+  Uint8List? _imageBytes;
 
   final List<String> _categories = const ["Notes", "Tech", "Bags", "Stationery", "Other"];
 
@@ -37,37 +35,29 @@ class _CreateListingViewState extends State<CreateListingView> {
 
   Future<void> _pickImage() async {
     try {
-      final XFile? picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
-      if (picked == null) return;
+      final result = await pickImageBytes(source: ImageSource.gallery, imageQuality: 80);
+      if (result == null) return;
 
-      if (kIsWeb) {
-        final bytes = await picked.readAsBytes();
-        setState(() {
-          _pickedFile = picked;
-          _webImage = bytes;
-        });
-      } else {
-        setState(() => _pickedFile = picked);
-      }
+      setState(() {
+        _imageBytes = result.bytes;
+      });
     } catch (_) {
       _showSnack("Could not pick image.");
     }
   }
 
   Future<String?> _uploadImage(String userId) async {
-    if (_pickedFile == null) return null;
+    if (_imageBytes == null) return null;
 
     final storageRef = FirebaseStorage.instance
         .ref()
         .child('marketplace_items')
         .child('${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg');
 
-    UploadTask uploadTask;
-    if (kIsWeb) {
-      uploadTask = storageRef.putData(_webImage!, SettableMetadata(contentType: 'image/jpeg'));
-    } else {
-      uploadTask = storageRef.putFile(File(_pickedFile!.path));
-    }
+    final uploadTask = storageRef.putData(
+      _imageBytes!,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
 
     final snap = await uploadTask.timeout(const Duration(seconds: 30));
     return await snap.ref.getDownloadURL();
@@ -96,6 +86,10 @@ class _CreateListingViewState extends State<CreateListingView> {
     }
     if (price <= 0) {
       _showSnack("Enter a valid price.");
+      return;
+    }
+    if (_selectedCategory == "Notes" && _isDigital) {
+      _showSnack("Digital notes must be listed from your Notes editor so Seshly can store and deliver them.");
       return;
     }
 
@@ -172,11 +166,13 @@ class _CreateListingViewState extends State<CreateListingView> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: ResponsiveCenter(
+        padding: EdgeInsets.zero,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             GestureDetector(
               onTap: _pickImage,
               child: Container(
@@ -187,7 +183,7 @@ class _CreateListingViewState extends State<CreateListingView> {
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                 ),
-                child: _pickedFile == null
+                child: _imageBytes == null
                     ? Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -198,9 +194,7 @@ class _CreateListingViewState extends State<CreateListingView> {
                       )
                     : ClipRRect(
                         borderRadius: BorderRadius.circular(18),
-                        child: kIsWeb
-                            ? Image.memory(_webImage!, fit: BoxFit.cover, width: double.infinity)
-                            : Image.file(File(_pickedFile!.path), fit: BoxFit.cover, width: double.infinity),
+                        child: Image.memory(_imageBytes!, fit: BoxFit.cover, width: double.infinity),
                       ),
               ),
             ),
@@ -273,8 +267,17 @@ class _CreateListingViewState extends State<CreateListingView> {
                 ],
               ),
             ),
+            if (_selectedCategory == "Notes" && _isDigital) ...[
+              const SizedBox(height: 10),
+              Text(
+                "Digital notes are listed from your Notes editor so Seshly can store and deliver them. "
+                "Physical notes are fine here.",
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ],
             const SizedBox(height: 30),
-          ],
+            ],
+          ),
         ),
       ),
     );

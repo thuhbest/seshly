@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/message_tile.dart';
 import 'chat_room_view.dart';
 import '../widgets/new_chat_sheet.dart';
+import 'package:seshly/widgets/responsive.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class MessagesView extends StatelessWidget {
   const MessagesView({super.key});
@@ -11,117 +13,29 @@ class MessagesView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const Color backgroundColor = Color(0xFF0F142B);
-    const Color tealAccent = Color(0xFF00C09E);
     const Color cardColor = Color(0xFF1E243A);
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              // --- Header ---
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isWide = constraints.maxWidth >= ResponsiveBreakpoints.desktop;
+        final listPanel = _buildListPanel(context, currentUserId, isWide: isWide, cardColor: cardColor);
+
+        return Scaffold(
+          backgroundColor: backgroundColor,
+          body: SafeArea(
+            child: isWide
+                ? Row(
                     children: [
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.05),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 28),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("Messages", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                          Text("Direct & Groups", style: TextStyle(color: Colors.white54, fontSize: 14)),
-                        ],
-                      ),
+                      SizedBox(width: 380, child: listPanel),
+                      const VerticalDivider(width: 1, thickness: 1, color: Colors.white10),
+                      Expanded(child: _buildEmptyDetailPanel()),
                     ],
-                  ),
-                  GestureDetector(
-                    onTap: () => showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) => const NewChatSheet(),
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: tealAccent.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.add, color: tealAccent, size: 22),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 25),
-              // --- Search Bar ---
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 15),
-                decoration: BoxDecoration(
-                  color: cardColor.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: const TextField(
-                  style: TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    icon: Icon(Icons.search, color: Colors.white54, size: 20),
-                    hintText: "Search messages...",
-                    hintStyle: TextStyle(color: Colors.white38, fontSize: 16),
-                    border: InputBorder.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 25),
-              // --- Chat List Section ---
-              Expanded(
-                child: currentUserId == null
-                    ? const Center(child: Text("Please sign in to view messages", style: TextStyle(color: Colors.white54)))
-                    : StreamBuilder<QuerySnapshot>(
-                        stream: _chatStream(currentUserId, ordered: true),
-                        builder: (context, snapshot) {
-                          if (snapshot.hasError) {
-                            debugPrint("Firestore Error: ${snapshot.error}");
-                            return StreamBuilder<QuerySnapshot>(
-                              stream: _chatStream(currentUserId, ordered: false),
-                              builder: (context, fallbackSnapshot) {
-                                if (fallbackSnapshot.connectionState == ConnectionState.waiting) {
-                                  return const Center(child: CircularProgressIndicator(color: tealAccent));
-                                }
-                                final fallbackChats = fallbackSnapshot.data?.docs ?? [];
-                                return _buildChatList(context, fallbackChats, currentUserId);
-                              },
-                            );
-                          }
-
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator(color: tealAccent));
-                          }
-
-                          final chats = snapshot.data?.docs ?? [];
-                          return _buildChatList(context, chats, currentUserId);
-                        },
-                      ),
-              ),
-            ],
+                  )
+                : listPanel,
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -135,9 +49,149 @@ class MessagesView extends StatelessWidget {
     return query.snapshots();
   }
 
-  Widget _buildChatList(BuildContext context, List<QueryDocumentSnapshot> chats, String currentUserId) {
+  Widget _buildListPanel(
+    BuildContext context,
+    String? currentUserId, {
+    required bool isWide,
+    required Color cardColor,
+  }) {
     const Color tealAccent = Color(0xFF00C09E);
+    final EdgeInsets panelPadding =
+        isWide ? const EdgeInsets.symmetric(horizontal: 16) : pagePadding(context);
+    return Padding(
+      padding: panelPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  if (!isWide)
+                    PressableScale(
+                      onTap: () => Navigator.pop(context),
+                      borderRadius: BorderRadius.circular(999),
+                      pressedScale: 0.92,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 28),
+                      ),
+                    ),
+                  if (!isWide) const SizedBox(width: 12),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Messages", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                      Text("Direct & Groups", style: TextStyle(color: Colors.white54, fontSize: 14)),
+                    ],
+                  ),
+                ],
+              ),
+              PressableScale(
+                onTap: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => const NewChatSheet(),
+                ),
+                borderRadius: BorderRadius.circular(999),
+                pressedScale: 0.92,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: tealAccent.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.add, color: tealAccent, size: 22),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 25),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            decoration: BoxDecoration(
+              color: cardColor.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const TextField(
+              style: TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                icon: Icon(Icons.search, color: Colors.white54, size: 20),
+                hintText: "Search messages...",
+                hintStyle: TextStyle(color: Colors.white38, fontSize: 16),
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 25),
+          Expanded(
+            child: currentUserId == null
+                ? const Center(child: Text("Please sign in to view messages", style: TextStyle(color: Colors.white54)))
+                : StreamBuilder<QuerySnapshot>(
+                    stream: _chatStream(currentUserId, ordered: true),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        debugPrint("Firestore Error: ${snapshot.error}");
+                        return StreamBuilder<QuerySnapshot>(
+                          stream: _chatStream(currentUserId, ordered: false),
+                          builder: (context, fallbackSnapshot) {
+                            if (fallbackSnapshot.connectionState == ConnectionState.waiting) {
+                              return const Center(child: CircularProgressIndicator(color: tealAccent));
+                            }
+                            final fallbackChats = fallbackSnapshot.data?.docs ?? [];
+                            return _buildChatList(context, fallbackChats, currentUserId);
+                          },
+                        );
+                      }
 
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator(color: tealAccent));
+                      }
+
+                      final chats = snapshot.data?.docs ?? [];
+                      return _buildChatList(context, chats, currentUserId);
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyDetailPanel() {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.white.withValues(alpha: 0.1)),
+            const SizedBox(height: 16),
+            const Text(
+              "Select a chat to preview",
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Pick a conversation on the left to keep chatting without losing context.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatList(BuildContext context, List<QueryDocumentSnapshot> chats, String currentUserId) {
     if (chats.isEmpty) {
       return Center(
         child: Column(
@@ -191,7 +245,7 @@ class MessagesView extends StatelessWidget {
         );
 
         if (otherUserId == null) {
-          return GestureDetector(
+          return PressableScale(
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -202,6 +256,8 @@ class MessagesView extends StatelessWidget {
                 ),
               ),
             ),
+            borderRadius: BorderRadius.circular(16),
+            pressedScale: 0.98,
             child: tile,
           );
         }
@@ -221,7 +277,7 @@ class MessagesView extends StatelessWidget {
 
             final String presenceLabel = isOnline ? "Online" : "Last seen ${_timeAgo(lastSeen)}";
 
-            return GestureDetector(
+            return PressableScale(
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -232,6 +288,8 @@ class MessagesView extends StatelessWidget {
                   ),
                 ),
               ),
+              borderRadius: BorderRadius.circular(16),
+              pressedScale: 0.98,
               child: MessageTile(
                 title: chatName,
                 subtitle: chatData['lastMessage'] ?? "Tap to chat",
@@ -280,3 +338,5 @@ class MessagesView extends StatelessWidget {
     return null;
   }
 }
+
+

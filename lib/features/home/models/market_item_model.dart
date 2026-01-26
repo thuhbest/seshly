@@ -16,6 +16,11 @@ class MarketItem {
   final String? fileType;
   final String status;
   final Timestamp? createdAt;
+  final int? sellerPrice;
+  final int? platformFee;
+  final String? listingType;
+  final String? fulfillment;
+  final bool priceIncludesFee;
 
   MarketItem({
     required this.id,
@@ -33,6 +38,11 @@ class MarketItem {
     required this.fileType,
     required this.status,
     required this.createdAt,
+    this.sellerPrice,
+    this.platformFee,
+    this.listingType,
+    this.fulfillment,
+    this.priceIncludesFee = false,
   });
 
   factory MarketItem.fromDoc(DocumentSnapshot doc) {
@@ -61,6 +71,11 @@ class MarketItem {
       fileType: data['fileType'] as String?,
       status: (data['status'] ?? 'active').toString(),
       createdAt: data['createdAt'] as Timestamp?,
+      sellerPrice: (data['sellerPrice'] as num?)?.toInt(),
+      platformFee: (data['platformFee'] as num?)?.toInt(),
+      listingType: data['listingType']?.toString(),
+      fulfillment: data['fulfillment']?.toString(),
+      priceIncludesFee: data['priceIncludesFee'] == true,
     );
   }
 
@@ -69,5 +84,9 @@ class MarketItem {
       return "R$price";
     }
     return "$currency $price";
+  }
+
+  bool get isNotesListing {
+    return (listingType ?? '').toLowerCase() == 'notes' || category.toLowerCase() == 'notes';
   }
 }

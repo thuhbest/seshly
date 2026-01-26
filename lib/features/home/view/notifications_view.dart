@@ -7,6 +7,8 @@ import '../widgets/notification_tile.dart';
 import 'question_detail_view.dart';
 import 'market_item_detail_view.dart';
 import 'market_order_detail_view.dart';
+import 'package:seshly/widgets/responsive.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class NotificationsView extends StatefulWidget {
   const NotificationsView({super.key});
@@ -135,7 +137,7 @@ class _NotificationsViewState extends State<NotificationsView> {
       return;
     }
 
-    final chatData = chatSnap.data() as Map<String, dynamic>? ?? {};
+    final chatData = chatSnap.data() ?? <String, dynamic>{};
     final bool isGroup = chatData['isGroup'] == true;
     String chatTitle = fallbackName ?? "Chat";
 
@@ -247,6 +249,69 @@ class _NotificationsViewState extends State<NotificationsView> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
+    final Widget body = user == null
+        ? const Center(
+            child: Text("Please sign in to see notifications", style: TextStyle(color: Colors.white54)),
+          )
+        : StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .collection('notifications')
+                .orderBy('createdAt', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: _tealAccent));
+              }
+              if (snapshot.hasError) {
+                return const Center(child: Text("Error loading notifications", style: TextStyle(color: Colors.white54)));
+              }
+
+              final docs = snapshot.data?.docs ?? [];
+              if (docs.isEmpty) {
+                return const Center(
+                  child: Text("No notifications yet", style: TextStyle(color: Colors.white38)),
+                );
+              }
+
+              final newDocs = docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                return data['isRead'] != true;
+              }).toList();
+              final earlierDocs = docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                return data['isRead'] == true;
+              }).toList();
+
+              return ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: pagePadding(context),
+                children: [
+                  const SizedBox(height: 20),
+                  if (newDocs.isNotEmpty) ...[
+                    const Text(
+                      "New",
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                    const SizedBox(height: 15),
+                    ...newDocs.map(_buildNotificationTile),
+                  ],
+                  if (earlierDocs.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    const Text(
+                      "Earlier",
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                    const SizedBox(height: 15),
+                    ...earlierDocs.map(_buildNotificationTile),
+                  ],
+                  const SizedBox(height: 20),
+                ],
+              );
+            },
+          );
+
     return Scaffold(
       backgroundColor: _backgroundColor,
       appBar: AppBar(
@@ -296,68 +361,10 @@ class _NotificationsViewState extends State<NotificationsView> {
           const SizedBox(width: 10),
         ],
       ),
-      body: user == null
-          ? const Center(
-              child: Text("Please sign in to see notifications", style: TextStyle(color: Colors.white54)),
-            )
-          : StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(user.uid)
-                  .collection('notifications')
-                  .orderBy('createdAt', descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(color: _tealAccent));
-                }
-                if (snapshot.hasError) {
-                  return const Center(child: Text("Error loading notifications", style: TextStyle(color: Colors.white54)));
-                }
-
-                final docs = snapshot.data?.docs ?? [];
-                if (docs.isEmpty) {
-                  return const Center(
-                    child: Text("No notifications yet", style: TextStyle(color: Colors.white38)),
-                  );
-                }
-
-                final newDocs = docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return data['isRead'] != true;
-                }).toList();
-                final earlierDocs = docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return data['isRead'] == true;
-                }).toList();
-
-                return ListView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  children: [
-                    const SizedBox(height: 20),
-                    if (newDocs.isNotEmpty) ...[
-                      const Text(
-                        "New",
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                      ),
-                      const SizedBox(height: 15),
-                      ...newDocs.map(_buildNotificationTile),
-                    ],
-                    if (earlierDocs.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      const Text(
-                        "Earlier",
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                      ),
-                      const SizedBox(height: 15),
-                      ...earlierDocs.map(_buildNotificationTile),
-                    ],
-                    const SizedBox(height: 20),
-                  ],
-                );
-              },
-            ),
+      body: ResponsiveCenter(
+        padding: EdgeInsets.zero,
+        child: body,
+      ),
     );
   }
 
@@ -372,8 +379,10 @@ class _NotificationsViewState extends State<NotificationsView> {
 
     final visual = _visualForType(type, actorName);
 
-    return GestureDetector(
+    return PressableScale(
       onTap: () => _handleNotificationTap(doc),
+      borderRadius: BorderRadius.circular(15),
+      pressedScale: 0.98,
       child: NotificationTile(
         title: title,
         subtitle: subtitle,
@@ -398,3 +407,5 @@ class _NotificationVisual {
     this.initials,
   });
 }
+
+

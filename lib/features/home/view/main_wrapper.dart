@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:seshly/services/auth_service.dart';
 import 'package:seshly/services/notification_service.dart';
+import 'package:seshly/widgets/responsive.dart';
 
 // 1. Import the FriendsView
 import 'package:seshly/features/friends/view/friends_view.dart';
@@ -111,38 +112,78 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     const Color backgroundColor = Color(0xFF0F142B);
-
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      // IndexedStack keeps all pages "alive" in the background
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
-      // FloatingActionButton logic - Updated to navigate to FindTutorView
-      floatingActionButton: _currentIndex == 0 
-      ? FloatingActionButton(
-          backgroundColor: const Color(0xFF00C09E),
-          onPressed: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const FindTutorView()));
-          },
-          child: const Icon(Icons.person_add_alt_1, color: Colors.white),
-        )
-      : null,
-      bottomNavigationBar: CustomBottomNav(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          if (index == 0) {
-            _homeRefreshTick.value++;
-          }
-          if (_currentIndex != index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          }
-        },
-      ),
+    final Widget content = IndexedStack(
+      index: _currentIndex,
+      children: _pages,
     );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isWide = constraints.maxWidth >= ResponsiveBreakpoints.desktop;
+        final bool isExtended = constraints.maxWidth >= 1200;
+
+        return Scaffold(
+          backgroundColor: backgroundColor,
+          body: isWide
+              ? Row(
+                  children: [
+                    NavigationRail(
+                      backgroundColor: backgroundColor,
+                      selectedIndex: _currentIndex,
+                      onDestinationSelected: _handleNavTap,
+                      extended: isExtended,
+                      selectedIconTheme: const IconThemeData(color: Color(0xFF00C09E)),
+                      unselectedIconTheme: const IconThemeData(color: Colors.white54),
+                      selectedLabelTextStyle: const TextStyle(color: Color(0xFF00C09E), fontWeight: FontWeight.bold),
+                      unselectedLabelTextStyle: const TextStyle(color: Colors.white54),
+                      destinations: const [
+                        NavigationRailDestination(icon: Icon(Icons.home_filled), label: Text("Home")),
+                        NavigationRailDestination(icon: Icon(Icons.auto_awesome_rounded), label: Text("Sesh")),
+                        NavigationRailDestination(icon: Icon(Icons.people_alt_outlined), label: Text("Friends")),
+                        NavigationRailDestination(icon: Icon(Icons.calendar_today_outlined), label: Text("Calendar")),
+                        NavigationRailDestination(icon: Icon(Icons.person_outline), label: Text("Profile")),
+                      ],
+                    ),
+                    const VerticalDivider(width: 1, thickness: 1, color: Colors.white10),
+                    Expanded(
+                      child: ResponsiveCenter(
+                        padding: EdgeInsets.zero,
+                        child: content,
+                      ),
+                    ),
+                  ],
+                )
+              : content,
+          // FloatingActionButton logic - Updated to navigate to FindTutorView
+          floatingActionButton: _currentIndex == 0
+              ? FloatingActionButton(
+                  backgroundColor: const Color(0xFF00C09E),
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const FindTutorView()));
+                  },
+                  child: const Icon(Icons.person_add_alt_1, color: Colors.white),
+                )
+              : null,
+          bottomNavigationBar: isWide
+              ? null
+              : CustomBottomNav(
+                  currentIndex: _currentIndex,
+                  onTap: _handleNavTap,
+                ),
+        );
+      },
+    );
+  }
+
+  void _handleNavTap(int index) {
+    if (index == 0) {
+      _homeRefreshTick.value++;
+    }
+    if (_currentIndex != index) {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
   }
 }
 

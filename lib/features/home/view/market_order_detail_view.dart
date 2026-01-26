@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/market_item_model.dart';
+import 'package:seshly/widgets/responsive.dart';
 
 class MarketOrderDetailView extends StatefulWidget {
   final String orderId;
@@ -66,32 +67,41 @@ class _MarketOrderDetailViewState extends State<MarketOrderDetailView> {
         ),
         title: const Text("Order details", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('marketplace_orders').doc(widget.orderId).snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: tealAccent));
-          }
-          if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-            return const Center(child: Text("Order not found", style: TextStyle(color: Colors.white54)));
-          }
+      body: ResponsiveCenter(
+        padding: EdgeInsets.zero,
+        child: StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance.collection('marketplace_orders').doc(widget.orderId).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(color: tealAccent));
+            }
+            if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+              return const Center(child: Text("Order not found", style: TextStyle(color: Colors.white54)));
+            }
 
-          final data = snapshot.data!.data() as Map<String, dynamic>;
-          final String status = (data['status'] ?? 'pending').toString();
-          final String itemId = (data['itemId'] ?? '').toString();
-          final String sellerId = (data['sellerId'] ?? '').toString();
-          final String itemTitle = (data['itemTitle'] ?? "Item").toString();
-          final String buyerName = (data['buyerName'] ?? "Student").toString();
-          final String sellerName = (data['sellerName'] ?? "Student").toString();
-          final int price = (data['price'] as num?)?.toInt() ?? 0;
-          final String currency = (data['currency'] ?? 'ZAR').toString();
-          final bool isSeller = FirebaseAuth.instance.currentUser?.uid == sellerId;
+            final data = snapshot.data!.data() as Map<String, dynamic>;
+            final String status = (data['status'] ?? 'pending').toString();
+            final String itemId = (data['itemId'] ?? '').toString();
+            final String sellerId = (data['sellerId'] ?? '').toString();
+            final String itemTitle = (data['itemTitle'] ?? "Item").toString();
+            final String buyerName = (data['buyerName'] ?? "Student").toString();
+            final String sellerName = (data['sellerName'] ?? "Student").toString();
+            final int price = (data['price'] as num?)?.toInt() ?? 0;
+            final String currency = (data['currency'] ?? 'ZAR').toString();
+            final bool isSeller = FirebaseAuth.instance.currentUser?.uid == sellerId;
+            final int? sellerPrice = (data['sellerPrice'] as num?)?.toInt();
+            final int? platformFee = (data['platformFee'] as num?)?.toInt();
+            final String listingType = (data['listingType'] ?? '').toString();
+            final String itemCategory = (data['itemCategory'] ?? '').toString();
+            final bool isNotesOrder = listingType == 'notes' || itemCategory.toLowerCase() == 'notes';
+            final int sellerEarns = sellerPrice ?? (price - (platformFee ?? 0)).clamp(0, price).toInt();
+            final int feeAmount = platformFee ?? (price - (sellerPrice ?? 0)).clamp(0, price).toInt();
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
@@ -123,6 +133,42 @@ class _MarketOrderDetailViewState extends State<MarketOrderDetailView> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                if (isNotesOrder)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: cardColor.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Seshly notes delivery",
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          "Seshly releases the notes after payment. Price includes a 10% fee.",
+                          style: TextStyle(color: Colors.white54, fontSize: 12),
+                        ),
+                        if (sellerPrice != null || platformFee != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            "Seller earns ${_formatPrice(currency, sellerEarns)}",
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                          Text(
+                            "Seshly fee ${_formatPrice(currency, feeAmount)}",
+                            style: const TextStyle(color: Colors.white38, fontSize: 12),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                if (isNotesOrder) const SizedBox(height: 16),
                 if (itemId.isNotEmpty)
                   StreamBuilder<DocumentSnapshot>(
                     stream: FirebaseFirestore.instance.collection('marketplace_items').doc(itemId).snapshots(),
@@ -240,10 +286,11 @@ class _MarketOrderDetailViewState extends State<MarketOrderDetailView> {
                       child: Text("Order completed", style: TextStyle(color: tealAccent, fontWeight: FontWeight.bold)),
                     ),
                   ),
-              ],
-            ),
-          );
-        },
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

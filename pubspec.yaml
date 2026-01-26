@@ -62,15 +62,16 @@ dependencies:
   image_picker: ^1.0.0
   video_player: ^2.8.1
   url_launcher: ^6.2.1
-  share_plus: ^7.2.2
   path_provider: ^2.1.1
-  image_gallery_saver: ^2.0.3
-  flutter_cache_manager: ^3.3.1
   flutter_svg: ^2.0.9
   file_picker: ^8.0.0
   crypto: ^3.0.3
+  speech_to_text: ^6.6.0
   syncfusion_flutter_pdf: ^26.2.14
   syncfusion_flutter_pdfviewer: ^26.2.14
+  record: ^5.1.2
+  audioplayers: ^5.2.1
+  cross_file: ^0.3.4
 
 dev_dependencies:
   flutter_test:

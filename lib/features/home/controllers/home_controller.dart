@@ -16,18 +16,14 @@ class HomeController {
   HomeController(this.context);
 
   // Function to update the category (will be called from the UI)
-  void updateCategory(String category, Function setStateCallback) {
-    setStateCallback(() {
-      selectedCategory = category;
-    });
+  void updateCategory(String category) {
+    selectedCategory = category;
     debugPrint("Category changed to: $category");
   }
 
   // Function to update the bottom nav tab
-  void updateTab(int index, Function setStateCallback) {
-    setStateCallback(() {
-      currentIndex = index;
-    });
+  void updateTab(int index) {
+    currentIndex = index;
     debugPrint("Tab changed to index: $index");
   }
 
@@ -38,13 +34,20 @@ class HomeController {
   }
 
   // This function creates a "Relevance Score" for every post
-  Stream<List<Map<String, dynamic>>> getRankedPosts() {
+  Stream<List<Map<String, dynamic>>> getRankedPosts(String category) {
     return _db.collection('posts').snapshots().map((snapshot) {
       List<Map<String, dynamic>> posts = snapshot.docs.map((doc) {
         var data = doc.data();
         data['id'] = doc.id;
         return data;
       }).toList();
+
+      if (category != "All") {
+        posts = posts.where((post) {
+          final subject = post['subject']?.toString() ?? '';
+          return _matchesCategory(category, subject);
+        }).toList();
+      }
 
       // MOCK USER DATA (In a real app, fetch this from the user's profile doc)
       List<String> userInterests = ["Calculus", "Mathematics", "Engineering"];
@@ -60,6 +63,39 @@ class HomeController {
 
       return posts;
     });
+  }
+
+  String _normalize(String? value) {
+    return (value ?? '').toLowerCase().trim();
+  }
+
+  List<String> _subjectsForCategory(String category) {
+    switch (category) {
+      case "Mathematics":
+        return const ["mathematics", "math", "calculus", "algebra", "geometry", "statistics", "stats"];
+      case "Physics":
+        return const ["physics", "mechanics", "quantum", "thermodynamics", "optics"];
+      case "Chemistry":
+        return const ["chemistry", "chem", "organic", "inorganic", "biochemistry"];
+      case "Biology":
+        return const ["biology", "bio", "genetics", "microbiology", "anatomy"];
+      case "Computer Science":
+        return const ["computer science", "comp sci", "cs", "programming", "coding", "software", "algorithms", "data structures"];
+      case "Engineering":
+        return const ["engineering", "eng", "mechanical", "electrical", "civil", "chemical engineering"];
+      default:
+        return [category];
+    }
+  }
+
+  bool _matchesCategory(String category, String subject) {
+    final normalizedSubject = _normalize(subject);
+    final keywords = _subjectsForCategory(category).map(_normalize);
+    for (final keyword in keywords) {
+      if (keyword.isEmpty) continue;
+      if (normalizedSubject.contains(keyword)) return true;
+    }
+    return false;
   }
 
   double _calculateScore(Map<String, dynamic> post, List<String> interests, List<String> friends) {

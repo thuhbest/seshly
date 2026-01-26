@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/responsive.dart';
 
 class MentorshipAdminView extends StatelessWidget {
   const MentorshipAdminView({super.key});
@@ -17,122 +18,125 @@ class MentorshipAdminView extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text('Mentorship admin', style: TextStyle(color: Colors.white)),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('mentorships')
-            .where('status', isEqualTo: 'active')
-            .snapshots(),
-        builder: (context, mentorshipSnap) {
-          if (!mentorshipSnap.hasData) {
-            return Center(child: CircularProgressIndicator(color: tealAccent));
-          }
-          final mentorshipDocs = mentorshipSnap.data!.docs;
+      body: ResponsiveCenter(
+        maxWidth: 980,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('mentorships')
+              .where('status', isEqualTo: 'active')
+              .snapshots(),
+          builder: (context, mentorshipSnap) {
+            if (!mentorshipSnap.hasData) {
+              return Center(child: CircularProgressIndicator(color: tealAccent));
+            }
+            final mentorshipDocs = mentorshipSnap.data!.docs;
 
-          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('mentorship_profiles').snapshots(),
-            builder: (context, profileSnap) {
-              final profileDocs = profileSnap.data?.docs ?? [];
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance.collection('mentorship_profiles').snapshots(),
+              builder: (context, profileSnap) {
+                final profileDocs = profileSnap.data?.docs ?? [];
 
-              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance
-                    .collectionGroup('checkins')
-                    .orderBy('createdAt', descending: true)
-                    .limit(500)
-                    .snapshots(),
-                builder: (context, checkinSnap) {
-                  final checkinDocs = checkinSnap.data?.docs ?? [];
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collectionGroup('checkins')
+                      .orderBy('createdAt', descending: true)
+                      .limit(500)
+                      .snapshots(),
+                  builder: (context, checkinSnap) {
+                    final checkinDocs = checkinSnap.data?.docs ?? [];
 
-                  final metrics = _computeMentorshipMetrics(mentorshipDocs);
-                  final deiMetrics = _computeDeiMetrics(profileDocs);
-                  final heatmap = _computeStressHeatmap(checkinDocs);
+                    final metrics = _computeMentorshipMetrics(mentorshipDocs);
+                    final deiMetrics = _computeDeiMetrics(profileDocs);
+                    final heatmap = _computeStressHeatmap(checkinDocs);
 
-                  return ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      _metricRow(
-                        [
-                          _metricCard('Active mentorships', metrics['total'].toString(), cardColor),
-                          _metricCard('Dropout risk index', '${metrics['avgRisk']}%', cardColor),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _metricRow(
-                        [
-                          _metricCard('High risk cases', metrics['highRisk'].toString(), cardColor),
-                          _metricCard('Interventions on time', '${metrics['interventionRate']}%', cardColor),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _metricRow(
-                        [
-                          _metricCard('First-year survival', '${metrics['firstYearRate']}%', cardColor),
-                          _metricCard('Mentor engagement', '${metrics['engagementRate']}%', cardColor),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      _sectionTitle('Faculty risk comparison'),
-                      const SizedBox(height: 8),
-                      if ((metrics['facultyRisk'] as Map).isEmpty)
-                        _listRow('No faculty data yet', 'Waiting for mentorship activity', cardColor)
-                      else
-                        ...metrics['facultyRisk'].entries.map((entry) {
-                          return _listRow(
-                            entry.key,
-                            'Avg risk ${entry.value['avg']}% | ${entry.value['count']} mentorships',
-                            cardColor,
-                          );
-                        }).toList(),
-                      const SizedBox(height: 20),
-                      _sectionTitle('Stress heatmap (last 28 days)'),
-                      const SizedBox(height: 8),
-                      if (heatmap.isEmpty)
-                        _listRow('No check-ins yet', 'Waiting for weekly check-ins', cardColor)
-                      else
-                        ...heatmap.entries.map((entry) {
-                          final data = entry.value;
-                          final total = data['total'] as int;
-                          final struggling = data['struggling'] as int;
-                          final ratio = total == 0 ? 0 : ((struggling / total) * 100).round();
-                          return _listRow(
-                            entry.key,
-                            '$ratio% struggling | $total check-ins',
-                            cardColor,
-                          );
-                        }).toList(),
-                      const SizedBox(height: 20),
-                      _sectionTitle('DEI and access reporting'),
-                      const SizedBox(height: 8),
-                      _listRow('Opt-in rate', '${deiMetrics['optInRate']}%', cardColor),
-                      _listRow('First-gen participation', '${deiMetrics['firstGenRate']}%', cardColor),
-                      _listRow('International participation', '${deiMetrics['internationalRate']}%', cardColor),
-                      _listRow('Funding distribution', deiMetrics['fundingSummary'], cardColor),
-                      const SizedBox(height: 20),
-                      _sectionTitle('Early warning triggers'),
-                      const SizedBox(height: 8),
-                      _listRow('Struggling streaks', metrics['strugglingCount'].toString(), cardColor),
-                      _listRow('No mentor contact', metrics['noContactCount'].toString(), cardColor),
-                      _listRow('Goal stagnation', metrics['goalStagnation'].toString(), cardColor),
-                      _listRow('Missed events', metrics['missedEvents'].toString(), cardColor),
-                      const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F142B),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    return ListView(
+                      children: [
+                        _metricRow(
+                          [
+                            _metricCard('Active mentorships', metrics['total'].toString(), cardColor),
+                            _metricCard('Dropout risk index', '${metrics['avgRisk']}%', cardColor),
+                          ],
                         ),
-                        child: const Text(
-                          'Privacy note: analytics are anonymized. No names or message content are visible to admins.',
-                          style: TextStyle(color: Colors.white54, fontSize: 12),
+                        const SizedBox(height: 12),
+                        _metricRow(
+                          [
+                            _metricCard('High risk cases', metrics['highRisk'].toString(), cardColor),
+                            _metricCard('Interventions on time', '${metrics['interventionRate']}%', cardColor),
+                          ],
                         ),
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-          );
-        },
+                        const SizedBox(height: 12),
+                        _metricRow(
+                          [
+                            _metricCard('First-year survival', '${metrics['firstYearRate']}%', cardColor),
+                            _metricCard('Mentor engagement', '${metrics['engagementRate']}%', cardColor),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        _sectionTitle('Faculty risk comparison'),
+                        const SizedBox(height: 8),
+                        if ((metrics['facultyRisk'] as Map).isEmpty)
+                          _listRow('No faculty data yet', 'Waiting for mentorship activity', cardColor)
+                        else
+                          ...metrics['facultyRisk'].entries.map((entry) {
+                            return _listRow(
+                              entry.key,
+                              'Avg risk ${entry.value['avg']}% | ${entry.value['count']} mentorships',
+                              cardColor,
+                            );
+                          }),
+                        const SizedBox(height: 20),
+                        _sectionTitle('Stress heatmap (last 28 days)'),
+                        const SizedBox(height: 8),
+                        if (heatmap.isEmpty)
+                          _listRow('No check-ins yet', 'Waiting for weekly check-ins', cardColor)
+                        else
+                          ...heatmap.entries.map((entry) {
+                            final data = entry.value;
+                            final total = data['total'] as int;
+                            final struggling = data['struggling'] as int;
+                            final ratio = total == 0 ? 0 : ((struggling / total) * 100).round();
+                            return _listRow(
+                              entry.key,
+                              '$ratio% struggling | $total check-ins',
+                              cardColor,
+                            );
+                          }),
+                        const SizedBox(height: 20),
+                        _sectionTitle('DEI and access reporting'),
+                        const SizedBox(height: 8),
+                        _listRow('Opt-in rate', '${deiMetrics['optInRate']}%', cardColor),
+                        _listRow('First-gen participation', '${deiMetrics['firstGenRate']}%', cardColor),
+                        _listRow('International participation', '${deiMetrics['internationalRate']}%', cardColor),
+                        _listRow('Funding distribution', deiMetrics['fundingSummary'], cardColor),
+                        const SizedBox(height: 20),
+                        _sectionTitle('Early warning triggers'),
+                        const SizedBox(height: 8),
+                        _listRow('Struggling streaks', metrics['strugglingCount'].toString(), cardColor),
+                        _listRow('No mentor contact', metrics['noContactCount'].toString(), cardColor),
+                        _listRow('Goal stagnation', metrics['goalStagnation'].toString(), cardColor),
+                        _listRow('Missed events', metrics['missedEvents'].toString(), cardColor),
+                        const SizedBox(height: 20),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F142B),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                          ),
+                          child: const Text(
+                            'Privacy note: analytics are anonymized. No names or message content are visible to admins.',
+                            style: TextStyle(color: Colors.white54, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

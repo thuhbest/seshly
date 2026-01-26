@@ -4,6 +4,8 @@ import 'package:flutter/rendering.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:seshly/services/sesh_focus_service.dart';
+import 'package:seshly/widgets/responsive.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 import '../widgets/post_card.dart';
 import '../widgets/category_selector.dart';
 import '../controllers/home_controller.dart';
@@ -26,6 +28,7 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   late HomeController _homeController;
+  late Stream<List<Map<String, dynamic>>> _postsStream;
   final ScrollController _scrollController = ScrollController();
   bool _isHeaderVisible = true;
   bool _isStoppingFocus = false;
@@ -34,6 +37,7 @@ class _HomeViewState extends State<HomeView> {
   void initState() {
     super.initState();
     _homeController = HomeController(context);
+    _postsStream = _homeController.getRankedPosts(_homeController.selectedCategory);
     widget.refreshSignal?.addListener(_handleExternalRefresh);
     
     // 🔥 Listen to scroll to hide/show the "What are you stuck on" button
@@ -53,13 +57,21 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Future<void> _refreshPosts() async {
-    setState(() {
-      // Re-trigger the controller to fetch fresh data
-      _homeController.updateCategory(_homeController.selectedCategory, setState);
-    });
     // Optional: Scroll to top when refreshing
     if (_scrollController.hasClients) {
       await _scrollController.animateTo(0, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+    }
+    await Future.delayed(const Duration(milliseconds: 200));
+  }
+
+  void _setCategory(String category) {
+    if (_homeController.selectedCategory == category) return;
+    setState(() {
+      _homeController.updateCategory(category);
+      _postsStream = _homeController.getRankedPosts(category);
+    });
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
     }
   }
 
@@ -153,56 +165,58 @@ class _HomeViewState extends State<HomeView> {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: pagePadding(context),
         child: Column(
           children: [
             const SizedBox(height: 20),
             // 🔥 HEADER SECTION (Always Visible)
-            GestureDetector(
-              onTap: _refreshPosts, // Clicking "Home" refreshes posts
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Column(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                PressableScale(
+                  onTap: _refreshPosts, // Clicking "Home" refreshes posts
+                  pressedScale: 0.98,
+                  borderRadius: BorderRadius.circular(8),
+                  child: const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text("Home", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                       Text("Discover academic questions", style: TextStyle(color: Colors.white54)),
                     ],
                   ),
-                  Row(
-                    children: [
+                ),
+                Row(
+                  children: [
+                    HeaderIconButton(
+                      icon: Icons.shopping_basket_outlined,
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceView())),
+                    ),
+                    if (currentUserId == null)
                       HeaderIconButton(
-                        icon: Icons.shopping_basket_outlined,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceView())),
+                        icon: Icons.notifications_none,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsView())),
+                      )
+                    else
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(currentUserId)
+                            .collection('notifications')
+                            .where('isRead', isEqualTo: false)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          final unreadCount = snapshot.data?.docs.length ?? 0;
+                          return HeaderIconButton(
+                            icon: Icons.notifications_none,
+                            count: unreadCount > 0 ? unreadCount.toString() : null,
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsView())),
+                          );
+                        },
                       ),
-                      if (currentUserId == null)
-                        HeaderIconButton(
-                          icon: Icons.notifications_none,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsView())),
-                        )
-                      else
-                        StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(currentUserId)
-                              .collection('notifications')
-                              .where('isRead', isEqualTo: false)
-                              .snapshots(),
-                          builder: (context, snapshot) {
-                            final unreadCount = snapshot.data?.docs.length ?? 0;
-                            return HeaderIconButton(
-                              icon: Icons.notifications_none,
-                              count: unreadCount > 0 ? unreadCount.toString() : null,
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsView())),
-                            );
-                          },
-                        ),
-                      _buildFocusButton(),
-                    ],
-                  )
-                ],
-              ),
+                    _buildFocusButton(),
+                  ],
+                )
+              ],
             ),
 
             // 🔥 DISAPPEARING SEARCH BUTTON
@@ -223,7 +237,7 @@ class _HomeViewState extends State<HomeView> {
             const SizedBox(height: 20),
             CategorySelector(
               selectedCategory: _homeController.selectedCategory,
-              onCategorySelected: (category) => _homeController.updateCategory(category, setState),
+              onCategorySelected: _setCategory,
             ),
             const SizedBox(height: 25),
             
@@ -234,7 +248,7 @@ class _HomeViewState extends State<HomeView> {
                 backgroundColor: const Color(0xFF1E243A),
                 onRefresh: _refreshPosts,
                 child: StreamBuilder<List<Map<String, dynamic>>>(
-                  stream: _homeController.getRankedPosts(), 
+                  stream: _postsStream,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator(color: Color(0xFF00C09E)));
@@ -258,6 +272,7 @@ class _HomeViewState extends State<HomeView> {
                       itemBuilder: (context, index) {
                         final data = posts[index];
                         return PostCard(
+                          key: ValueKey(data['id']),
                           postId: data['id'],
                           authorId: data['authorId'] ?? "",
                           subject: data['subject'] ?? "General",
@@ -267,7 +282,9 @@ class _HomeViewState extends State<HomeView> {
                           likes: data['likes'] ?? 0,
                           comments: data['comments'] ?? 0,
                           attachmentUrl: data['attachmentUrl'], 
-                          link: data['link'], 
+                          link: data['link'],
+                          repostOf: data['repostOf'] as Map<String, dynamic>?,
+                          repostText: data['repostText'] as String?,
                         );
                       },
                     );

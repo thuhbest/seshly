@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,12 +5,13 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
+import 'package:seshly/utils/image_picker_util.dart';
 
 enum NoteTool { pen, pencil, highlighter, eraser, text, move }
 
@@ -115,17 +115,21 @@ class _ToolButton extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final Color? activeColor;
 
   const _ToolButton({
     required this.icon,
     required this.label,
     required this.selected,
     required this.onTap,
+    this.activeColor,
   });
 
   @override
   Widget build(BuildContext context) {
     const Color tealAccent = Color(0xFF00C09E);
+    final Color selectedColor = activeColor ?? tealAccent;
+    final Color selectedIconColor = selectedColor == tealAccent ? const Color(0xFF0F142B) : Colors.white;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
@@ -133,18 +137,18 @@ class _ToolButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: selected ? tealAccent : Colors.white.withValues(alpha: 0.08),
+            color: selected ? selectedColor : Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: selected ? tealAccent : Colors.white12),
+            border: Border.all(color: selected ? selectedColor : Colors.white12),
           ),
           child: Row(
             children: [
-              Icon(icon, size: 16, color: selected ? const Color(0xFF0F142B) : Colors.white70),
+              Icon(icon, size: 16, color: selected ? selectedIconColor : Colors.white70),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? const Color(0xFF0F142B) : Colors.white70,
+                  color: selected ? selectedIconColor : Colors.white70,
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                 ),
@@ -344,28 +348,39 @@ class _NoteEditorViewState extends State<NoteEditorView> {
   final Color tealAccent = const Color(0xFF00C09E);
   final ScrollController _scrollController = ScrollController();
   final PdfViewerController _pdfController = PdfViewerController();
-  final ImagePicker _imagePicker = ImagePicker();
   final GlobalKey _canvasKey = GlobalKey();
   final List<NoteStroke> _strokes = [];
   final List<NoteTextItem> _texts = [];
   final List<NoteImageItem> _images = [];
+  final TextEditingController _inlineTextController = TextEditingController();
+  final FocusNode _inlineTextFocusNode = FocusNode();
+  final SpeechToText _speech = SpeechToText();
   NoteStroke? _activeStroke;
   bool _isLoading = true;
   bool _isSaving = false;
   bool _hasChanges = false;
   bool _allowPop = false;
+  bool _isInlineEditing = false;
+  bool _isListening = false;
+  bool _speechAvailable = false;
+  bool _speechInitializing = false;
+  bool _isDraggingAsset = false;
   double _canvasHeight = 1400;
   double _canvasWidth = 360;
   double _pageSpacing = 16;
   double _pdfScrollOffset = 0;
+  double _textFontSize = 18;
   String _noteTitle = 'Note';
   String _noteType = 'canvas';
   String? _pdfUrl;
   String? _pdfName;
   String? _folderTitle;
+  String _textFontFamily = _fontFamilies.first;
   NoteTool _activeTool = NoteTool.pen;
   Color _activeColor = const Color(0xFF1F1F1F);
   double _strokeWidth = 3.0;
+  int? _editingTextIndex;
+  Offset _inlineTextPosition = const Offset(40, 120);
 
   static const List<Color> _noteColors = [
     Color(0xFF1F1F1F),
@@ -384,10 +399,27 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     'Arial',
   ];
 
+  static const int _maxRemoteBytes = 25 * 1024 * 1024;
+  final Map<String, Uint8List> _remoteBytesCache = {};
+
   @override
   void initState() {
     super.initState();
+    _inlineTextFocusNode.addListener(_handleInlineFocusChange);
     _loadNote();
+  }
+
+  @override
+  void dispose() {
+    _inlineTextFocusNode.removeListener(_handleInlineFocusChange);
+    _inlineTextFocusNode.dispose();
+    _inlineTextController.dispose();
+    if (_speech.isListening) {
+      _speech.stop();
+    }
+    _scrollController.dispose();
+    _pdfController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadNote() async {
@@ -429,6 +461,39 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     });
   }
 
+  void _handleInlineFocusChange() {
+    if (!_inlineTextFocusNode.hasFocus) {
+      _commitInlineText();
+    }
+  }
+
+  Future<Uint8List?> _loadStorageBytes(String url) async {
+    final cached = _remoteBytesCache[url];
+    if (cached != null) return cached;
+    try {
+      final data = await FirebaseStorage.instance.refFromURL(url).getData(_maxRemoteBytes);
+      if (data == null) return null;
+      _remoteBytesCache[url] = data;
+      return data;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _safeFileName(String raw) {
+    final cleaned = raw.trim().replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_');
+    if (cleaned.isEmpty) return 'seshly_note';
+    return cleaned;
+  }
+
+  void _selectTool(NoteTool tool) {
+    if (_activeTool == tool) return;
+    if (_isInlineEditing) {
+      _commitInlineText();
+    }
+    setState(() => _activeTool = tool);
+  }
+
   bool get _isDrawingTool {
     return _activeTool == NoteTool.pen ||
         _activeTool == NoteTool.pencil ||
@@ -462,6 +527,9 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     if (_isSaving) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+    if (_isInlineEditing) {
+      _commitInlineText();
+    }
     setState(() => _isSaving = true);
     try {
       final noteRef = FirebaseFirestore.instance
@@ -493,6 +561,9 @@ class _NoteEditorViewState extends State<NoteEditorView> {
   void _handlePopRequest() {
     if (_allowPop) return;
     () async {
+      if (_isInlineEditing) {
+        _commitInlineText();
+      }
       if (_hasChanges) {
         await _saveNote();
       }
@@ -523,8 +594,16 @@ class _NoteEditorViewState extends State<NoteEditorView> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(foregroundColor: Colors.white54),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: tealAccent),
+            child: const Text('Save'),
+          ),
         ],
       ),
     );
@@ -589,127 +668,67 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     });
   }
 
-  Future<void> _addTextAt(Offset localPosition, double scale, double yOffset) async {
+  void _addTextAt(Offset localPosition, double scale, double yOffset) {
     final basePosition = Offset(localPosition.dx / scale, (localPosition.dy + yOffset) / scale);
-    final newItem = await _showTextDialog(position: basePosition);
-    if (newItem == null) return;
+    _beginInlineText(position: basePosition);
+  }
+
+  void _beginInlineText({required Offset position, NoteTextItem? existing, int? existingIndex}) {
+    if (_isInlineEditing) {
+      _commitInlineText();
+    }
     setState(() {
-      _texts.add(newItem);
-      _hasChanges = true;
+      _isInlineEditing = true;
+      _editingTextIndex = existingIndex;
+      _inlineTextPosition = position;
+      _inlineTextController.text = existing?.text ?? '';
+      _textFontFamily = existing?.fontFamily ?? _textFontFamily;
+      _textFontSize = existing?.fontSize ?? _textFontSize;
+      if (existing != null) {
+        _activeColor = Color(existing.color);
+      }
+    });
+    FocusScope.of(context).requestFocus(_inlineTextFocusNode);
+  }
+
+  void _commitInlineText() {
+    if (!_isInlineEditing) return;
+    final text = _inlineTextController.text.trim();
+    setState(() {
+      if (text.isEmpty) {
+        if (_editingTextIndex != null) {
+          _texts.removeAt(_editingTextIndex!);
+          _hasChanges = true;
+        }
+      } else {
+        final item = NoteTextItem(
+          id: _editingTextIndex != null ? _texts[_editingTextIndex!].id : const Uuid().v4(),
+          text: text,
+          x: _inlineTextPosition.dx,
+          y: _inlineTextPosition.dy,
+          fontSize: _textFontSize,
+          fontFamily: _textFontFamily,
+          color: _activeColor.toARGB32(),
+        );
+        if (_editingTextIndex != null) {
+          _texts[_editingTextIndex!] = item;
+        } else {
+          _texts.add(item);
+        }
+        _hasChanges = true;
+      }
+      _inlineTextController.clear();
+      _editingTextIndex = null;
+      _isInlineEditing = false;
     });
   }
 
-  Future<NoteTextItem?> _showTextDialog({required Offset position, NoteTextItem? existing}) async {
-    final controller = TextEditingController(text: existing?.text ?? '');
-    String fontFamily = existing?.fontFamily ?? _fontFamilies.first;
-    double fontSize = existing?.fontSize ?? 16;
-    Color color = existing != null ? Color(existing.color) : _activeColor;
-    final bool? saved = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            backgroundColor: cardColor,
-            title: Text(existing == null ? 'Add text' : 'Edit text', style: const TextStyle(color: Colors.white)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: controller,
-                  maxLines: 4,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Type here...',
-                    hintStyle: const TextStyle(color: Colors.white24),
-                    filled: true,
-                    fillColor: backgroundColor,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Text('Font', style: TextStyle(color: Colors.white70)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButton<String>(
-                        value: fontFamily,
-                        isExpanded: true,
-                        dropdownColor: backgroundColor,
-                        onChanged: (value) => setDialogState(() => fontFamily = value ?? fontFamily),
-                        items: _fontFamilies
-                            .map((font) => DropdownMenuItem<String>(
-                                  value: font,
-                                  child: Text(font, style: const TextStyle(color: Colors.white)),
-                                ))
-                            .toList(),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Text('Size', style: TextStyle(color: Colors.white70)),
-                    Expanded(
-                      child: Slider(
-                        value: fontSize,
-                        min: 12,
-                        max: 32,
-                        divisions: 10,
-                        label: fontSize.toStringAsFixed(0),
-                        activeColor: tealAccent,
-                        onChanged: (value) => setDialogState(() => fontSize = value),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: _noteColors.map((colorOption) {
-                    final bool selected = colorOption.toARGB32() == color.toARGB32();
-                    return GestureDetector(
-                      onTap: () => setDialogState(() => color = colorOption),
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 8),
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: colorOption,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: selected ? Colors.white : Colors.transparent, width: 2),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
-            ],
-          );
-        },
-      ),
-    );
-    if (saved != true || controller.text.trim().isEmpty) return null;
-    return NoteTextItem(
-      id: existing?.id ?? const Uuid().v4(),
-      text: controller.text.trim(),
-      x: existing?.x ?? position.dx,
-      y: existing?.y ?? position.dy,
-      fontSize: fontSize,
-      fontFamily: fontFamily,
-      color: color.toARGB32(),
-    );
-  }
 
   Future<void> _addImage(double scale, double yOffset) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 80);
-    if (image == null) return;
+    final result = await pickImageBytes(source: ImageSource.gallery, imageQuality: 80);
+    if (result == null) return;
 
     final storageRef = FirebaseStorage.instance
         .ref()
@@ -718,11 +737,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
         .child('images')
         .child('${widget.noteId}_${DateTime.now().millisecondsSinceEpoch}.jpg');
 
-    if (kIsWeb) {
-      await storageRef.putData(await image.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
-    } else {
-      await storageRef.putFile(File(image.path));
-    }
+    await storageRef.putData(result.bytes, SettableMetadata(contentType: 'image/jpeg'));
 
     final url = await storageRef.getDownloadURL();
     final baseX = 30 / scale;
@@ -764,14 +779,117 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     });
   }
 
-  Future<void> _editTextItem(int index) async {
-    final item = _texts[index];
-    final updated = await _showTextDialog(position: Offset(item.x, item.y), existing: item);
-    if (updated == null) return;
-    setState(() {
-      _texts[index] = updated;
-      _hasChanges = true;
+  void _setDraggingAsset(bool value) {
+    if (_isDraggingAsset == value) return;
+    setState(() => _isDraggingAsset = value);
+  }
+
+  Future<bool> _ensureSpeechReady() async {
+    if (kIsWeb) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Voice notes are not supported on web yet.')),
+        );
+      }
+      return false;
+    }
+    if (_speechAvailable) return true;
+    if (_speechInitializing) return false;
+    setState(() => _speechInitializing = true);
+    final available = await _speech.initialize(
+      onStatus: (status) {
+        if (status == 'notListening' && mounted) {
+          setState(() => _isListening = false);
+        }
+      },
+      onError: (_) {
+        if (mounted) {
+          setState(() => _isListening = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Speech recognition error.')),
+          );
+        }
+      },
+    );
+    if (mounted) {
+      setState(() {
+        _speechAvailable = available;
+        _speechInitializing = false;
+      });
+      if (!available) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Speech recognition is not available on this device.')),
+        );
+      }
+    }
+    return available;
+  }
+
+  Future<bool> _chargeForListening() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    bool allowed = false;
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final snapshot = await transaction.get(userRef);
+      final data = snapshot.data() ?? <String, dynamic>{};
+      final int seshMinutes = (data['seshMinutes'] as num?)?.toInt() ?? 0;
+      if (seshMinutes < 1) {
+        allowed = false;
+        return;
+      }
+      transaction.update(userRef, {'seshMinutes': FieldValue.increment(-1)});
+      allowed = true;
     });
+    if (!allowed && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You need at least 1 sesh to use voice notes.')),
+      );
+    }
+    return allowed;
+  }
+
+  void _appendSpeechText(String text) {
+    if (!_isInlineEditing) {
+      _beginInlineText(position: _inlineTextPosition);
+    }
+    final current = _inlineTextController.text;
+    final separator = current.isEmpty ? '' : ' ';
+    _inlineTextController.text = '$current$separator$text';
+    _inlineTextController.selection = TextSelection.fromPosition(
+      TextPosition(offset: _inlineTextController.text.length),
+    );
+  }
+
+  Future<void> _toggleListening() async {
+    if (_isListening) {
+      await _speech.stop();
+      if (mounted) setState(() => _isListening = false);
+      return;
+    }
+    final ready = await _ensureSpeechReady();
+    if (!ready) return;
+    final paid = await _chargeForListening();
+    if (!paid) return;
+
+    if (_activeTool != NoteTool.text) {
+      _selectTool(NoteTool.text);
+    }
+    setState(() => _isListening = true);
+    await _speech.listen(
+      onResult: (result) {
+        if (result.recognizedWords.trim().isEmpty) return;
+        _appendSpeechText(result.recognizedWords.trim());
+      },
+      listenOptions: SpeechListenOptions(
+        listenMode: ListenMode.dictation,
+      ),
+    );
+  }
+
+  void _editTextItem(int index) {
+    final item = _texts[index];
+    _beginInlineText(position: Offset(item.x, item.y), existing: item, existingIndex: index);
   }
 
   Future<Uint8List> _exportCanvasPdfBytes() async {
@@ -837,8 +955,10 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     if (_pdfUrl == null) {
       return _exportCanvasPdfBytes();
     }
-    final file = await DefaultCacheManager().getSingleFile(_pdfUrl!);
-    final pdfBytes = await file.readAsBytes();
+    final pdfBytes = await _loadStorageBytes(_pdfUrl!);
+    if (pdfBytes == null) {
+      return _exportCanvasPdfBytes();
+    }
     final document = PdfDocument(inputBytes: pdfBytes);
     final baseWidth = _canvasWidth;
     final spacing = _pageSpacing;
@@ -895,8 +1015,8 @@ class _NoteEditorViewState extends State<NoteEditorView> {
 
     for (final image in _images) {
       try {
-        final imageFile = await DefaultCacheManager().getSingleFile(image.url);
-        final imageBytes = await imageFile.readAsBytes();
+        final imageBytes = await _loadStorageBytes(image.url);
+        if (imageBytes == null) continue;
         final pdfImage = PdfBitmap(imageBytes);
         final pageIndex = _pageIndexForY(image.y, pageTops, pageHeights, spacing);
         final page = document.pages[pageIndex];
@@ -926,12 +1046,27 @@ class _NoteEditorViewState extends State<NoteEditorView> {
 
   Future<void> _exportToFile() async {
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
       final bytes = await _exportPdfBytes();
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/${_noteTitle.replaceAll(' ', '_')}.pdf');
-      await file.writeAsBytes(bytes, flush: true);
+      final fileName = '${_safeFileName(_noteTitle)}.pdf';
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('note_exports')
+          .child(user.uid)
+          .child('${widget.noteId}_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      await storageRef.putData(
+        bytes,
+        SettableMetadata(
+          contentType: 'application/pdf',
+          contentDisposition: 'attachment; filename="$fileName"',
+        ),
+      );
+      final url = await storageRef.getDownloadURL();
+      final launched = await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PDF exported to device storage.')));
+        final message = launched ? 'PDF ready to download.' : 'PDF export ready (open the link manually).';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       }
     } catch (_) {
       if (mounted) {
@@ -1044,65 +1179,99 @@ class _NoteEditorViewState extends State<NoteEditorView> {
 
     final bool? confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: cardColor,
-        title: const Text('Sell on marketplace', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Listing title',
-                hintStyle: const TextStyle(color: Colors.white24),
-                filled: true,
-                fillColor: backgroundColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final rawPrice = priceController.text.replaceAll(RegExp(r'[^0-9]'), '');
+          final basePrice = int.tryParse(rawPrice) ?? 0;
+          final platformFee = (basePrice * 0.10).round();
+          final displayPrice = basePrice + platformFee;
+          return AlertDialog(
+            backgroundColor: cardColor,
+            title: const Text('Sell on marketplace', style: TextStyle(color: Colors.white)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Listing title',
+                    hintStyle: const TextStyle(color: Colors.white24),
+                    filled: true,
+                    fillColor: backgroundColor,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descriptionController,
+                  style: const TextStyle(color: Colors.white),
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: 'Description',
+                    hintStyle: const TextStyle(color: Colors.white24),
+                    filled: true,
+                    fillColor: backgroundColor,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: priceController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setDialogState(() {}),
+                  decoration: InputDecoration(
+                    hintText: 'Price (ZAR)',
+                    hintStyle: const TextStyle(color: Colors.white24),
+                    filled: true,
+                    fillColor: backgroundColor,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: backgroundColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Seshly stores your notes and releases them after payment.',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Buyer pays R$displayPrice (includes 10% Seshly fee). You earn R$basePrice.',
+                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descriptionController,
-              style: const TextStyle(color: Colors.white),
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Description',
-                hintStyle: const TextStyle(color: Colors.white24),
-                filled: true,
-                fillColor: backgroundColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: priceController,
-              style: const TextStyle(color: Colors.white),
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                hintText: 'Price (ZAR)',
-                hintStyle: const TextStyle(color: Colors.white24),
-                filled: true,
-                fillColor: backgroundColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('List')),
-        ],
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('List')),
+            ],
+          );
+        },
       ),
     );
     if (confirmed != true) return;
     if (!mounted) return;
 
-    final price = int.tryParse(priceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    if (price <= 0) {
+    final basePrice = int.tryParse(priceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    if (basePrice <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid price.')));
       return;
     }
+    final platformFee = (basePrice * 0.10).round();
+    final displayPrice = basePrice + platformFee;
 
     _showLoading('Creating listing...');
     try {
@@ -1121,7 +1290,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
       await FirebaseFirestore.instance.collection('marketplace_items').add({
         'title': titleController.text.trim(),
         'description': descriptionController.text.trim(),
-        'price': price,
+        'price': displayPrice,
         'currency': 'ZAR',
         'category': 'Notes',
         'isDigital': true,
@@ -1132,6 +1301,13 @@ class _NoteEditorViewState extends State<NoteEditorView> {
         'fileUrl': fileUrl,
         'fileName': '${_noteTitle.replaceAll(' ', '_')}.pdf',
         'fileType': 'pdf',
+        'sellerPrice': basePrice,
+        'platformFee': platformFee,
+        'priceIncludesFee': true,
+        'listingType': 'notes',
+        'fulfillment': 'seshly',
+        'sourceNoteId': widget.noteId,
+        'sourceFolderId': widget.folderId,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -1229,37 +1405,37 @@ class _NoteEditorViewState extends State<NoteEditorView> {
                   icon: Icons.edit_rounded,
                   label: 'Pen',
                   selected: _activeTool == NoteTool.pen,
-                  onTap: () => setState(() => _activeTool = NoteTool.pen),
+                  onTap: () => _selectTool(NoteTool.pen),
                 ),
                 _ToolButton(
                   icon: Icons.create_outlined,
                   label: 'Pencil',
                   selected: _activeTool == NoteTool.pencil,
-                  onTap: () => setState(() => _activeTool = NoteTool.pencil),
+                  onTap: () => _selectTool(NoteTool.pencil),
                 ),
                 _ToolButton(
                   icon: Icons.highlight_outlined,
                   label: 'Highlight',
                   selected: _activeTool == NoteTool.highlighter,
-                  onTap: () => setState(() => _activeTool = NoteTool.highlighter),
+                  onTap: () => _selectTool(NoteTool.highlighter),
                 ),
                 _ToolButton(
                   icon: Icons.cleaning_services_outlined,
                   label: 'Eraser',
                   selected: _activeTool == NoteTool.eraser,
-                  onTap: () => setState(() => _activeTool = NoteTool.eraser),
+                  onTap: () => _selectTool(NoteTool.eraser),
                 ),
                 _ToolButton(
                   icon: Icons.text_fields,
                   label: 'Text',
                   selected: _activeTool == NoteTool.text,
-                  onTap: () => setState(() => _activeTool = NoteTool.text),
+                  onTap: () => _selectTool(NoteTool.text),
                 ),
                 _ToolButton(
                   icon: Icons.pan_tool_outlined,
                   label: 'Move',
                   selected: _activeTool == NoteTool.move,
-                  onTap: () => setState(() => _activeTool = NoteTool.move),
+                  onTap: () => _selectTool(NoteTool.move),
                 ),
                 const SizedBox(width: 8),
                 _ToolButton(
@@ -1267,6 +1443,13 @@ class _NoteEditorViewState extends State<NoteEditorView> {
                   label: 'Image',
                   selected: false,
                   onTap: () => _addImage(scale, yOffset),
+                ),
+                _ToolButton(
+                  icon: _isListening ? Icons.mic : Icons.mic_none,
+                  label: _isListening ? 'Listening' : 'Listen',
+                  selected: _isListening,
+                  activeColor: Colors.redAccent,
+                  onTap: _toggleListening,
                 ),
                 _ToolButton(
                   icon: Icons.share_outlined,
@@ -1313,7 +1496,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
                 );
               }).toList(),
             ),
-          if (_activeTool == NoteTool.text)
+          if (_activeTool == NoteTool.text) ...[
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Row(
@@ -1324,6 +1507,54 @@ class _NoteEditorViewState extends State<NoteEditorView> {
                 ],
               ),
             ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Text('Font', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _textFontFamily,
+                      dropdownColor: backgroundColor,
+                      isExpanded: true,
+                      onChanged: (value) => setState(() => _textFontFamily = value ?? _textFontFamily),
+                      items: _fontFamilies
+                          .map((font) => DropdownMenuItem<String>(
+                                value: font,
+                                child: Text(font, style: const TextStyle(color: Colors.white)),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Text('Size', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                Expanded(
+                  child: Slider(
+                    value: _textFontSize,
+                    min: 12,
+                    max: 34,
+                    divisions: 11,
+                    label: _textFontSize.toStringAsFixed(0),
+                    activeColor: tealAccent,
+                    onChanged: (value) => setState(() => _textFontSize = value),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Voice notes cost 1 sesh per session.',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1352,7 +1583,9 @@ class _NoteEditorViewState extends State<NoteEditorView> {
                 },
                 child: SingleChildScrollView(
                   controller: _scrollController,
-                  physics: _activeTool == NoteTool.move ? const BouncingScrollPhysics() : const NeverScrollableScrollPhysics(),
+                  physics: _activeTool == NoteTool.move && !_isDraggingAsset
+                      ? const BouncingScrollPhysics()
+                      : const NeverScrollableScrollPhysics(),
                   child: Center(
                     child: RepaintBoundary(
                       key: _canvasKey,
@@ -1382,7 +1615,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
                               ..._buildTextWidgets(scale, 0),
                               Positioned.fill(
                                 child: IgnorePointer(
-                                  ignoring: !(_isDrawingTool || _activeTool == NoteTool.text),
+                                  ignoring: _isInlineEditing || !(_isDrawingTool || _activeTool == NoteTool.text),
                                   child: GestureDetector(
                                     behavior: HitTestBehavior.translucent,
                                     onPanStart: (details) => _startStroke(details.localPosition, scale, 0),
@@ -1396,6 +1629,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
                                   ),
                                 ),
                               ),
+                              _buildInlineTextEditor(scale, 0, displayWidth, displayHeight),
                             ],
                           ),
                         ),
@@ -1411,10 +1645,59 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     );
   }
 
+  Widget _buildInlineTextEditor(double scale, double yOffset, double maxWidth, double maxHeight) {
+    if (!_isInlineEditing) return const SizedBox.shrink();
+    final double maxLeft = maxWidth - 180.0;
+    final double maxTop = maxHeight - 80.0;
+    final double left = (_inlineTextPosition.dx * scale).clamp(12.0, maxLeft < 12.0 ? 12.0 : maxLeft).toDouble();
+    final double top = (_inlineTextPosition.dy * scale - yOffset).clamp(12.0, maxTop < 12.0 ? 12.0 : maxTop).toDouble();
+    final double maxFieldWidth = maxWidth - left - 24;
+
+    return Positioned(
+      left: left,
+      top: top,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxFieldWidth, minWidth: 120),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+          ),
+          child: TextField(
+            controller: _inlineTextController,
+            focusNode: _inlineTextFocusNode,
+            minLines: 1,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
+            textCapitalization: TextCapitalization.sentences,
+            cursorColor: tealAccent,
+            style: TextStyle(
+              color: _activeColor,
+              fontSize: _textFontSize * scale,
+              fontFamily: _textFontFamily,
+              height: 1.2,
+            ),
+            decoration: const InputDecoration(
+              isDense: true,
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+            onSubmitted: (_) => _commitInlineText(),
+          ),
+        ),
+      ),
+    );
+  }
+
   List<Widget> _buildTextWidgets(double scale, double yOffset) {
     return _texts.asMap().entries.map((entry) {
       final index = entry.key;
       final item = entry.value;
+      if (_editingTextIndex == index && _isInlineEditing) {
+        return const SizedBox.shrink();
+      }
       return Positioned(
         left: item.x * scale,
         top: item.y * scale - yOffset,
@@ -1426,7 +1709,13 @@ class _NoteEditorViewState extends State<NoteEditorView> {
               _hasChanges = true;
             });
           },
-          onPanUpdate: (details) => _updateTextPosition(index, details.delta, scale),
+          onPanStart: _activeTool == NoteTool.move ? (_) => _setDraggingAsset(true) : null,
+          onPanUpdate: (details) {
+            if (_activeTool != NoteTool.move) return;
+            _updateTextPosition(index, details.delta, scale);
+          },
+          onPanEnd: _activeTool == NoteTool.move ? (_) => _setDraggingAsset(false) : null,
+          onPanCancel: _activeTool == NoteTool.move ? () => _setDraggingAsset(false) : null,
           child: Text(
             item.text,
             style: TextStyle(
@@ -1449,13 +1738,24 @@ class _NoteEditorViewState extends State<NoteEditorView> {
         left: item.x * scale,
         top: item.y * scale - yOffset,
         child: GestureDetector(
+          onTapDown: (_) {
+            if (_activeTool != NoteTool.move) {
+              _selectTool(NoteTool.move);
+            }
+          },
           onLongPress: () {
             setState(() {
               _images.removeAt(index);
               _hasChanges = true;
             });
           },
-          onPanUpdate: (details) => _updateImagePosition(index, details.delta, scale),
+          onPanStart: _activeTool == NoteTool.move ? (_) => _setDraggingAsset(true) : null,
+          onPanUpdate: (details) {
+            if (_activeTool != NoteTool.move) return;
+            _updateImagePosition(index, details.delta, scale);
+          },
+          onPanEnd: _activeTool == NoteTool.move ? (_) => _setDraggingAsset(false) : null,
+          onPanCancel: _activeTool == NoteTool.move ? () => _setDraggingAsset(false) : null,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Image.network(
@@ -1513,7 +1813,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
                   ..._buildTextWidgets(scale, _pdfScrollOffset),
                   Positioned.fill(
                     child: IgnorePointer(
-                      ignoring: !(_isDrawingTool || _activeTool == NoteTool.text),
+                      ignoring: _isInlineEditing || !(_isDrawingTool || _activeTool == NoteTool.text),
                       child: GestureDetector(
                         behavior: HitTestBehavior.translucent,
                         onPanStart: (details) => _startStroke(details.localPosition, scale, _pdfScrollOffset),
@@ -1527,6 +1827,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
                       ),
                     ),
                   ),
+                  _buildInlineTextEditor(scale, _pdfScrollOffset, displayWidth, constraints.maxHeight),
                 ],
               ),
             ),
@@ -1552,7 +1853,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
 
     return PopScope(
       canPop: _allowPop,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         _handlePopRequest();
       },

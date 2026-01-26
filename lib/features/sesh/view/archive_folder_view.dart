@@ -1,12 +1,12 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'note_editor_view.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class ArchiveFolderView extends StatefulWidget {
   final String folderId;
@@ -21,6 +21,17 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
   final Color backgroundColor = const Color(0xFF0F142B);
   final Color cardColor = const Color(0xFF1E243A);
   bool _isCreating = false;
+
+  Future<Uint8List?> _readFileBytes(PlatformFile file) async {
+    if (file.bytes != null) return file.bytes;
+    final stream = file.readStream;
+    if (stream == null) return null;
+    final chunks = <int>[];
+    await for (final chunk in stream) {
+      chunks.addAll(chunk);
+    }
+    return Uint8List.fromList(chunks);
+  }
 
   Future<void> _incrementNoteCount(int delta) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -80,6 +91,7 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
       type: FileType.custom,
       allowedExtensions: ['pdf'],
       withData: true,
+      withReadStream: true,
     );
     if (result == null) return;
 
@@ -87,6 +99,13 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
     try {
       final file = result.files.single;
       final fileName = file.name;
+      final bytes = await _readFileBytes(file);
+      if (bytes == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Could not read the selected PDF.")));
+        }
+        return;
+      }
       final noteRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -101,13 +120,7 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
           .child(user.uid)
           .child('${noteRef.id}_${DateTime.now().millisecondsSinceEpoch}.pdf');
 
-      if (kIsWeb) {
-        await storageRef.putData(file.bytes!, SettableMetadata(contentType: 'application/pdf'));
-      } else if (file.path != null) {
-        await storageRef.putFile(File(file.path!));
-      } else if (file.bytes != null) {
-        await storageRef.putData(file.bytes!, SettableMetadata(contentType: 'application/pdf'));
-      }
+      await storageRef.putData(bytes, SettableMetadata(contentType: 'application/pdf'));
 
       final url = await storageRef.getDownloadURL();
       await noteRef.set({
@@ -195,8 +208,16 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(foregroundColor: Colors.white54),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: tealAccent),
+            child: const Text('Save'),
+          ),
         ],
       ),
     );
@@ -222,8 +243,16 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
         title: const Text('Delete folder?', style: TextStyle(color: Colors.white)),
         content: const Text('This will remove the folder and its notes.', style: TextStyle(color: Colors.white54)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.redAccent))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(foregroundColor: Colors.white54),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -264,8 +293,16 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(foregroundColor: Colors.white54),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: tealAccent),
+            child: const Text('Save'),
+          ),
         ],
       ),
     );
@@ -281,8 +318,16 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
         title: const Text('Delete note?', style: TextStyle(color: Colors.white)),
         content: const Text('This note will be removed.', style: TextStyle(color: Colors.white54)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.redAccent))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(foregroundColor: Colors.white54),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -335,11 +380,11 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
             actions: [
               IconButton(
                 onPressed: () => _renameFolder(folderName),
-                icon: const Icon(Icons.edit_outlined, color: Colors.white70),
+                icon: Icon(Icons.edit_outlined, color: tealAccent),
               ),
               IconButton(
                 onPressed: _deleteFolder,
-                icon: const Icon(Icons.delete_outline, color: Colors.white54),
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
               ),
             ],
           ),
@@ -382,13 +427,15 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
                       ? 'Just now'
                       : DateFormat('dd MMM, HH:mm').format(updatedAt.toDate());
 
-                  return GestureDetector(
+                  return PressableScale(
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => NoteEditorView(folderId: widget.folderId, noteId: doc.id),
                       ),
                     ),
+                    borderRadius: BorderRadius.circular(18),
+                    pressedScale: 0.985,
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(16),
@@ -427,8 +474,8 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
                             ),
                           ),
                           PopupMenuButton<String>(
-                            color: backgroundColor,
-                            icon: const Icon(Icons.more_vert, color: Colors.white38),
+                            color: cardColor,
+                            icon: const Icon(Icons.more_vert, color: Colors.white70),
                             onSelected: (value) {
                               if (value == 'rename') {
                                 _renameNote(doc, title);
@@ -437,8 +484,14 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
                               }
                             },
                             itemBuilder: (context) => [
-                              const PopupMenuItem(value: 'rename', child: Text('Rename')),
-                              const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                              const PopupMenuItem(
+                                value: 'rename',
+                                child: Text('Rename', style: TextStyle(color: Colors.white)),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                              ),
                             ],
                           ),
                         ],
@@ -472,8 +525,10 @@ class _ActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     const Color tealAccent = Color(0xFF00C09E);
     const Color cardColor = Color(0xFF1E243A);
-    return GestureDetector(
+    return PressableScale(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      pressedScale: 0.985,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
