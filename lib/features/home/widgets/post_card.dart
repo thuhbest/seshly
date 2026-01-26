@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../view/question_detail_view.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 import 'package:seshly/features/tutors/view/find_tutor_view.dart';
 import '../../profile/view/profile_view.dart';
 
@@ -22,6 +18,8 @@ class PostCard extends StatefulWidget {
   final int comments;
   final String? attachmentUrl;
   final String? link;
+  final Map<String, dynamic>? repostOf;
+  final String? repostText;
 
   const PostCard({
     super.key,
@@ -35,6 +33,8 @@ class PostCard extends StatefulWidget {
     required this.comments,
     this.attachmentUrl,
     this.link,
+    this.repostOf,
+    this.repostText,
   });
 
   @override
@@ -43,12 +43,15 @@ class PostCard extends StatefulWidget {
 
 class _PostCardState extends State<PostCard> {
   bool _isExpanded = false;
+  bool _expandedLoaded = false;
   VideoPlayerController? _videoController;
   bool _isVideo = false;
   bool _hasReacted = false;
   final Color tealAccent = const Color(0xFF00C09E);
   final Color cardColor = const Color(0xFF1E243A);
   final Color backgroundColor = const Color(0xFF0F142B);
+
+  String get _expandedStorageKey => 'post_expand_${widget.postId}';
 
   @override
   void initState() {
@@ -65,6 +68,18 @@ class _PostCardState extends State<PostCard> {
           if (mounted) setState(() {});
         });
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_expandedLoaded) return;
+    final bucket = PageStorage.of(context);
+    final stored = bucket.readState(context, identifier: _expandedStorageKey);
+    if (stored is bool) {
+      _isExpanded = stored;
+    }
+    _expandedLoaded = true;
   }
 
   Future<void> _checkIfUserReacted() async {
@@ -88,7 +103,7 @@ class _PostCardState extends State<PostCard> {
   void _showDeleteConfirmation() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text("Delete Post?", style: TextStyle(color: Colors.white)),
@@ -98,17 +113,16 @@ class _PostCardState extends State<PostCard> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text("Cancel", style: TextStyle(color: Colors.white38)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () async {
               await FirebaseFirestore.instance.collection('posts').doc(widget.postId).delete();
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Post deleted")));
-              }
+              if (!mounted) return;
+              Navigator.of(context, rootNavigator: true).pop();
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Post deleted")));
             },
             child: const Text("Delete Forever", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
@@ -123,7 +137,7 @@ class _PostCardState extends State<PostCard> {
       context: context,
       backgroundColor: cardColor,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) => Padding(
+      builder: (sheetContext) => Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -142,10 +156,9 @@ class _PostCardState extends State<PostCard> {
                   'createdAt': FieldValue.serverTimestamp(),
                   'status': 'pending',
                 });
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Report submitted. Thank you.")));
-                }
+                if (!mounted) return;
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Report submitted. Thank you.")));
               },
             )),
           ],
@@ -154,48 +167,116 @@ class _PostCardState extends State<PostCard> {
     );
   }
 
-  void _showShareOptions() {
-    showModalBottomSheet(
+  void _showRepostDialog() {
+    final controller = TextEditingController();
+    showDialog(
       context: context,
-      backgroundColor: cardColor,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Repost", style: TextStyle(color: Colors.white)),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: Icon(Icons.copy_rounded, color: tealAccent),
-              title: const Text("Copy Text", style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: widget.question));
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Text copied to clipboard")));
-              },
-            ),
-            if (widget.attachmentUrl != null)
-              ListTile(
-                leading: Icon(Icons.download_rounded, color: tealAccent),
-                title: Text(_isVideo ? "Save Video to Gallery" : "Save Image to Gallery", style: const TextStyle(color: Colors.white)),
-                onTap: () async {
-                  Navigator.pop(context);
-                  var file = await DefaultCacheManager().getSingleFile(widget.attachmentUrl!);
-                  await ImageGallerySaver.saveFile(file.path);
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saved to gallery!")));
-                },
+            TextField(
+              controller: controller,
+              maxLines: 4,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: "Add your thoughts (optional)",
+                hintStyle: const TextStyle(color: Colors.white38),
+                filled: true,
+                fillColor: backgroundColor,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
-            ListTile(
-              leading: Icon(Icons.ios_share_rounded, color: tealAccent),
-              title: const Text("Share to Apps", style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Share.share("${widget.question}\n\nShared from Seshly");
-                Navigator.pop(context);
-              },
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+              ),
+              child: Text(
+                widget.question,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
             ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Cancel", style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: tealAccent),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await _createRepost(controller.text.trim());
+            },
+            child: const Text("Repost", style: TextStyle(color: Color(0xFF0F142B), fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
+  }
+
+  void _toggleExpanded() {
+    setState(() => _isExpanded = !_isExpanded);
+    final bucket = PageStorage.of(context);
+    bucket.writeState(context, _isExpanded, identifier: _expandedStorageKey);
+  }
+
+  Future<void> _createRepost(String comment) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please sign in to repost.")));
+      return;
+    }
+
+    try {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final userData = userDoc.data() ?? {};
+      final authorName = (userData['fullName'] ?? userData['displayName'] ?? "Student").toString();
+      final String repostText = comment.trim();
+      final String storedQuestion = repostText.isEmpty ? widget.question : repostText;
+
+      await FirebaseFirestore.instance.collection('posts').add({
+        'subject': widget.subject,
+        'question': storedQuestion,
+        'repostText': repostText,
+        'repostOf': {
+          'postId': widget.postId,
+          'authorId': widget.authorId,
+          'author': widget.author,
+          'subject': widget.subject,
+          'question': widget.question,
+          'attachmentUrl': widget.attachmentUrl,
+          'link': widget.link,
+        },
+        'isRepost': true,
+        'author': authorName,
+        'authorId': user.uid,
+        'createdAt': FieldValue.serverTimestamp(),
+        'likes': 0,
+        'comments': 0,
+        'isUrgent': false,
+        'attachmentUrl': null,
+        'link': null,
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Reposted")));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Could not repost right now.")));
+    }
   }
 
   Future<void> _handleHelpful() async {
@@ -223,7 +304,8 @@ class _PostCardState extends State<PostCard> {
   @override
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
-    final questionText = widget.question.trim();
+    final bool isRepost = widget.repostOf != null;
+    final questionText = isRepost ? (widget.repostText ?? '').trim() : widget.question.trim();
     final bool canExpand = questionText.length > 140;
     final Color chipBackground = tealAccent.withValues(alpha: 0.1);
     final Color chipBorder = tealAccent.withValues(alpha: 0.25);
@@ -282,34 +364,40 @@ class _PostCardState extends State<PostCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
-                  onTap: canExpand ? () => setState(() => _isExpanded = !_isExpanded) : null,
-                  child: Text(
-                    questionText,
-                    maxLines: _isExpanded ? null : 3,
-                    overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
-                  ),
-                ),
-                if (canExpand) ...[
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: () => setState(() => _isExpanded = !_isExpanded),
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text(
-                        _isExpanded ? 'Show less' : '...more',
-                        style: TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
+                if (questionText.isNotEmpty) ...[
+                  GestureDetector(
+                    onTap: canExpand ? _toggleExpanded : null,
+                    child: Text(
+                      questionText,
+                      maxLines: _isExpanded ? null : 3,
+                      overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
                     ),
                   ),
+                  if (canExpand) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: _toggleExpanded,
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          _isExpanded ? 'Show less' : '...more',
+                          style: TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
                 ],
-                const SizedBox(height: 12),
+                if (isRepost) ...[
+                  _buildRepostQuote(),
+                  const SizedBox(height: 12),
+                ],
                 
                 // 🔥 FIXED AUTHOR BUTTON: isolated animation and static "by "
                 Row(
@@ -328,7 +416,12 @@ class _PostCardState extends State<PostCard> {
                       accentFill: chipBackground,
                       accentBorder: chipBorder,
                       onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileView()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ProfileView(userId: widget.authorId, showBack: true),
+                          ),
+                        );
                       },
                     ),
                   ],
@@ -339,8 +432,10 @@ class _PostCardState extends State<PostCard> {
           if (widget.attachmentUrl != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: GestureDetector(
+              child: PressableScale(
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FullScreenMediaViewer(url: widget.attachmentUrl!, isVideo: _isVideo, videoController: _videoController))),
+                borderRadius: BorderRadius.circular(16),
+                pressedScale: 0.98,
                 child: Hero(
                   tag: widget.postId, 
                   child: ClipRRect(
@@ -370,20 +465,29 @@ class _PostCardState extends State<PostCard> {
                   icon: Icons.chat_bubble_rounded, 
                   label: widget.comments.toString(), 
                   backgroundColor: chipBackground,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestionDetailView()))
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => QuestionDetailView(postId: widget.postId)))
                 ),
                 ActionIconButton(
                   icon: Icons.person_search_rounded, 
                   label: "Tutor", 
                   color: tealAccent, 
                   backgroundColor: chipBackground,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FindTutorView()))
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => FindTutorView(
+                        initialSubject: widget.subject,
+                        questionText: widget.question,
+                        postId: widget.postId,
+                      ),
+                    ),
+                  )
                 ),
                 ActionIconButton(
                   icon: Icons.repeat, 
                   label: "Repost", 
                   backgroundColor: chipBackground,
-                  onTap: _showShareOptions
+                  onTap: _showRepostDialog
                 ),
               ],
             ),
@@ -398,6 +502,91 @@ class _PostCardState extends State<PostCard> {
       return const Center(child: CircularProgressIndicator(color: Color(0xFF00C09E)));
     }
     return VideoPlayer(_videoController!);
+  }
+
+  Widget _buildRepostQuote() {
+    final data = widget.repostOf ?? {};
+    final String originalAuthor = (data['author'] ?? 'Student').toString();
+    final String originalSubject = (data['subject'] ?? 'General').toString();
+    final String originalQuestion = (data['question'] ?? '').toString();
+    final String? originalAttachment = data['attachmentUrl'] as String?;
+    final String? originalLink = data['link'] as String?;
+    final bool hasAttachment = originalAttachment != null && originalAttachment.isNotEmpty;
+    final bool hasLink = originalLink != null && originalLink.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F142B).withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  "Repost",
+                  style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                originalSubject,
+                style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            originalQuestion.isEmpty ? "Original post" : originalQuestion,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "by $originalAuthor",
+            style: const TextStyle(color: Colors.white38, fontSize: 11),
+          ),
+          if (hasAttachment || hasLink) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              children: [
+                if (hasAttachment) _repostPill(Icons.attachment_rounded, "Attachment"),
+                if (hasLink) _repostPill(Icons.link, "Link"),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _repostPill(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white54, size: 12),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+        ],
+      ),
+    );
   }
 }
 
@@ -512,7 +701,7 @@ class FullScreenMediaViewer extends StatelessWidget {
   }
 }
 
-class ActionIconButton extends StatefulWidget {
+class ActionIconButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
@@ -529,37 +718,26 @@ class ActionIconButton extends StatefulWidget {
   });
 
   @override
-  State<ActionIconButton> createState() => _ActionIconButtonState();
-}
-
-class _ActionIconButtonState extends State<ActionIconButton> {
-  bool _isPressed = false;
-
-  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _isPressed ? 0.92 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: widget.backgroundColor ?? widget.color.withValues(alpha: 25), // Adjusted for proper screenshot match (0.1 * 255)
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Icon(widget.icon, color: widget.color, size: 18),
-              if (widget.label.isNotEmpty) ...[
-                const SizedBox(width: 6),
-                Text(widget.label, style: TextStyle(color: widget.color, fontWeight: FontWeight.bold, fontSize: 13)),
-              ]
-            ],
-          ),
+    final Color fill = backgroundColor ?? color.withValues(alpha: 25);
+    return PressableScale(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      pressedScale: 0.92,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 18),
+            if (label.isNotEmpty) ...[
+              const SizedBox(width: 6),
+              Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+            ]
+          ],
         ),
       ),
     );

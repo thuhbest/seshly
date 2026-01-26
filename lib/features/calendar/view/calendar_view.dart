@@ -6,6 +6,7 @@ import '../models/calendar_event.dart';
 import '../services/timetable_pdf_importer.dart';
 import '../widgets/calendar_grid.dart';
 import '../widgets/event_card.dart';
+import 'package:seshly/widgets/responsive.dart';
 
 class CalendarView extends StatefulWidget {
   const CalendarView({super.key});
@@ -45,7 +46,7 @@ class _CalendarViewState extends State<CalendarView> {
       backgroundColor: backgroundColor,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: pagePadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -283,19 +284,6 @@ class _CalendarViewState extends State<CalendarView> {
     return '${fmt.format(start)} - ${fmt.format(end)}';
   }
 
-  String _relativeTag(DateTime start) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final d = DateTime(start.year, start.month, start.day);
-    final diff = d.difference(today).inDays;
-
-    if (diff == 0) return 'Today';
-    if (diff == 1) return 'Tomorrow';
-    if (diff > 1) return 'In $diff days';
-    if (diff == -1) return 'Yesterday';
-    return '${diff.abs()} days ago';
-  }
-
   Future<void> _scanAndImportPdf() async {
     try {
       await _importer.importForMonth(currentMonth);
@@ -359,12 +347,11 @@ class _CalendarViewState extends State<CalendarView> {
                           initialTime: startTime,
                           builder: (pickerContext, child) => Theme(
                             data: Theme.of(pickerContext).copyWith(
-                              dialogBackgroundColor: backgroundColor,
                               colorScheme: const ColorScheme.dark(
                                 primary: tealAccent,
                                 surface: backgroundColor,
                                 onSurface: Colors.white,
-                              ),
+                              ), dialogTheme: DialogThemeData(backgroundColor: backgroundColor),
                             ),
                             child: child!,
                           ),
@@ -383,12 +370,11 @@ class _CalendarViewState extends State<CalendarView> {
                           initialTime: endTime,
                           builder: (pickerContext, child) => Theme(
                             data: Theme.of(pickerContext).copyWith(
-                              dialogBackgroundColor: backgroundColor,
                               colorScheme: const ColorScheme.dark(
                                 primary: tealAccent,
                                 surface: backgroundColor,
                                 onSurface: Colors.white,
-                              ),
+                              ), dialogTheme: DialogThemeData(backgroundColor: backgroundColor),
                             ),
                             child: child!,
                           ),
@@ -542,3 +528,5 @@ class _CalendarViewState extends State<CalendarView> {
     );
   }
 }
+
+

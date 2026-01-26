@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class SeshAIHintModal extends StatefulWidget {
   const SeshAIHintModal({super.key});
@@ -113,8 +114,10 @@ class _SeshAIHintModalState extends State<SeshAIHintModal> {
     
     return Column(
       children: [
-        GestureDetector(
+        PressableScale(
           onTap: canRequest ? _requestHint : null,
+          borderRadius: BorderRadius.circular(15),
+          pressedScale: 0.97,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             width: double.infinity,

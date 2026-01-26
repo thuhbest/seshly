@@ -42,7 +42,7 @@ class _FriendRequestsDialogState extends State<FriendRequestsDialog> {
       final doc = await _firestore.collection('users').doc(userId).get();
       return doc.data();
     } catch (e) {
-      print('Error getting user data: $e');
+      debugPrint('Error getting user data: $e');
       return null;
     }
   }
@@ -82,7 +82,7 @@ class _FriendRequestsDialogState extends State<FriendRequestsDialog> {
       
       return mutualFriends;
     } catch (e) {
-      print('Error getting mutual friends: $e');
+      debugPrint('Error getting mutual friends: $e');
       return [];
     }
   }
@@ -118,6 +118,7 @@ class _FriendRequestsDialogState extends State<FriendRequestsDialog> {
         widget.onRequestHandled!();
       }
 
+      if (!mounted) return;
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -127,7 +128,8 @@ class _FriendRequestsDialogState extends State<FriendRequestsDialog> {
         ),
       );
     } catch (e) {
-      print('Error handling friend request: $e');
+      debugPrint('Error handling friend request: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to ${accept ? 'accept' : 'decline'} friend request'),

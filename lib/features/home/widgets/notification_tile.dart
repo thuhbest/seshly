@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class NotificationTile extends StatelessWidget {
   final String title;
@@ -96,8 +97,10 @@ class NotificationTile extends StatelessWidget {
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
                     ),
                     if (actionLabel != null)
-                      GestureDetector(
+                      PressableScale(
                         onTap: () {},
+                        borderRadius: BorderRadius.circular(6),
+                        pressedScale: 0.95,
                         child: Text(
                           actionLabel!,
                           style: const TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 13),

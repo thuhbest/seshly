@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'vault_upload_view.dart';
-import '../widgets/contribution_stats.dart';
+import 'package:seshly/widgets/pressable_scale.dart';
 
 class VaultView extends StatefulWidget {
   const VaultView({super.key});
@@ -24,7 +24,7 @@ class _VaultViewState extends State<VaultView> {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -41,9 +41,17 @@ class _VaultViewState extends State<VaultView> {
               ],
             ),
             const SizedBox(height: 30),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: isAllMaterials ? _buildMaterialList(false) : _buildMaterialList(true),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final double width = constraints.maxWidth;
+                final int crossAxisCount = width >= 1100 ? 3 : (width >= 800 ? 2 : 1);
+                return AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: isAllMaterials
+                      ? _buildMaterialList(false, crossAxisCount: crossAxisCount)
+                      : _buildMaterialList(true, crossAxisCount: crossAxisCount),
+                );
+              },
             ),
             const SizedBox(height: 100),
           ],
@@ -97,7 +105,7 @@ class _VaultViewState extends State<VaultView> {
     );
   }
 
-  Widget _buildMaterialList(bool onlyMine) {
+  Widget _buildMaterialList(bool onlyMine, {required int crossAxisCount}) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     Query query = FirebaseFirestore.instance.collection('vault').orderBy('stars', descending: true);
 
@@ -115,9 +123,27 @@ class _VaultViewState extends State<VaultView> {
 
         if (docs.isEmpty) return const Center(child: Text("No documents found.", style: TextStyle(color: Colors.white24)));
 
-        return ListView.builder(
+        if (crossAxisCount <= 1) {
+          return ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final data = docs[index].data() as Map<String, dynamic>;
+              return _buildVaultCard(docs[index].id, data);
+            },
+          );
+        }
+
+        return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 2.6,
+          ),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
@@ -154,7 +180,7 @@ class _VaultViewState extends State<VaultView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(data['subject'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                Text("${data['type']} • ${data['year']}", style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                Text("${data['type']} | ${data['year']}", style: const TextStyle(color: Colors.white38, fontSize: 12)),
               ],
             ),
           ),
@@ -213,15 +239,13 @@ class VaultActionButton extends StatefulWidget {
 }
 
 class _VaultActionButtonState extends State<VaultActionButton> {
-  bool _isPressed = false;
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
+    return PressableScale(
       onTap: widget.onTap,
-      child: AnimatedScale(scale: _isPressed ? 0.94 : 1.0, duration: const Duration(milliseconds: 100), child: widget.child),
+      pressedScale: 0.94,
+      child: widget.child,
     );
   }
 }
+

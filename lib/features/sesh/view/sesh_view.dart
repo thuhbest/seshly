@@ -4,7 +4,7 @@ import '../widgets/sesh_feature_card.dart';
 import '../widgets/sesh_input_box.dart';
 import '../view/vault_view.dart';
 import '../view/archive_view.dart';
-import '../view/progress_view.dart'; // Import ProgressView
+import 'package:seshly/widgets/responsive.dart';
 
 class SeshView extends StatefulWidget {
   const SeshView({super.key});
@@ -20,7 +20,7 @@ class _SeshViewState extends State<SeshView> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: pagePadding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -101,8 +101,6 @@ class _SeshViewState extends State<SeshView> {
         return const VaultView();
       case "Archive":
         return const ArchiveView();
-      case "Progress":
-        return const ProgressView(); // Updated to use ProgressView
       default:
         return const Center(
           child: Text(

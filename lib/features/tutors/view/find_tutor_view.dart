@@ -1,9 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/step_card.dart';
 import '../view/recharge_view.dart'; // Import RechargeView
 
 class FindTutorView extends StatefulWidget {
-  const FindTutorView({super.key});
+  final String? initialSubject;
+  final String? questionText;
+  final String? postId;
+
+  const FindTutorView({
+    super.key,
+    this.initialSubject,
+    this.questionText,
+    this.postId,
+  });
 
   @override
   State<FindTutorView> createState() => _FindTutorViewState();
@@ -12,15 +23,33 @@ class FindTutorView extends StatefulWidget {
 class _FindTutorViewState extends State<FindTutorView> {
   String? selectedSubject;
   bool showOtherField = false;
+  bool showResults = false;
   final TextEditingController _otherController = TextEditingController();
+  final TextEditingController _topicController = TextEditingController();
   final List<String> subjects = [
     "Mathematics", "Physics", "Chemistry", 
     "Programming", "Biology", "Statistics", "Other"
   ];
 
   @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialSubject?.trim();
+    if (initial != null && initial.isNotEmpty) {
+      if (subjects.contains(initial)) {
+        selectedSubject = initial;
+      } else {
+        showOtherField = true;
+        selectedSubject = initial;
+        _otherController.text = initial;
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _otherController.dispose();
+    _topicController.dispose();
     super.dispose();
   }
 
@@ -69,29 +98,40 @@ class _FindTutorViewState extends State<FindTutorView> {
               const SizedBox(height: 25),
 
               // --- Balance Card ---
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: tealAccent.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: tealAccent.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Your Sesh Minutes", style: TextStyle(color: Colors.white54, fontSize: 14)),
-                        SizedBox(height: 8),
-                        Text("450", style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    Icon(Icons.bolt, color: tealAccent.withValues(alpha: 0.5), size: 40),
-                  ],
-                ),
-              ),
+              _buildBalanceCard(tealAccent),
               const SizedBox(height: 35),
+              if ((widget.questionText ?? '').isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E243A).withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Question from your post",
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        widget.questionText!,
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        "Tutors will see the full question before accepting.",
+                        style: TextStyle(color: Colors.white38, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
 
               const Text("What subject do you need help with?", 
                 style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Serif')),
@@ -143,6 +183,7 @@ class _FindTutorViewState extends State<FindTutorView> {
                         } else {
                           selectedSubject = null;
                         }
+                        showResults = false;
                       },
                     ),
                   ),
@@ -150,15 +191,46 @@ class _FindTutorViewState extends State<FindTutorView> {
               
               if (showOtherField) const SizedBox(height: 20),
 
+              const Text("Topic or chapter (optional)",
+                style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E243A).withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                child: TextField(
+                  controller: _topicController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: "e.g. Chain Rule, Normal Distribution",
+                    hintStyle: TextStyle(color: Colors.white38, fontSize: 13),
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
               // --- Find Button with pressing effect ---
               PressableElevatedButton(
                 onPressed: selectedSubject != null ? () {
                   // Handle find tutor action
-                  print('Find tutor for: $selectedSubject');
+                  setState(() => showResults = true);
                 } : null,
                 icon: Icons.send_outlined,
                 label: "Find Tutor Instantly",
               ),
+              if (showResults) ...[
+                const SizedBox(height: 30),
+                const Text(
+                  "Available tutors",
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Serif'),
+                ),
+                const SizedBox(height: 12),
+                _buildTutorResults(),
+              ],
               const SizedBox(height: 40),
 
               const Text("How it works", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Serif')),
@@ -172,6 +244,53 @@ class _FindTutorViewState extends State<FindTutorView> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildBalanceCard(Color tealAccent) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return _buildBalanceContent(tealAccent, '--', isGuest: true);
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() as Map<String, dynamic>? ?? {};
+        final int minutes = (data['seshMinutes'] as num?)?.toInt() ?? 0;
+        return _buildBalanceContent(tealAccent, minutes.toString());
+      },
+    );
+  }
+
+  Widget _buildBalanceContent(Color tealAccent, String minutesText, {bool isGuest = false}) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: tealAccent.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: tealAccent.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isGuest ? "Sign in to see balance" : "Your Sesh Minutes",
+                style: const TextStyle(color: Colors.white54, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                minutesText,
+                style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          Icon(Icons.bolt, color: tealAccent.withValues(alpha: 0.5), size: 40),
+        ],
       ),
     );
   }
@@ -196,9 +315,223 @@ class _FindTutorViewState extends State<FindTutorView> {
             showOtherField = false;
             _otherController.clear();
           }
+          showResults = false;
         });
       },
     );
+  }
+
+  Widget _buildTutorResults() {
+    const Color tealAccent = Color(0xFF00C09E);
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    final String subject = (selectedSubject ?? "").trim().toLowerCase();
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .where('tutorStatus', isEqualTo: 'active')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: tealAccent));
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              "Unable to load tutors right now.",
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+            ),
+          );
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+        final matches = docs.where((doc) {
+          if (doc.id == currentUserId) return false;
+          final data = doc.data() as Map<String, dynamic>;
+          final bool isOnline = data['isOnline'] == true;
+          final bool requestsEnabled = data['tutorRequestsEnabled'] == true;
+          if (!isOnline && !requestsEnabled) return false;
+
+          final tutorSubjects = _extractSubjects(data);
+          if (subject.isEmpty) return true;
+          return tutorSubjects.any((subj) => subj.toLowerCase() == subject);
+        }).toList();
+
+        if (matches.isEmpty) {
+          return Text(
+            "No tutors online for that subject yet.",
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
+          );
+        }
+
+        return Column(
+          children: matches.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final name = (data['fullName'] ?? data['displayName'] ?? "Tutor").toString();
+            final tutorProfile = data['tutorProfile'] as Map<String, dynamic>? ?? {};
+            final int displayRate = (tutorProfile['displayRate'] as num?)?.toInt() ?? 0;
+            final String tutorType = (tutorProfile['tutorType'] ?? "Individual").toString();
+            final String orgName = (tutorProfile['organizationName'] ?? "").toString();
+            final List<String> tutorSubjects = _extractSubjects(data);
+            final bool requestsEnabled = data['tutorRequestsEnabled'] == true;
+            final bool isOnline = data['isOnline'] == true;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E243A).withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: tealAccent.withValues(alpha: 0.15),
+                        child: Text(
+                          name.isNotEmpty ? name.substring(0, 1) : "T",
+                          style: const TextStyle(color: tealAccent, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text(
+                              tutorSubjects.isNotEmpty ? tutorSubjects.join(", ") : "Subjects not set",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white54, fontSize: 12),
+                            ),
+                            if (tutorType != "Individual" && orgName.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                "$tutorType: $orgName",
+                                style: const TextStyle(color: Colors.white38, fontSize: 11),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            displayRate > 0 ? "R$displayRate/min" : "Rate N/A",
+                            style: const TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: (requestsEnabled ? Colors.orangeAccent : Colors.green).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              requestsEnabled ? "Requests on" : "Online",
+                              style: TextStyle(color: requestsEnabled ? Colors.orangeAccent : Colors.green, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => _createTutorRequest(doc.id, data),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: tealAccent,
+                        foregroundColor: const Color(0xFF0F142B),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text(isOnline ? "Request Tutor" : "Send Request"),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Future<void> _createTutorRequest(String tutorId, Map<String, dynamic> tutorData) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please sign in to request a tutor.")));
+      return;
+    }
+
+    final String subject = (selectedSubject ?? "").trim();
+    if (subject.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Select a subject first.")));
+      return;
+    }
+
+    try {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final userData = userDoc.data() ?? {};
+      final studentName = (userData['fullName'] ?? userData['displayName'] ?? "Student").toString();
+      final tutorName = (tutorData['fullName'] ?? tutorData['displayName'] ?? "Tutor").toString();
+      final String topic = _topicController.text.trim();
+      final String questionText = (widget.questionText ?? '').trim();
+      final String snippet = questionText.length > 160 ? questionText.substring(0, 160) : questionText;
+
+      await FirebaseFirestore.instance.collection('tutor_requests').add({
+        'tutorId': tutorId,
+        'tutorName': tutorName,
+        'studentId': user.uid,
+        'studentName': studentName,
+        'subject': subject,
+        'topic': topic,
+        'questionText': questionText,
+        'questionSnippet': snippet,
+        'postId': widget.postId,
+        'status': 'pending',
+        'source': widget.postId != null ? 'post' : 'manual',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Tutor request sent.")));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Could not send request.")));
+    }
+  }
+
+  List<String> _extractSubjects(Map<String, dynamic> data) {
+    final List<String> subjects = [];
+    final profile = data['tutorProfile'] as Map<String, dynamic>? ?? {};
+
+    void addList(dynamic raw) {
+      if (raw is List) {
+        for (final value in raw) {
+          final text = value.toString().trim();
+          if (text.isNotEmpty && !subjects.contains(text)) {
+            subjects.add(text);
+          }
+        }
+      }
+    }
+
+    addList(data['tutorSubjects']);
+    addList(profile['mainSubjects']);
+    addList(profile['minorSubjects']);
+    return subjects;
   }
 }
 
