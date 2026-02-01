@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:seshly/features/sesh/view/sesh_ai_chat_view.dart';
 
 class SeshInputBox extends StatefulWidget {
@@ -46,38 +47,44 @@ class _SeshInputBoxState extends State<SeshInputBox> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E243A).withValues(alpha: 0.5),
+        color: const Color(0xFF141B2F).withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: tealAccent.withValues(alpha: 0.2),
+          color: tealAccent.withValues(alpha: 0.35),
           width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             "Ask Sesh Anything",
-            style: TextStyle(
+            style: GoogleFonts.playfairDisplay(
               color: Colors.white,
               fontSize: 18,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Serif',
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: Colors.white.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(15),
             ),
             child: TextField(
               controller: _controller,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
+              style: GoogleFonts.spaceGrotesk(color: Colors.white),
+              decoration: InputDecoration(
                 hintText: "What do you need help with today?",
-                hintStyle: TextStyle(color: Colors.white38),
+                hintStyle: GoogleFonts.spaceGrotesk(color: Colors.white38),
                 border: InputBorder.none,
               ),
             ),
@@ -97,7 +104,7 @@ class _SeshInputBoxState extends State<SeshInputBox> {
                   : const Icon(Icons.auto_awesome, size: 18),
               label: Text(
                 _isLoading ? "Thinking..." : "Get AI Help",
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w600, fontSize: 16),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: tealAccent,

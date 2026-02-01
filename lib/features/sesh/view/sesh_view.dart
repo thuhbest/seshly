@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:seshly/services/sesh_ai_api.dart';
 import 'package:seshly/features/sesh/view/sesh_ai_chat_view.dart';
@@ -199,61 +200,96 @@ class _SeshViewState extends State<SeshView> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: pagePadding(context),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Sesh AI", 
-                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
-                    ),
-                    Text(
-                      "Your personal study assistant", 
-                      style: TextStyle(color: Colors.white54)
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withAlpha((0.05 * 255).round()), // fixed withOpacity
-                    shape: BoxShape.circle
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B1024),
+      body: Stack(
+        children: [
+          _buildBackground(),
+          SafeArea(
+            child: Padding(
+              padding: pagePadding(context),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Sesh AI",
+                            style: GoogleFonts.playfairDisplay(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            "Your personal study assistant",
+                            style: GoogleFonts.spaceGrotesk(color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF7CF1D6), Color(0xFF00C09E)],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF0F142B), size: 20),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SeshAiThreadsView()),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                  child: IconButton(
-                    icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF00C09E), size: 20),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SeshAiThreadsView()),
-                      );
-                    },
+                  const SizedBox(height: 18),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF141B2F).withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.auto_awesome, color: Color(0xFF7CF1D6)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "Sesh AI keeps your learning focused, fast, and honest — no shortcuts.",
+                            style: GoogleFonts.spaceGrotesk(color: Colors.white70, fontSize: 12.5),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 25),
-            SeshTabBar(
-              selectedTab: _selectedTab,
-              onTabChanged: (tab) => setState(() => _selectedTab = tab),
-            ),
-            const SizedBox(height: 30),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: _buildActiveView(),
+                  const SizedBox(height: 20),
+                  SeshTabBar(
+                    selectedTab: _selectedTab,
+                    onTabChanged: (tab) => setState(() => _selectedTab = tab),
+                  ),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: _buildActiveView(),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -301,5 +337,49 @@ class _SeshViewState extends State<SeshView> {
           ),
         );
     }
+  }
+
+  Widget _buildBackground() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF0B1024), Color(0xFF0F2236), Color(0xFF0A1E2F)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -120,
+            right: -60,
+            child: _glow(const Color(0xFF00C09E), 240),
+          ),
+          Positioned(
+            bottom: -140,
+            left: -80,
+            child: _glow(const Color(0xFF6F8FE4), 280),
+          ),
+          Positioned(
+            top: 160,
+            left: 30,
+            child: _glow(const Color(0xFF7CF1D6), 140),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _glow(Color color, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [color.withValues(alpha: 0.35), color.withValues(alpha: 0.0)],
+        ),
+      ),
+    );
   }
 }

@@ -74,6 +74,23 @@ class SeshAiChatStore {
       }, SetOptions(merge: true));
     });
   }
+
+  Future<void> updateThread({
+    required String threadId,
+    String? title,
+    bool? pinned,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('Not signed in');
+    }
+    final threadRef = _db.collection('users').doc(user.uid).collection('ai_threads').doc(threadId);
+    await threadRef.set({
+      if (title != null) 'title': title,
+      if (pinned != null) 'pinned': pinned,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
 }
 
 class ChatMessage {
@@ -82,6 +99,7 @@ class ChatMessage {
     required this.role,
     required this.text,
     required this.attachments,
+    required this.reactions,
     required this.createdAt,
   });
 
@@ -89,12 +107,20 @@ class ChatMessage {
   final String role;
   final String text;
   final List<String> attachments;
+  final Map<String, List<String>> reactions;
   final DateTime? createdAt;
 
   bool get isUser => role == 'user';
 
   static ChatMessage fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
+    final rawReactions = (data['reactions'] as Map<String, dynamic>?) ?? {};
+    final reactions = <String, List<String>>{};
+    rawReactions.forEach((key, value) {
+      if (value is List) {
+        reactions[key] = value.map((e) => e.toString()).toList();
+      }
+    });
     return ChatMessage(
       id: doc.id,
       role: (data['role'] ?? 'assistant').toString(),
@@ -102,7 +128,46 @@ class ChatMessage {
       attachments: (data['attachments'] as List<dynamic>? ?? [])
           .map((e) => e.toString())
           .toList(),
+      reactions: reactions,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );
+  }
+}
+
+extension SeshAiChatReactions on SeshAiChatStore {
+  Future<void> toggleReaction({
+    required String threadId,
+    required String messageId,
+    required String emoji,
+    required String userId,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('Not signed in');
+    }
+    final msgRef = _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('ai_threads')
+        .doc(threadId)
+        .collection('messages')
+        .doc(messageId);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(msgRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? {};
+      final reactions = (data['reactions'] as Map<String, dynamic>?) ?? {};
+      final current = (reactions[emoji] as List<dynamic>? ?? []).map((e) => e.toString()).toList();
+      if (current.contains(userId)) {
+        tx.set(msgRef, {
+          'reactions.$emoji': FieldValue.arrayRemove([userId]),
+        }, SetOptions(merge: true));
+      } else {
+        tx.set(msgRef, {
+          'reactions.$emoji': FieldValue.arrayUnion([userId]),
+        }, SetOptions(merge: true));
+      }
+    });
   }
 }
