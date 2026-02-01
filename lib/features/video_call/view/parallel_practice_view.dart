@@ -4,6 +4,7 @@ import '../widgets/mode_switch_pill.dart';
 import '../widgets/student_grid.dart';
 import '../widgets/shared_board.dart';
 import '../widgets/right_rail.dart';
+import 'session_wrap_view.dart';
 import '../widgets/give_task_modal.dart';
 
 class ParallelPracticeView extends StatefulWidget {
@@ -16,10 +17,17 @@ class ParallelPracticeView extends StatefulWidget {
 class _ParallelPracticeViewState extends State<ParallelPracticeView> {
   SessionMode _currentMode = SessionMode.teach;
   final bool _isRailExpanded = true;
+  late final String _sessionId;
 
   final Color backgroundColor = const Color(0xFF0F142B);
   final Color tealAccent = const Color(0xFF00C09E);
   final Color cardColor = const Color(0xFF1E243A);
+
+  @override
+  void initState() {
+    super.initState();
+    _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +41,7 @@ class _ParallelPracticeViewState extends State<ParallelPracticeView> {
             child: Row(
               children: [
                 Expanded(child: _buildMainCanvas()),
-                if (_isRailExpanded && isWide) const RightRail(),
+                if (_isRailExpanded && isWide) RightRail(sessionId: _sessionId),
               ],
             ),
           ),
@@ -200,7 +208,15 @@ class _ParallelPracticeViewState extends State<ParallelPracticeView> {
               onPressed: () => Navigator.pop(context),
               child: const Text("Cancel")),
           TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SessionWrapView(sessionId: _sessionId),
+                  ),
+                );
+              },
               child: const Text("End",
                   style: TextStyle(color: Colors.redAccent))),
         ],

@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isParticipant(sessionId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/sessions/$(sessionId)/participants/$(request.auth.uid));
+    }
+
+    function roleFor(sessionId) {
+      return get(/databases/$(database)/documents/sessions/$(sessionId)/participants/$(request.auth.uid)).data.role;
+    }
+
+    function isTutor(sessionId) {
+      return isParticipant(sessionId) && (roleFor(sessionId) in ['primaryTutor', 'coTutor']);
+    }
+
+    function isPrimaryTutor(sessionId) {
+      return isParticipant(sessionId) && (roleFor(sessionId) == 'primaryTutor');
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if isParticipant(sessionId);
+      allow write: if false;
+
+      match /participants/{userId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /presence/{userId} {
+        allow read: if isParticipant(sessionId);
+        allow create, update: if isParticipant(sessionId) && request.auth.uid == userId;
+        allow delete: if false;
+      }
+
+      match /tasks/{taskId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /templates/{templateId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /submissions/{submissionId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /boardSnapshots/{snapshotId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /markers/{markerId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /events/{eventId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /invites/{inviteId} {
+        allow read: if isParticipant(sessionId) || (resource.data.invitedUserId == request.auth.uid);
+        allow write: if false;
+      }
+
+      match /aiJobs/{jobId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /recordings/{recordingId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+    }
+
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+
+      match /ai_threads/{threadId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+
+        match /messages/{messageId} {
+          allow read, write: if isSignedIn() && request.auth.uid == userId;
+        }
+      }
+    }
+  }
+}

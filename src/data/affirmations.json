@@ -1,0 +1,2102 @@
+[
+  {
+    "id": "focus_001",
+    "text": "I choose to focus on the task steadily.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_002",
+    "text": "I choose to focus on the task with clarity.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_003",
+    "text": "I choose to focus on the task with purpose.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_004",
+    "text": "I choose to focus on the task calmly.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_005",
+    "text": "I choose to focus on the task with ease.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_006",
+    "text": "I choose to focus on the task right now.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_007",
+    "text": "I choose to focus on the task with discipline.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_008",
+    "text": "I choose to focus on the task with patience.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_009",
+    "text": "I choose to focus on the task without distractions.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_010",
+    "text": "I choose to focus on my study plan steadily.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_011",
+    "text": "I choose to focus on my study plan with clarity.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_012",
+    "text": "I choose to focus on my study plan with purpose.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_013",
+    "text": "I choose to focus on my study plan calmly.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_014",
+    "text": "I choose to focus on my study plan with ease.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_015",
+    "text": "I choose to focus on my study plan right now.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_016",
+    "text": "I choose to focus on my study plan with discipline.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_017",
+    "text": "I choose to focus on my study plan with patience.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_018",
+    "text": "I choose to focus on my study plan without distractions.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_019",
+    "text": "I choose to focus on this problem steadily.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_020",
+    "text": "I choose to focus on this problem with clarity.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_021",
+    "text": "I choose to focus on this problem with purpose.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_022",
+    "text": "I choose to focus on this problem calmly.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_023",
+    "text": "I choose to focus on this problem with ease.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_024",
+    "text": "I choose to focus on this problem right now.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_025",
+    "text": "I choose to focus on this problem with discipline.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_026",
+    "text": "I choose to focus on this problem with patience.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_027",
+    "text": "I choose to focus on this problem without distractions.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_028",
+    "text": "I choose to focus on today's work steadily.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_029",
+    "text": "I choose to focus on today's work with clarity.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_030",
+    "text": "I choose to focus on today's work with purpose.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_031",
+    "text": "I choose to focus on today's work calmly.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_032",
+    "text": "I choose to focus on today's work with ease.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_033",
+    "text": "I choose to focus on today's work right now.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_034",
+    "text": "I choose to focus on today's work with discipline.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_035",
+    "text": "I choose to focus on today's work with patience.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_036",
+    "text": "I choose to focus on today's work without distractions.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_037",
+    "text": "I choose to focus on one step at a time steadily.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_038",
+    "text": "I choose to focus on one step at a time with clarity.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_039",
+    "text": "I choose to focus on one step at a time with purpose.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_040",
+    "text": "I choose to focus on one step at a time calmly.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_041",
+    "text": "I choose to focus on one step at a time with ease.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_042",
+    "text": "I choose to focus on one step at a time right now.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_043",
+    "text": "I choose to focus on one step at a time with discipline.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_044",
+    "text": "I choose to focus on one step at a time with patience.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_045",
+    "text": "I choose to focus on one step at a time without distractions.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_046",
+    "text": "I choose to focus on the next question steadily.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_047",
+    "text": "I choose to focus on the next question with clarity.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_048",
+    "text": "I choose to focus on the next question with purpose.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_049",
+    "text": "I choose to focus on the next question calmly.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_050",
+    "text": "I choose to focus on the next question with ease.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_051",
+    "text": "I choose to focus on the next question right now.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_052",
+    "text": "I choose to focus on the next question with discipline.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_053",
+    "text": "I choose to focus on the next question with patience.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_054",
+    "text": "I choose to focus on the next question without distractions.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_055",
+    "text": "I choose to focus on the key idea steadily.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_056",
+    "text": "I choose to focus on the key idea with clarity.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_057",
+    "text": "I choose to focus on the key idea with purpose.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_058",
+    "text": "I choose to focus on the key idea calmly.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_059",
+    "text": "I choose to focus on the key idea with ease.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_060",
+    "text": "I choose to focus on the key idea right now.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_061",
+    "text": "I choose to focus on the key idea with discipline.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_062",
+    "text": "I choose to focus on the key idea with patience.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_063",
+    "text": "I choose to focus on the key idea without distractions.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_064",
+    "text": "I choose to focus on my priority steadily.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_065",
+    "text": "I choose to focus on my priority with clarity.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_066",
+    "text": "I choose to focus on my priority with purpose.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_067",
+    "text": "I choose to focus on my priority calmly.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_068",
+    "text": "I choose to focus on my priority with ease.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_069",
+    "text": "I choose to focus on my priority right now.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_070",
+    "text": "I choose to focus on my priority with discipline.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_071",
+    "text": "I choose to focus on my priority with patience.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_072",
+    "text": "I choose to focus on my priority without distractions.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_073",
+    "text": "I choose to return to the task steadily.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_074",
+    "text": "I choose to return to the task with clarity.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "focus_075",
+    "text": "I choose to return to the task with purpose.",
+    "tags": [
+      "focus"
+    ]
+  },
+  {
+    "id": "calm_001",
+    "text": "I breathe and feel gentle calm in this moment.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_002",
+    "text": "I breathe and feel gentle calm with each breath.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_003",
+    "text": "I breathe and feel gentle calm right now.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_004",
+    "text": "I breathe and feel gentle calm as I study.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_005",
+    "text": "I breathe and feel gentle calm as I work.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_006",
+    "text": "I breathe and feel gentle calm throughout this session.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_007",
+    "text": "I breathe and feel gentle calm today.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_008",
+    "text": "I breathe and feel gentle peace in this moment.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_009",
+    "text": "I breathe and feel gentle peace with each breath.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_010",
+    "text": "I breathe and feel gentle peace right now.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_011",
+    "text": "I breathe and feel gentle peace as I study.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_012",
+    "text": "I breathe and feel gentle peace as I work.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_013",
+    "text": "I breathe and feel gentle peace throughout this session.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_014",
+    "text": "I breathe and feel gentle peace today.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_015",
+    "text": "I breathe and feel gentle ease in this moment.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_016",
+    "text": "I breathe and feel gentle ease with each breath.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_017",
+    "text": "I breathe and feel gentle ease right now.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_018",
+    "text": "I breathe and feel gentle ease as I study.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_019",
+    "text": "I breathe and feel gentle ease as I work.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_020",
+    "text": "I breathe and feel gentle ease throughout this session.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_021",
+    "text": "I breathe and feel gentle ease today.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_022",
+    "text": "I breathe and feel gentle balance in this moment.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_023",
+    "text": "I breathe and feel gentle balance with each breath.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_024",
+    "text": "I breathe and feel gentle balance right now.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_025",
+    "text": "I breathe and feel gentle balance as I study.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_026",
+    "text": "I breathe and feel gentle balance as I work.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_027",
+    "text": "I breathe and feel gentle balance throughout this session.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_028",
+    "text": "I breathe and feel gentle balance today.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_029",
+    "text": "I breathe and feel gentle stillness in this moment.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_030",
+    "text": "I breathe and feel gentle stillness with each breath.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_031",
+    "text": "I breathe and feel gentle stillness right now.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_032",
+    "text": "I breathe and feel gentle stillness as I study.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_033",
+    "text": "I breathe and feel gentle stillness as I work.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_034",
+    "text": "I breathe and feel gentle stillness throughout this session.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_035",
+    "text": "I breathe and feel gentle stillness today.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_036",
+    "text": "I breathe and feel gentle centered focus in this moment.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_037",
+    "text": "I breathe and feel gentle centered focus with each breath.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_038",
+    "text": "I breathe and feel gentle centered focus right now.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_039",
+    "text": "I breathe and feel gentle centered focus as I study.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_040",
+    "text": "I breathe and feel gentle centered focus as I work.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_041",
+    "text": "I breathe and feel gentle centered focus throughout this session.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_042",
+    "text": "I breathe and feel gentle centered focus today.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_043",
+    "text": "I breathe and feel gentle relaxation in this moment.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_044",
+    "text": "I breathe and feel gentle relaxation with each breath.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_045",
+    "text": "I breathe and feel gentle relaxation right now.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_046",
+    "text": "I breathe and feel gentle relaxation as I study.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_047",
+    "text": "I breathe and feel gentle relaxation as I work.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_048",
+    "text": "I breathe and feel gentle relaxation throughout this session.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_049",
+    "text": "I breathe and feel gentle relaxation today.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_050",
+    "text": "I breathe and feel gentle grounded energy in this moment.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_051",
+    "text": "I breathe and feel gentle grounded energy with each breath.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_052",
+    "text": "I breathe and feel gentle grounded energy right now.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_053",
+    "text": "I breathe and feel gentle grounded energy as I study.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_054",
+    "text": "I breathe and feel gentle grounded energy as I work.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_055",
+    "text": "I breathe and feel gentle grounded energy throughout this session.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_056",
+    "text": "I breathe and feel gentle grounded energy today.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_057",
+    "text": "I breathe and feel steady calm in this moment.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_058",
+    "text": "I breathe and feel steady calm with each breath.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_059",
+    "text": "I breathe and feel steady calm right now.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_060",
+    "text": "I breathe and feel steady calm as I study.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_061",
+    "text": "I breathe and feel steady calm as I work.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_062",
+    "text": "I breathe and feel steady calm throughout this session.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_063",
+    "text": "I breathe and feel steady calm today.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_064",
+    "text": "I breathe and feel steady peace in this moment.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_065",
+    "text": "I breathe and feel steady peace with each breath.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_066",
+    "text": "I breathe and feel steady peace right now.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_067",
+    "text": "I breathe and feel steady peace as I study.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_068",
+    "text": "I breathe and feel steady peace as I work.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_069",
+    "text": "I breathe and feel steady peace throughout this session.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_070",
+    "text": "I breathe and feel steady peace today.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_071",
+    "text": "I breathe and feel steady ease in this moment.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_072",
+    "text": "I breathe and feel steady ease with each breath.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_073",
+    "text": "I breathe and feel steady ease right now.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_074",
+    "text": "I breathe and feel steady ease as I study.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "calm_075",
+    "text": "I breathe and feel steady ease as I work.",
+    "tags": [
+      "calm"
+    ]
+  },
+  {
+    "id": "confidence_001",
+    "text": "I trust steady confidence in my learning.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_002",
+    "text": "I trust steady confidence through practice.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_003",
+    "text": "I trust steady confidence today.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_004",
+    "text": "I trust steady confidence when it matters.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_005",
+    "text": "I trust steady confidence with each step.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_006",
+    "text": "I trust steady confidence as I improve.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_007",
+    "text": "I trust steady confidence through challenges.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_008",
+    "text": "I trust steady self-belief in my learning.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_009",
+    "text": "I trust steady self-belief through practice.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_010",
+    "text": "I trust steady self-belief today.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_011",
+    "text": "I trust steady self-belief when it matters.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_012",
+    "text": "I trust steady self-belief with each step.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_013",
+    "text": "I trust steady self-belief as I improve.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_014",
+    "text": "I trust steady self-belief through challenges.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_015",
+    "text": "I trust steady courage in my learning.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_016",
+    "text": "I trust steady courage through practice.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_017",
+    "text": "I trust steady courage today.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_018",
+    "text": "I trust steady courage when it matters.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_019",
+    "text": "I trust steady courage with each step.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_020",
+    "text": "I trust steady courage as I improve.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_021",
+    "text": "I trust steady courage through challenges.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_022",
+    "text": "I trust steady assurance in my learning.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_023",
+    "text": "I trust steady assurance through practice.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_024",
+    "text": "I trust steady assurance today.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_025",
+    "text": "I trust steady assurance when it matters.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_026",
+    "text": "I trust steady assurance with each step.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_027",
+    "text": "I trust steady assurance as I improve.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_028",
+    "text": "I trust steady assurance through challenges.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_029",
+    "text": "I trust steady strength in my learning.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_030",
+    "text": "I trust steady strength through practice.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_031",
+    "text": "I trust steady strength today.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_032",
+    "text": "I trust steady strength when it matters.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_033",
+    "text": "I trust steady strength with each step.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_034",
+    "text": "I trust steady strength as I improve.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_035",
+    "text": "I trust steady strength through challenges.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_036",
+    "text": "I trust steady certainty in my learning.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_037",
+    "text": "I trust steady certainty through practice.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_038",
+    "text": "I trust steady certainty today.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_039",
+    "text": "I trust steady certainty when it matters.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_040",
+    "text": "I trust steady certainty with each step.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_041",
+    "text": "I trust steady certainty as I improve.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_042",
+    "text": "I trust steady certainty through challenges.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_043",
+    "text": "I trust steady resilience in my learning.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_044",
+    "text": "I trust steady resilience through practice.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_045",
+    "text": "I trust steady resilience today.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_046",
+    "text": "I trust steady resilience when it matters.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_047",
+    "text": "I trust steady resilience with each step.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_048",
+    "text": "I trust steady resilience as I improve.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_049",
+    "text": "I trust steady resilience through challenges.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_050",
+    "text": "I trust steady capability in my learning.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_051",
+    "text": "I trust steady capability through practice.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_052",
+    "text": "I trust steady capability today.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_053",
+    "text": "I trust steady capability when it matters.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_054",
+    "text": "I trust steady capability with each step.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_055",
+    "text": "I trust steady capability as I improve.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_056",
+    "text": "I trust steady capability through challenges.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_057",
+    "text": "I trust lasting confidence in my learning.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_058",
+    "text": "I trust lasting confidence through practice.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_059",
+    "text": "I trust lasting confidence today.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_060",
+    "text": "I trust lasting confidence when it matters.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_061",
+    "text": "I trust lasting confidence with each step.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_062",
+    "text": "I trust lasting confidence as I improve.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_063",
+    "text": "I trust lasting confidence through challenges.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_064",
+    "text": "I trust lasting self-belief in my learning.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_065",
+    "text": "I trust lasting self-belief through practice.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_066",
+    "text": "I trust lasting self-belief today.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_067",
+    "text": "I trust lasting self-belief when it matters.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_068",
+    "text": "I trust lasting self-belief with each step.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_069",
+    "text": "I trust lasting self-belief as I improve.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_070",
+    "text": "I trust lasting self-belief through challenges.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_071",
+    "text": "I trust lasting courage in my learning.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_072",
+    "text": "I trust lasting courage through practice.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_073",
+    "text": "I trust lasting courage today.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_074",
+    "text": "I trust lasting courage when it matters.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "confidence_075",
+    "text": "I trust lasting courage with each step.",
+    "tags": [
+      "confidence"
+    ]
+  },
+  {
+    "id": "exams_001",
+    "text": "I approach exams with calm and ready from start to finish.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_002",
+    "text": "I approach exams with calm and ready throughout the exam.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_003",
+    "text": "I approach exams with calm and ready one question at a time.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_004",
+    "text": "I approach exams with calm and ready with every section.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_005",
+    "text": "I approach exams with calm and ready as time passes.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_006",
+    "text": "I approach exams with calm and ready under pressure.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_007",
+    "text": "I approach exams with calm and ready today.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_008",
+    "text": "I approach exams with calm and capable from start to finish.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_009",
+    "text": "I approach exams with calm and capable throughout the exam.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_010",
+    "text": "I approach exams with calm and capable one question at a time.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_011",
+    "text": "I approach exams with calm and capable with every section.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_012",
+    "text": "I approach exams with calm and capable as time passes.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_013",
+    "text": "I approach exams with calm and capable under pressure.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_014",
+    "text": "I approach exams with calm and capable today.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_015",
+    "text": "I approach exams with calm and in control from start to finish.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_016",
+    "text": "I approach exams with calm and in control throughout the exam.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_017",
+    "text": "I approach exams with calm and in control one question at a time.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_018",
+    "text": "I approach exams with calm and in control with every section.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_019",
+    "text": "I approach exams with calm and in control as time passes.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_020",
+    "text": "I approach exams with calm and in control under pressure.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_021",
+    "text": "I approach exams with calm and in control today.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_022",
+    "text": "I approach exams with calm and composed from start to finish.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_023",
+    "text": "I approach exams with calm and composed throughout the exam.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_024",
+    "text": "I approach exams with calm and composed one question at a time.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_025",
+    "text": "I approach exams with calm and composed with every section.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_026",
+    "text": "I approach exams with calm and composed as time passes.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_027",
+    "text": "I approach exams with calm and composed under pressure.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_028",
+    "text": "I approach exams with calm and composed today.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_029",
+    "text": "I approach exams with calm and collected from start to finish.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_030",
+    "text": "I approach exams with calm and collected throughout the exam.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_031",
+    "text": "I approach exams with calm and collected one question at a time.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_032",
+    "text": "I approach exams with calm and collected with every section.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_033",
+    "text": "I approach exams with calm and collected as time passes.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_034",
+    "text": "I approach exams with calm and collected under pressure.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_035",
+    "text": "I approach exams with calm and collected today.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_036",
+    "text": "I approach exams with calm and efficient from start to finish.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_037",
+    "text": "I approach exams with calm and efficient throughout the exam.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_038",
+    "text": "I approach exams with calm and efficient one question at a time.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_039",
+    "text": "I approach exams with calm and efficient with every section.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_040",
+    "text": "I approach exams with calm and efficient as time passes.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_041",
+    "text": "I approach exams with calm and efficient under pressure.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_042",
+    "text": "I approach exams with calm and efficient today.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_043",
+    "text": "I approach exams with calm and balanced from start to finish.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_044",
+    "text": "I approach exams with calm and balanced throughout the exam.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_045",
+    "text": "I approach exams with calm and balanced one question at a time.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_046",
+    "text": "I approach exams with calm and balanced with every section.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_047",
+    "text": "I approach exams with calm and balanced as time passes.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_048",
+    "text": "I approach exams with calm and balanced under pressure.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_049",
+    "text": "I approach exams with calm and balanced today.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_050",
+    "text": "I approach exams with calm and resolved from start to finish.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_051",
+    "text": "I approach exams with calm and resolved throughout the exam.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_052",
+    "text": "I approach exams with calm and resolved one question at a time.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_053",
+    "text": "I approach exams with calm and resolved with every section.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_054",
+    "text": "I approach exams with calm and resolved as time passes.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_055",
+    "text": "I approach exams with calm and resolved under pressure.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_056",
+    "text": "I approach exams with calm and resolved today.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_057",
+    "text": "I approach exams with focused and ready from start to finish.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_058",
+    "text": "I approach exams with focused and ready throughout the exam.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_059",
+    "text": "I approach exams with focused and ready one question at a time.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_060",
+    "text": "I approach exams with focused and ready with every section.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_061",
+    "text": "I approach exams with focused and ready as time passes.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_062",
+    "text": "I approach exams with focused and ready under pressure.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_063",
+    "text": "I approach exams with focused and ready today.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_064",
+    "text": "I approach exams with focused and capable from start to finish.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_065",
+    "text": "I approach exams with focused and capable throughout the exam.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_066",
+    "text": "I approach exams with focused and capable one question at a time.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_067",
+    "text": "I approach exams with focused and capable with every section.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_068",
+    "text": "I approach exams with focused and capable as time passes.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_069",
+    "text": "I approach exams with focused and capable under pressure.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_070",
+    "text": "I approach exams with focused and capable today.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_071",
+    "text": "I approach exams with focused and in control from start to finish.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_072",
+    "text": "I approach exams with focused and in control throughout the exam.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_073",
+    "text": "I approach exams with focused and in control one question at a time.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_074",
+    "text": "I approach exams with focused and in control with every section.",
+    "tags": [
+      "exams"
+    ]
+  },
+  {
+    "id": "exams_075",
+    "text": "I approach exams with focused and in control as time passes.",
+    "tags": [
+      "exams"
+    ]
+  }
+]

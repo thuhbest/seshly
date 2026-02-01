@@ -684,3 +684,5 @@ export const checkachievements = onCall({region: REGION}, async (request) => {
     return {success: true};
   });
 });
+
+export {parallelPracticeApi, parallelPracticeAiWorker} from "./parallelPractice";

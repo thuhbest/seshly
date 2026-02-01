@@ -5,5 +5,12 @@ declare module 'express-serve-static-core' {
   interface Request {
     requestId?: string;
     user?: DecodedIdToken;
+    rateLimitExceeded?: boolean;
+    rateLimitResult?: {
+      allowed: boolean;
+      remaining: number;
+      resetAt: number;
+      limit: number;
+    };
   }
 }

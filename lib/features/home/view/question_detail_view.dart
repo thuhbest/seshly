@@ -208,7 +208,14 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
                             ),
                           ),
                           const SizedBox(height: 25),
-                          isAiView ? const AiTutorHelpView() : _buildCommentsList(postId),
+                          isAiView
+                              ? AiTutorHelpView(
+                                  subject: subject,
+                                  question: question,
+                                  details: details,
+                                  attachmentUrl: safeAttachmentUrl,
+                                )
+                              : _buildCommentsList(postId),
                         ],
                       ),
                     ),

@@ -31,7 +31,7 @@ class _CalendarViewState extends State<CalendarView> {
     currentMonth = DateTime(now.year, now.month, 1);
     selectedDay = now.day;
     _repo = CalendarRepository();
-    _importer = TimetablePdfImporter(_repo);
+    _importer = TimetablePdfImporter();
   }
 
   @override

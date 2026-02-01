@@ -6,6 +6,7 @@ class SeshFeatureCard extends StatelessWidget {
   final String description;
   final String buttonText;
   final IconData icon;
+  final VoidCallback? onTap;
 
   const SeshFeatureCard({
     super.key,
@@ -13,6 +14,7 @@ class SeshFeatureCard extends StatelessWidget {
     required this.description,
     required this.buttonText,
     required this.icon,
+    this.onTap,
   });
 
   @override
@@ -62,7 +64,7 @@ class SeshFeatureCard extends StatelessWidget {
             ),
           ),
           PressableScale(
-            onTap: () {},
+            onTap: onTap,
             borderRadius: BorderRadius.circular(10),
             pressedScale: 0.96,
             child: Container(

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'sesh_ai_panel.dart';
 
 class RightRail extends StatefulWidget {
-  const RightRail({super.key});
+  const RightRail({super.key, this.sessionId});
+
+  final String? sessionId;
 
   @override
   State<RightRail> createState() => _RightRailState();
@@ -42,7 +44,7 @@ class _RightRailState extends State<RightRail> with SingleTickerProviderStateMix
             child: TabBarView(
               controller: _tabController,
               children: [
-                const SeshAIPanel(),
+                SeshAIPanel(sessionId: widget.sessionId),
                 const Center(child: Text("Tasks", style: TextStyle(color: Colors.white38))),
               ],
             ),

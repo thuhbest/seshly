@@ -72,6 +72,7 @@ dependencies:
   record: ^5.1.2
   audioplayers: ^5.2.1
   cross_file: ^0.3.4
+  http: ^1.2.2
 
 dev_dependencies:
   flutter_test:

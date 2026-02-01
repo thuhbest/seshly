@@ -1,8 +1,17 @@
+import 'dart:typed_data';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:seshly/services/sesh_ai_api.dart';
 import 'package:seshly/widgets/pressable_scale.dart';
 
 class SessionWrapView extends StatefulWidget {
-  const SessionWrapView({super.key});
+  const SessionWrapView({super.key, this.sessionId});
+
+  final String? sessionId;
 
   @override
   State<SessionWrapView> createState() => _SessionWrapViewState();
@@ -12,10 +21,19 @@ class _SessionWrapViewState extends State<SessionWrapView> {
   final Color tealAccent = const Color(0xFF00C09E);
   final Color backgroundColor = const Color(0xFF0F142B);
   final Color cardColor = const Color(0xFF1E243A);
+  final _api = SeshAiApi();
+  late final String _sessionId;
 
   String _selectedStyle = "Exam Focused";
   bool _includeHomework = true;
   bool _isGenerating = false;
+  String? _lastSummaryUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _sessionId = widget.sessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +88,7 @@ class _SessionWrapViewState extends State<SessionWrapView> {
                 Icon(Icons.auto_awesome, color: tealAccent, size: 20),
                 const SizedBox(width: 12),
                 const Expanded(
-                  child: Text("Sesh AI is compiling 14 board snapshots and 45min of audio.", 
+                  child: Text("Sesh AI will compile your board snapshots into session packs.",
                     style: TextStyle(color: Colors.white70, fontSize: 11)),
                 ),
               ],
@@ -101,6 +119,10 @@ class _SessionWrapViewState extends State<SessionWrapView> {
               itemBuilder: (context, index) => _buildStudentPackCard(index),
             ),
           ),
+          if (_lastSummaryUrl != null) ...[
+            const SizedBox(height: 12),
+            Text("Latest pack ready to share.", style: TextStyle(color: tealAccent, fontSize: 12)),
+          ],
         ],
       ),
     );
@@ -174,7 +196,8 @@ class _SessionWrapViewState extends State<SessionWrapView> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: () {
-                setState(() => _isGenerating = true);
+                if (_isGenerating) return;
+                _generateAndSendPacks();
               },
               child: _isGenerating 
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Color(0xFF0F142B), strokeWidth: 2))
@@ -184,6 +207,156 @@ class _SessionWrapViewState extends State<SessionWrapView> {
         ],
       ),
     );
+  }
+
+  Future<void> _generateAndSendPacks() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showSnack('Please sign in to generate packs.');
+      return;
+    }
+
+    setState(() => _isGenerating = true);
+    try {
+      final urls = await _loadIndexedSnapshots(user.uid, _sessionId);
+
+      if (urls.isEmpty) {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: const ['png', 'jpg', 'jpeg'],
+          allowMultiple: true,
+          withData: true,
+          withReadStream: true,
+        );
+        if (result == null || result.files.isEmpty) {
+          setState(() => _isGenerating = false);
+          return;
+        }
+
+        for (final file in result.files) {
+          final bytes = await _readFileBytes(file);
+          if (bytes == null) continue;
+          final storagePath = 'users/${user.uid}/ai/sessions/$_sessionId/boards/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+          final url = await _uploadBytes(
+            bytes,
+            storagePath,
+            _contentTypeForName(file.name),
+          );
+          if (url != null) {
+            urls.add(url);
+            await _indexSnapshot(
+              userId: user.uid,
+              sessionId: _sessionId,
+              url: url,
+              storagePath: storagePath,
+            );
+          }
+        }
+      }
+
+      if (urls.isEmpty) throw Exception('No snapshots uploaded.');
+
+      final response = await _api.sessionSummarize(
+        sessionId: _sessionId,
+        boardSnapshotSignedUrls: urls,
+        chatLog: const [],
+        subject: _selectedStyle,
+        participants: [
+          {'userId': user.uid, 'role': 'student'},
+        ],
+      );
+
+      final pdfs = response['pdfUrlsByStudent'] as Map<String, dynamic>?;
+      final firstUrl = (pdfs != null && pdfs.values.isNotEmpty) ? pdfs.values.first.toString() : null;
+      setState(() => _lastSummaryUrl = firstUrl);
+
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: cardColor,
+          title: const Text('Session Packs Ready', style: TextStyle(color: Colors.white)),
+          content: Text(
+            firstUrl == null ? 'Session packs were generated.' : 'Session packs were generated and saved.',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close', style: TextStyle(color: Colors.white54)),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      _showSnack('Generate failed: $error');
+    } finally {
+      if (mounted) setState(() => _isGenerating = false);
+    }
+  }
+
+  Future<String?> _uploadBytes(Uint8List bytes, String path, String contentType) async {
+    final ref = FirebaseStorage.instance.ref().child(path);
+    final metadata = SettableMetadata(contentType: contentType);
+    final task = await ref.putData(bytes, metadata);
+    return task.ref.getDownloadURL();
+  }
+
+  Future<void> _indexSnapshot({
+    required String userId,
+    required String sessionId,
+    required String url,
+    required String storagePath,
+  }) async {
+    final collection = FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('aiSessions')
+        .doc(sessionId)
+        .collection('boardSnapshots');
+    await collection.add({
+      'url': url,
+      'storagePath': storagePath,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<List<String>> _loadIndexedSnapshots(String userId, String sessionId) async {
+    final snap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('aiSessions')
+        .doc(sessionId)
+        .collection('boardSnapshots')
+        .orderBy('createdAt', descending: false)
+        .get();
+    return snap.docs
+        .map((doc) => (doc.data()['url'] ?? '').toString())
+        .where((url) => url.trim().isNotEmpty)
+        .toList();
+  }
+
+  Future<Uint8List?> _readFileBytes(PlatformFile file) async {
+    if (file.bytes != null) return file.bytes;
+    final stream = file.readStream;
+    if (stream == null) return null;
+    final chunks = <int>[];
+    await for (final chunk in stream) {
+      chunks.addAll(chunk);
+    }
+    return Uint8List.fromList(chunks);
+  }
+
+  String _contentTypeForName(String name) {
+    final lower = name.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    return 'application/octet-stream';
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _sectionHeader(String title) {
