@@ -39,8 +39,10 @@ class UserAnswersView extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
-              child: Text("Error: ${snapshot.error}", 
-              style: const TextStyle(color: Colors.white54))
+              child: const Text(
+                "Could not load your contributions right now.",
+                style: TextStyle(color: Colors.white54),
+              ),
             );
           }
           if (snapshot.connectionState == ConnectionState.waiting) {

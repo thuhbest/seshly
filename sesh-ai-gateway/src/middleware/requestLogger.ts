@@ -1,8 +1,15 @@
+import { createHash } from 'node:crypto';
 import { NextFunction, Request, Response } from 'express';
 import admin from 'firebase-admin';
 
 import { getFirestore } from '../services/firebase';
 import { config } from '../utils/env';
+
+function hashValue(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return createHash('sha256').update(trimmed).digest('hex');
+}
 
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const start = Date.now();
@@ -16,7 +23,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       status: res.statusCode,
       durationMs,
       userId: req.user?.uid || null,
-      ip: req.ip,
+      ipHash: hashValue(req.ip || ''),
       userAgent: req.header('user-agent') || null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     };

@@ -4,8 +4,19 @@ const express_1 = require("express");
 const firestore_1 = require("firebase-admin/firestore");
 const modelRouter_1 = require("../services/modelRouter");
 const firestoreService_1 = require("../services/firestoreService");
+const academicGuard_1 = require("../services/academicGuard");
 const env_1 = require("../utils/env");
 const router = (0, express_1.Router)();
+const allowedContextTypes = [
+    'comment',
+    'sesh_screen',
+    'practice',
+    'notes',
+    'session',
+    'calendar',
+    'vault',
+    'snap',
+];
 const systemPrompt = [
     'You are a classifier for Seshly, an education-focused app.',
     'Return JSON only.',
@@ -98,6 +109,7 @@ function parseTurnCount(contentHint) {
 async function classifyText(text, contextType, contentHint) {
     const provider = env_1.config.model.provider;
     const model = provider === 'openai' ? env_1.config.model.openai.model : env_1.config.model.google.model;
+    const maxTokens = env_1.config.maxTokensPerEndpoint['POST /ai/policy/gate'];
     const messages = [
         { role: 'system', content: systemPrompt },
         {
@@ -115,6 +127,7 @@ async function classifyText(text, contextType, contentHint) {
         messages,
         jsonOnly: true,
         temperature: 0,
+        maxTokens,
     });
     const parsed = safeJsonParse(output);
     return {
@@ -133,20 +146,17 @@ async function logDecision(payload) {
         console.error('Failed to log policy decision', error);
     }
 }
-router.post('/ai/policy/gate', async (req, res) => {
+async function handlePolicyGate(req, res, forcedContextType) {
     const body = (req.body ?? {});
     const text = typeof body.text === 'string' ? body.text.trim() : '';
-    const contextType = body.contextType;
-    const allowedContextTypes = [
-        'comment',
-        'sesh_screen',
-        'practice',
-        'notes',
-        'session',
-        'calendar',
-        'vault',
-        'snap',
-    ];
+    const contextType = forcedContextType ?? body.contextType;
+    if (forcedContextType && body.contextType && body.contextType !== forcedContextType) {
+        res.status(400).json({
+            error: 'context_mismatch',
+            message: `Context type must be ${forcedContextType} for this endpoint.`,
+        });
+        return;
+    }
     if (!text || !contextType || !allowedContextTypes.includes(contextType)) {
         res.status(400).json({ error: 'invalid_request', message: 'text and contextType are required.' });
         return;
@@ -164,7 +174,7 @@ router.post('/ai/policy/gate', async (req, res) => {
             intent: 'other',
             recommendTutor: false,
             reason: 'rate_limited',
-            nextStep: 'You’re sending requests too fast. Please wait a bit and try again.',
+            nextStep: "You're sending requests too fast. Please wait a bit and try again.",
         };
         await logDecision({
             type: 'policy_gate',
@@ -180,13 +190,41 @@ router.post('/ai/policy/gate', async (req, res) => {
     }
     let category = 'unknown';
     let intent = 'other';
-    try {
-        const classified = await classifyText(text, contextType, body.contentHint);
-        category = classified.category;
-        intent = classified.intent;
+    const academicGuard = (0, academicGuard_1.evaluateAcademicGuard)(text);
+    if (academicGuard.outcome === 'block') {
+        const response = {
+            allowed: false,
+            category: academicGuard.category,
+            intent: 'other',
+            recommendTutor: false,
+            reason: 'school_only',
+            nextStep: academicGuard.message,
+        };
+        await logDecision({
+            type: 'policy_gate',
+            userId,
+            contextType,
+            textSnippet: text.slice(0, 200),
+            academicGuardReason: academicGuard.reason,
+            ...response,
+            requestId: req.requestId || null,
+            strictExamMode: env_1.config.strictExamMode,
+        });
+        res.json(response);
+        return;
     }
-    catch (error) {
-        console.error('Policy classification failed', error);
+    if (academicGuard.category === 'school') {
+        category = 'school';
+    }
+    if (academicGuard.reason === 'needs_model_review') {
+        try {
+            const classified = await classifyText(text, contextType, body.contentHint);
+            category = classified.category;
+            intent = classified.intent;
+        }
+        catch (error) {
+            console.error('Policy classification failed', error);
+        }
     }
     const isPracticeContext = ['practice', 'comment', 'sesh_screen'].includes(contextType);
     const wantsFullAnswer = detectFullAnswerRequest(text);
@@ -210,7 +248,17 @@ router.post('/ai/policy/gate', async (req, res) => {
             intent,
             recommendTutor: false,
             reason: 'school_only',
-            nextStep: 'I’m here to help with school-related questions. Try rephrasing with your class, assignment, or study topic.',
+            nextStep: (0, academicGuard_1.buildSchoolOnlyMessage)(false),
+        };
+    }
+    else if (category === 'unknown') {
+        response = {
+            allowed: false,
+            category,
+            intent,
+            recommendTutor: false,
+            reason: 'school_only',
+            nextStep: (0, academicGuard_1.buildSchoolOnlyMessage)(true),
         };
     }
     else if (intent === 'socratic_help' && isPracticeContext) {
@@ -232,5 +280,17 @@ router.post('/ai/policy/gate', async (req, res) => {
         strictExamMode: env_1.config.strictExamMode,
     });
     res.json(response);
+}
+router.post('/ai/policy/gate', async (req, res) => {
+    await handlePolicyGate(req, res);
+});
+router.post('/ai/policy/gate/:contextType', async (req, res) => {
+    const raw = String(req.params.contextType || '').toLowerCase();
+    const contextType = allowedContextTypes.find((value) => value === raw);
+    if (!contextType) {
+        res.status(400).json({ error: 'invalid_context', message: 'Unknown context type.' });
+        return;
+    }
+    await handlePolicyGate(req, res, contextType);
 });
 exports.default = router;

@@ -1,7 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:seshly/services/app_analytics_service.dart';
+import 'package:seshly/services/app_error_service.dart';
 import 'package:seshly/services/sesh_ai_api.dart';
 import 'package:seshly/services/sesh_ai_chat_store.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -50,6 +54,8 @@ class _SeshAiChatViewState extends State<SeshAiChatView> {
   String? _primaryUrl;
   int _lastMessageCount = 0;
   String? _currentUserId;
+  String _threadTitle = '';
+  bool _isPinned = false;
 
   final _reactionOptions = const ['👍', '💡', '✅', '⭐', '❓', '👀'];
 
@@ -80,6 +86,7 @@ class _SeshAiChatViewState extends State<SeshAiChatView> {
       );
       if (!mounted) return;
       setState(() => _threadId = id);
+      await _loadThreadMeta(id);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (widget.initialAction != null) {
           _runInitialAction();
@@ -87,11 +94,39 @@ class _SeshAiChatViewState extends State<SeshAiChatView> {
           _sendMessage(widget.initialMessage!, attachments: widget.initialAttachments);
         }
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'ai',
+        source: 'init_thread',
+      );
       if (!mounted) return;
       setState(() => _threadId = '');
-      _showSnack('Failed to start chat: $error');
+      _showSnack(
+        AppErrorService.instance.userMessageFor(
+          error,
+          fallback: 'Failed to start chat. Please try again.',
+        ),
+      );
     }
+  }
+
+  Future<void> _loadThreadMeta(String threadId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final snap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('ai_threads')
+        .doc(threadId)
+        .get();
+    final data = snap.data() ?? {};
+    if (!mounted) return;
+    setState(() {
+      _threadTitle = (data['title'] ?? widget.title).toString();
+      _isPinned = (data['pinned'] ?? false) == true;
+    });
   }
 
   Future<void> _runInitialAction() async {
@@ -108,8 +143,22 @@ class _SeshAiChatViewState extends State<SeshAiChatView> {
         );
       }
       setState(() => _primaryUrl = result.primaryUrl);
-    } catch (error) {
-      await _appendAssistant('Action failed: $error');
+      await AppAnalyticsService.instance.trackAiUsage(
+        action: 'chat_initial_action',
+        status: 'success',
+      );
+    } catch (error, stackTrace) {
+      await AppAnalyticsService.instance.trackAiUsage(
+        action: 'chat_initial_action',
+        status: 'error',
+      );
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'ai',
+        source: 'chat_initial_action',
+      );
+      await _appendAssistant(_mapError(error));
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -139,7 +188,21 @@ class _SeshAiChatViewState extends State<SeshAiChatView> {
       );
       final reply = response['replyText']?.toString().trim();
       await _appendAssistant(reply?.isNotEmpty == true ? reply! : 'No response.');
-    } catch (error) {
+      await AppAnalyticsService.instance.trackAiUsage(
+        action: 'chat_message',
+        status: 'success',
+      );
+    } catch (error, stackTrace) {
+      await AppAnalyticsService.instance.trackAiUsage(
+        action: 'chat_message',
+        status: 'error',
+      );
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'ai',
+        source: 'chat_message',
+      );
       await _appendAssistant(_mapError(error));
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -217,20 +280,10 @@ class _SeshAiChatViewState extends State<SeshAiChatView> {
   }
 
   String _mapError(Object error) {
-    final message = error.toString();
-    if (message.contains('rate_limited') || message.contains('429')) {
-      return 'You are sending too fast. Please wait a moment and try again.';
-    }
-    if (message.contains('token_budget_exceeded')) {
-      return 'Daily AI limit reached. Try again tomorrow or ask a tutor.';
-    }
-    if (message.contains('Failed to fetch')) {
-      return 'Network blocked the request. Please check your connection and try again.';
-    }
-    if (message.contains('Not signed in') || message.contains('Missing auth')) {
-      return 'Please sign in to use Sesh AI.';
-    }
-    return 'Request failed. Please try again in a moment.';
+    return AppErrorService.instance.userMessageFor(
+      error,
+      fallback: 'Request failed. Please try again in a moment.',
+    );
   }
 
   @override
@@ -249,7 +302,7 @@ class _SeshAiChatViewState extends State<SeshAiChatView> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
         ),
         title: Text(
-          widget.title,
+          _threadTitle.isEmpty ? widget.title : _threadTitle,
           style: GoogleFonts.playfairDisplay(
             color: Colors.white,
             fontWeight: FontWeight.w600,
@@ -265,6 +318,27 @@ class _SeshAiChatViewState extends State<SeshAiChatView> {
                 style: GoogleFonts.spaceGrotesk(color: const Color(0xFF7CF1D6)),
               ),
             ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            color: const Color(0xFF141B2F),
+            onSelected: (value) {
+              if (value == 'rename') {
+                _showRenameDialog();
+              } else if (value == 'pin') {
+                _togglePin();
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'rename',
+                child: Text('Rename', style: GoogleFonts.spaceGrotesk(color: Colors.white)),
+              ),
+              PopupMenuItem(
+                value: 'pin',
+                child: Text(_isPinned ? 'Unpin' : 'Pin', style: GoogleFonts.spaceGrotesk(color: Colors.white)),
+              ),
+            ],
+          ),
         ],
       ),
       body: Stack(
@@ -541,6 +615,49 @@ class _SeshAiChatViewState extends State<SeshAiChatView> {
         ],
       ),
     );
+  }
+
+  Future<void> _showRenameDialog() async {
+    if (_threadId == null || _threadId!.isEmpty) return;
+    final controller = TextEditingController(text: _threadTitle.isEmpty ? widget.title : _threadTitle);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF141B2F),
+        title: Text('Rename chat', style: GoogleFonts.playfairDisplay(color: Colors.white)),
+        content: TextField(
+          controller: controller,
+          style: GoogleFonts.spaceGrotesk(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Chat title',
+            hintStyle: GoogleFonts.spaceGrotesk(color: Colors.white38),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.spaceGrotesk(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: Text('Save', style: GoogleFonts.spaceGrotesk(color: const Color(0xFF7CF1D6))),
+          ),
+        ],
+      ),
+    );
+    if (result != null && result.isNotEmpty) {
+      await _store.updateThread(threadId: _threadId!, title: result);
+      if (!mounted) return;
+      setState(() => _threadTitle = result);
+    }
+  }
+
+  Future<void> _togglePin() async {
+    if (_threadId == null || _threadId!.isEmpty) return;
+    final next = !_isPinned;
+    await _store.updateThread(threadId: _threadId!, pinned: next);
+    if (!mounted) return;
+    setState(() => _isPinned = next);
   }
 
   Widget _buildBackground() {

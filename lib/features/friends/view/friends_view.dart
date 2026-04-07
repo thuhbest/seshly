@@ -7,6 +7,9 @@ import '../messages/view/messages_view.dart';
 import '../messages/view/chat_room_view.dart'; // 🔥 Added for navigation
 import '../widgets/leaderboard_card.dart';
 import '../widgets/friend_requests_dialog.dart';
+import 'package:seshly/theme/seshly_theme.dart';
+import 'package:seshly/services/app_error_service.dart';
+import 'package:seshly/services/community_backend_service.dart';
 import 'package:seshly/widgets/responsive.dart';
 import 'package:seshly/widgets/pressable_scale.dart';
 
@@ -26,6 +29,23 @@ class _FriendsViewState extends State<FriendsView> {
   Stream<QuerySnapshot>? _searchResults;
   bool _isSearching = false;
   String _currentQuery = '';
+  final CommunityBackendService _backend = CommunityBackendService.instance;
+
+  Map<String, dynamic> _asStringDynamicMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map(
+        (key, entryValue) => MapEntry(key.toString(), entryValue),
+      );
+    }
+    return <String, dynamic>{};
+  }
+
+  int _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return 0;
+  }
 
   @override
   void initState() {
@@ -75,27 +95,41 @@ class _FriendsViewState extends State<FriendsView> {
       final lowercaseQuery = normalizedQuery.toLowerCase();
 
       bool isEmailQuery = lowercaseQuery.contains('@');
-      bool isPotentialStudentNumber = RegExp(r'[0-9]').hasMatch(normalizedQuery);
+      bool isPotentialStudentNumber = RegExp(
+        r'[0-9]',
+      ).hasMatch(normalizedQuery);
 
       if (isEmailQuery) {
         _searchResults = FirebaseFirestore.instance
             .collection('users')
             .where('emailLowercase', isGreaterThanOrEqualTo: lowercaseQuery)
-            .where('emailLowercase', isLessThanOrEqualTo: '$lowercaseQuery\uf8ff')
+            .where(
+              'emailLowercase',
+              isLessThanOrEqualTo: '$lowercaseQuery\uf8ff',
+            )
             .limit(20)
             .snapshots();
       } else if (isPotentialStudentNumber) {
         _searchResults = FirebaseFirestore.instance
             .collection('users')
-            .where('studentNumberLowercase', isGreaterThanOrEqualTo: lowercaseQuery)
-            .where('studentNumberLowercase', isLessThanOrEqualTo: '$lowercaseQuery\uf8ff')
+            .where(
+              'studentNumberLowercase',
+              isGreaterThanOrEqualTo: lowercaseQuery,
+            )
+            .where(
+              'studentNumberLowercase',
+              isLessThanOrEqualTo: '$lowercaseQuery\uf8ff',
+            )
             .limit(20)
             .snapshots();
       } else {
         _searchResults = FirebaseFirestore.instance
             .collection('users')
             .where('fullNameLowercase', isGreaterThanOrEqualTo: lowercaseQuery)
-            .where('fullNameLowercase', isLessThanOrEqualTo: '$lowercaseQuery\uf8ff')
+            .where(
+              'fullNameLowercase',
+              isLessThanOrEqualTo: '$lowercaseQuery\uf8ff',
+            )
             .limit(20)
             .snapshots();
       }
@@ -107,48 +141,33 @@ class _FriendsViewState extends State<FriendsView> {
     if (currentUser == null || currentUser.uid == targetUserId) return;
 
     try {
-      final friendDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .collection('friends')
-          .doc(targetUserId)
-          .get();
-      if (friendDoc.exists) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You are already friends.'), backgroundColor: Color(0xFF00C09E)),
-        );
-        return;
-      }
-
-      final existingRequest = await FirebaseFirestore.instance
-          .collection('friend_requests')
-          .where('fromUserID', isEqualTo: currentUser.uid)
-          .where('toUserID', isEqualTo: targetUserId)
-          .where('status', isEqualTo: 'pending')
-          .get();
-
-      if (existingRequest.docs.isNotEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Friend request already sent'), backgroundColor: Colors.orange),
-        );
-        return;
-      }
-
-      await FirebaseFirestore.instance.collection('friend_requests').add({
-        'fromUserID': currentUser.uid,
-        'toUserID': targetUserId,
-        'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      await _backend.sendFriendRequest(targetUserId);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Friend request sent!'), backgroundColor: Color(0xFF00C09E)),
+        const SnackBar(
+          content: Text('Friend request sent!'),
+          backgroundColor: Color(0xFF00C09E),
+        ),
       );
-    } catch (e) {
-      debugPrint('Error: $e');
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'community',
+        source: 'send_friend_request',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppErrorService.instance.userMessageFor(
+              error,
+              fallback: 'Could not send a friend request right now.',
+            ),
+          ),
+        ),
+      );
     }
   }
 
@@ -163,43 +182,36 @@ class _FriendsViewState extends State<FriendsView> {
 
   // Helper to open a chat with a specific friend
   Future<void> _openChat(String friendId, String friendName) async {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUserId == null) return;
-
-    // Search for existing chat
-    final query = await FirebaseFirestore.instance
-        .collection('chats')
-        .where('participants', arrayContains: currentUserId)
-        .get();
-
-    String? existingChatId;
-    for (var doc in query.docs) {
-      List participants = doc['participants'];
-      if (participants.contains(friendId) && participants.length == 2) {
-        existingChatId = doc.id;
-        break;
-      }
-    }
-
-    if (!mounted) return;
-    if (existingChatId != null) {
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => ChatRoomView(chatId: existingChatId!, chatTitle: friendName, isGroup: false),
-      ));
-    } else {
-      // Create new chat document if it doesn't exist
-      final newChat = await FirebaseFirestore.instance.collection('chats').add({
-        'participants': [currentUserId, friendId],
-        'participantNames': {currentUserId: 'Me', friendId: friendName}, // Replace 'Me' with actual name logic
-        'lastMessage': '',
-        'lastMessageTime': FieldValue.serverTimestamp(),
-        'isGroup': false,
-        'unreadCounts': {currentUserId: 0, friendId: 0}, // 🔥 Initialize unread counts
-      });
+    try {
+      final chatId = await _backend.ensureDirectChat(friendId);
+      if (!mounted || chatId.isEmpty) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChatRoomView(
+            chatId: chatId,
+            chatTitle: friendName,
+            isGroup: false,
+          ),
+        ),
+      );
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'community',
+        source: 'ensure_direct_chat',
+      );
       if (!mounted) return;
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => ChatRoomView(chatId: newChat.id, chatTitle: friendName, isGroup: false),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppErrorService.instance.userMessageFor(
+              error,
+              fallback: 'Could not open this chat right now.',
+            ),
+          ),
+        ),
+      );
     }
   }
 
@@ -214,107 +226,13 @@ class _FriendsViewState extends State<FriendsView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Friends", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                    Text("Connect with your study community", style: TextStyle(color: Colors.white54)),
-                  ],
-                ),
-                Row(
-                  children: [
-                    ScaleButton(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => FriendRequestsDialog(onRequestHandled: _loadFriendRequestCount),
-                        );
-                      },
-                      child: _headerBadgeIcon(Icons.person_add_outlined, _friendRequestCount.toString()),
-                    ),
-                    // 🔥 UPDATED: Logic to show real sum of UNREAD messages
-                    StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('chats')
-                          .where('participants', arrayContains: currentUserId)
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        int totalUnread = 0;
-                        if (snapshot.hasData) {
-                          for (var doc in snapshot.data!.docs) {
-                            final data = doc.data() as Map<String, dynamic>;
-                            // Sum up the unread counts assigned specifically to the current user
-                            if (data['unreadCounts'] != null && data['unreadCounts'][currentUserId] != null) {
-                              totalUnread += (data['unreadCounts'][currentUserId] as int);
-                            }
-                          }
-                        }
-                        return ScaleButton(
-                          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MessagesView())),
-                          child: _headerBadgeIcon(Icons.chat_bubble_outline, totalUnread.toString()),
-                        );
-                      },
-                    ),
-                  ],
-                )
-              ],
-            ),
-            const SizedBox(height: 25),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(15)),
-              child: Row(
-                children: [
-                  const Icon(Icons.search, color: Colors.white54),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (value) {
-                        final query = value.trim();
-                        if (query != _currentQuery) {
-                          _currentQuery = query;
-                          _performSearch(query);
-                        }
-                      },
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        hintText: "Search by name, student number, or email",
-                        hintStyle: TextStyle(color: Colors.white38, fontSize: 14),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 15),
-                      ),
-                    ),
-                  ),
-                  if (_isSearching)
-                    ScaleButton(
-                      onTap: _clearSearch,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                        child: const Icon(Icons.close, color: Colors.white54, size: 18),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 25),
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(color: cardColor.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(12)),
-              child: Row(
-                children: [
-                  _toggleButton("Friends", 0),
-                  _toggleButton("Mentorship", 1),
-                  _toggleButton("Rankings", 2),
-                ],
-              ),
-            ),
-            const SizedBox(height: 25),
+            const SizedBox(height: 14),
+            _buildHeaderBar(currentUserId),
+            const SizedBox(height: 16),
+            _buildSearchPanel(cardColor),
+            const SizedBox(height: 14),
+            _buildSegmentTabs(cardColor),
+            const SizedBox(height: 18),
             Expanded(
               child: _isSearching ? _buildSearchResults() : _buildActiveTab(),
             ),
@@ -338,24 +256,253 @@ class _FriendsViewState extends State<FriendsView> {
   Widget _buildLeaderboardTab() {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').orderBy('streak', descending: true).limit(50).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .orderBy('streak', descending: true)
+          .limit(50)
+          .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF00C09E)));
+        if (!snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF00C09E)),
+          );
+        }
         final docs = snapshot.data!.docs;
-        return ListView.builder(
+        if (docs.isEmpty) {
+          return const Center(
+            child: Text(
+              "Leadership board will appear as soon as learners build streaks.",
+              style: TextStyle(color: Colors.white38),
+            ),
+          );
+        }
+
+        final int currentUserRank = currentUserId == null
+            ? 0
+            : docs.indexWhere((doc) => doc.id == currentUserId) + 1;
+        final Map<String, dynamic> leader =
+            docs.first.data() as Map<String, dynamic>;
+        final int leaderStreak = (leader['streak'] as num?)?.toInt() ?? 0;
+        final int leaderXp = (leader['xp'] as num?)?.toInt() ?? 0;
+
+        return ListView(
           physics: const BouncingScrollPhysics(),
-          itemCount: docs.length,
-          itemBuilder: (context, index) {
-            final data = docs[index].data() as Map<String, dynamic>;
-            return LeaderboardCard(
-              rank: index + 1,
-              name: data['fullName'] ?? 'User',
-              streak: (data['streak'] ?? 0).toString(),
-              isUser: docs[index].id == currentUserId,
-            );
-          },
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E243A).withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+              ),
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _leadershipMetric(
+                    "Current leader",
+                    (leader['fullName'] ?? 'Student').toString(),
+                  ),
+                  _leadershipMetric("Top streak", "$leaderStreak days"),
+                  _leadershipMetric("Leader XP", "$leaderXp XP"),
+                  _leadershipMetric(
+                    "Your position",
+                    currentUserRank == 0
+                        ? "Outside top 50"
+                        : "#$currentUserRank",
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...List.generate(docs.length, (index) {
+              final data = docs[index].data() as Map<String, dynamic>;
+              final String major = (data['major'] ?? '').toString().trim();
+              final String level =
+                  (data['levelOfStudy'] ?? data['year'] ?? 'Student')
+                      .toString();
+              final String university = (data['university'] ?? 'Global learner')
+                  .toString();
+              final String subtitle = [
+                university,
+                if (major.isNotEmpty) major else level,
+              ].join(' • ');
+              return LeaderboardCard(
+                rank: index + 1,
+                name: (data['fullName'] ?? 'User').toString(),
+                streak: (data['streak'] as num?)?.toInt() ?? 0,
+                xp: (data['xp'] as num?)?.toInt() ?? 0,
+                subtitle: subtitle,
+                isUser: docs[index].id == currentUserId,
+              );
+            }),
+          ],
         );
       },
+    );
+  }
+
+  Widget _buildHeaderBar(String? currentUserId) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Expanded(
+          child: Text(
+            "Friends",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        _buildHeroActions(currentUserId),
+      ],
+    );
+  }
+
+  Widget _buildHeroActions(String? currentUserId) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ScaleButton(
+          onTap: () {
+            showDialog(
+              context: context,
+              builder: (context) => FriendRequestsDialog(
+                onRequestHandled: _loadFriendRequestCount,
+              ),
+            );
+          },
+          child: _headerBadgeIcon(
+            Icons.person_add_outlined,
+            _friendRequestCount.toString(),
+          ),
+        ),
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('chats')
+              .where('participants', arrayContains: currentUserId)
+              .snapshots(),
+          builder: (context, snapshot) {
+            int totalUnread = 0;
+            if (snapshot.hasData) {
+              for (var doc in snapshot.data!.docs) {
+                final data = doc.data() as Map<String, dynamic>;
+                final unreadCounts = _asStringDynamicMap(data['unreadCounts']);
+                final unreadForUser = unreadCounts[currentUserId];
+                if (unreadForUser != null) {
+                  totalUnread += _toInt(unreadForUser);
+                }
+              }
+            }
+            return ScaleButton(
+              onTap: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const MessagesView())),
+              child: _headerBadgeIcon(
+                Icons.chat_bubble_outline,
+                totalUnread.toString(),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchPanel(Color cardColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.search_rounded, color: Colors.white54),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                final query = value.trim();
+                if (query != _currentQuery) {
+                  _currentQuery = query;
+                  _performSearch(query);
+                }
+              },
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: "Search by name, student number, or email",
+                hintStyle: TextStyle(color: Colors.white38, fontSize: 14),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          if (_isSearching)
+            ScaleButton(
+              onTap: _clearSearch,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.close, color: Colors.white54, size: 18),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegmentTabs(Color cardColor) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: cardColor.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        children: [
+          _toggleButton("Friends", 0, Icons.groups_rounded),
+          _toggleButton("Mentorship", 1, Icons.school_rounded),
+          _toggleButton("Leadership", 2, Icons.emoji_events_outlined),
+        ],
+      ),
+    );
+  }
+
+  Widget _leadershipMetric(String label, String value) {
+    return Container(
+      width: 150,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white54, fontSize: 11),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -364,33 +511,54 @@ class _FriendsViewState extends State<FriendsView> {
     if (currentUserId == null) return const SizedBox.shrink();
 
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').doc(currentUserId).collection('friends').snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUserId)
+          .collection('friends')
+          .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text("Add friends to see them here", style: TextStyle(color: Colors.white38)));
+          return _buildEmptyState(
+            icon: Icons.groups_2_outlined,
+            title: "No friends yet",
+            subtitle: "Search for students and build your study circle here.",
+          );
         }
 
         return ListView.builder(
+          physics: const BouncingScrollPhysics(),
           itemCount: snapshot.data!.docs.length,
           itemBuilder: (context, index) {
             final friendId = snapshot.data!.docs[index].id;
             return StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('users').doc(friendId).snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(friendId)
+                  .snapshots(),
               builder: (context, friendSnap) {
                 if (!friendSnap.hasData) return const SizedBox.shrink();
-                final data = friendSnap.data!.data() as Map<String, dynamic>? ?? {};
+                final data =
+                    friendSnap.data!.data() as Map<String, dynamic>? ?? {};
                 final friendName = (data['fullName'] ?? 'Student').toString();
-                final Timestamp? lastSeen = _asTimestamp(data['lastSeenAt']) ?? _asTimestamp(data['lastLoginAt']);
+                final Timestamp? lastSeen =
+                    _asTimestamp(data['lastSeenAt']) ??
+                    _asTimestamp(data['lastLoginAt']);
                 bool isOnline = data['isOnline'] == true;
                 if (!isOnline && lastSeen != null) {
-                  final minutes = DateTime.now().difference(lastSeen.toDate()).inMinutes;
+                  final minutes = DateTime.now()
+                      .difference(lastSeen.toDate())
+                      .inMinutes;
                   if (minutes <= 2) {
                     isOnline = true;
                   }
                 }
 
-                final String presenceLabel = isOnline ? "Online" : "Last seen ${_timeAgo(lastSeen)}";
+                final String presenceLabel = isOnline
+                    ? "Online"
+                    : "Last seen ${_timeAgo(lastSeen)}";
 
                 return FriendCard(
                   name: friendName,
@@ -429,7 +597,12 @@ class _FriendsViewState extends State<FriendsView> {
   Widget _buildSearchResults() {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     if (currentUserId == null) {
-      return const Center(child: Text("Sign in to search users", style: TextStyle(color: Colors.white38)));
+      return const Center(
+        child: Text(
+          "Sign in to search users",
+          style: TextStyle(color: Colors.white38),
+        ),
+      );
     }
 
     final friendsStream = FirebaseFirestore.instance
@@ -446,12 +619,17 @@ class _FriendsViewState extends State<FriendsView> {
     return StreamBuilder<QuerySnapshot>(
       stream: friendsStream,
       builder: (context, friendsSnapshot) {
-        final friendIds = friendsSnapshot.data?.docs.map((doc) => doc.id).toSet() ?? {};
+        final friendIds =
+            friendsSnapshot.data?.docs.map((doc) => doc.id).toSet() ?? {};
         return StreamBuilder<QuerySnapshot>(
           stream: outgoingRequestsStream,
           builder: (context, requestsSnapshot) {
-            final requestedIds = requestsSnapshot.data?.docs
-                    .map((doc) => (doc.data() as Map<String, dynamic>)['toUserID']?.toString())
+            final requestedIds =
+                requestsSnapshot.data?.docs
+                    .map(
+                      (doc) => (doc.data() as Map<String, dynamic>)['toUserID']
+                          ?.toString(),
+                    )
                     .where((id) => id != null)
                     .cast<String>()
                     .toSet() ??
@@ -463,13 +641,19 @@ class _FriendsViewState extends State<FriendsView> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text("No users found", style: TextStyle(color: Colors.white38)));
+                  return _buildEmptyState(
+                    icon: Icons.search_off_rounded,
+                    title: "No users found",
+                    subtitle: "Try a different name, student number, or email.",
+                  );
                 }
                 return ListView.builder(
                   itemCount: snapshot.data!.docs.length,
                   itemBuilder: (context, index) {
                     final userDoc = snapshot.data!.docs[index];
-                    if (userDoc.id == currentUserId) return const SizedBox.shrink();
+                    if (userDoc.id == currentUserId) {
+                      return const SizedBox.shrink();
+                    }
                     final isFriend = friendIds.contains(userDoc.id);
                     final isRequested = requestedIds.contains(userDoc.id);
                     return SearchUserResultCard(
@@ -489,20 +673,47 @@ class _FriendsViewState extends State<FriendsView> {
     );
   }
 
-  Widget _toggleButton(String label, int index) {
+  Widget _toggleButton(String label, int index, IconData icon) {
     bool isSelected = _selectedTab == index;
     return Expanded(
       child: ScaleButton(
         onTap: () => setState(() => _selectedTab = index),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF1E243A) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: isSelected ? Border.all(color: Colors.white.withValues(alpha: 0.1)) : null,
+            gradient: isSelected
+                ? const LinearGradient(
+                    colors: [Color(0xFF142A47), Color(0xFF1D2238)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: isSelected ? null : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: isSelected
+                ? Border.all(color: Colors.white.withValues(alpha: 0.1))
+                : null,
           ),
-          child: Center(
-            child: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.white54, fontWeight: FontWeight.bold)),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? SeshlyPalette.aqua : Colors.white54,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white54,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -520,7 +731,10 @@ class _FriendsViewState extends State<FriendsView> {
         Container(
           margin: const EdgeInsets.only(left: 10),
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            shape: BoxShape.circle,
+          ),
           child: Icon(icon, color: const Color(0xFF00C09E), size: 22),
         ),
         if (count != "0")
@@ -529,11 +743,59 @@ class _FriendsViewState extends State<FriendsView> {
             top: -2,
             child: Container(
               padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(color: Color(0xFF00C09E), shape: BoxShape.circle),
-              child: Text(count, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+              decoration: const BoxDecoration(
+                color: Color(0xFF00C09E),
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                count,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
-          )
+          ),
       ],
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 420),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E243A).withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: SeshlyPalette.aqua, size: 34),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white54, height: 1.4),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -559,7 +821,10 @@ class SearchUserResultCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: const Color(0xFF1E243A), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E243A),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
         children: [
           CircleAvatar(
@@ -571,7 +836,13 @@ class SearchUserResultCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(userData['fullName'] ?? 'User', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text(
+                  userData['fullName'] ?? 'User',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 Text(
                   '${userData['studentNumber'] ?? ''} - ${userData['levelOfStudy'] ?? ''}',
                   style: const TextStyle(color: Colors.white54, fontSize: 12),
@@ -585,11 +856,17 @@ class SearchUserResultCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFF00C09E).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFF00C09E).withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: const Color(0xFF00C09E).withValues(alpha: 0.4),
+                ),
               ),
               child: const Text(
                 'Friends',
-                style: TextStyle(color: Color(0xFF00C09E), fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Color(0xFF00C09E),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             )
           else if (isRequested)
@@ -602,16 +879,33 @@ class SearchUserResultCard extends StatelessWidget {
               ),
               child: const Text(
                 'Requested',
-                style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             )
           else
             ScaleButton(
               onTap: onAddFriend,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(color: const Color(0xFF00C09E), borderRadius: BorderRadius.circular(20)),
-                child: const Text('Add Friend', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00C09E),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Add Friend',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
         ],
@@ -639,4 +933,3 @@ class _ScaleButtonState extends State<ScaleButton> {
     );
   }
 }
-

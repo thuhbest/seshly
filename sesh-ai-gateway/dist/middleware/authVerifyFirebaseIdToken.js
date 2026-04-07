@@ -10,7 +10,7 @@ async function authVerifyFirebaseIdToken(req, res, next) {
         return;
     }
     try {
-        const decoded = await (0, firebase_1.getAuth)().verifyIdToken(match[1]);
+        const decoded = await (0, firebase_1.getAuth)().verifyIdToken(match[1], true);
         req.user = decoded;
         next();
     }

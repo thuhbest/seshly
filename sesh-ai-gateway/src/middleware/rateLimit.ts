@@ -31,6 +31,13 @@ function isPolicyGateRequest(req: Request): boolean {
   return req.method.toUpperCase() === 'POST' && getRouteKey(req).startsWith('/ai/policy/gate');
 }
 
+function ipRule(rule: RateLimitRule): RateLimitRule {
+  return {
+    windowSeconds: rule.windowSeconds,
+    max: Math.max(rule.max * 2, rule.max + 10),
+  };
+}
+
 export async function rateLimit(req: Request, res: Response, next: NextFunction): Promise<void> {
   const userId = req.user?.uid;
   if (!userId) {
@@ -40,20 +47,49 @@ export async function rateLimit(req: Request, res: Response, next: NextFunction)
 
   try {
     const ruleEntry = findRateLimitRule(req);
-    const result = await checkRateLimit(userId, {
-      max: ruleEntry?.rule.max,
-      windowSeconds: ruleEntry?.rule.windowSeconds,
-      keySuffix: ruleEntry?.key,
-    });
-    res.setHeader('x-rate-limit-limit', result.limit.toString());
-    res.setHeader('x-rate-limit-remaining', result.remaining.toString());
-    res.setHeader('x-rate-limit-reset', Math.ceil(result.resetAt / 1000).toString());
+    const userRule = ruleEntry?.rule ?? config.rateLimits.default ?? config.rateLimit;
+    const routeKey = ruleEntry?.key || getRouteKey(req);
+    const results = [
+      await checkRateLimit(userId, {
+        max: userRule.max,
+        windowSeconds: userRule.windowSeconds,
+        keySuffix: routeKey,
+        scope: 'user',
+      }),
+    ];
+    const requestIp = (req.ip || '').trim();
+    if (requestIp.length > 0) {
+      const derivedIpRule = ipRule(userRule);
+      results.push(
+        await checkRateLimit(requestIp, {
+          max: derivedIpRule.max,
+          windowSeconds: derivedIpRule.windowSeconds,
+          keySuffix: routeKey,
+          scope: 'ip',
+        }),
+      );
+    }
+    const primaryResult = results[0];
+    const blockedResult = results.find((result) => !result.allowed);
 
-    if (!result.allowed) {
-      res.setHeader('retry-after', Math.max(Math.ceil((result.resetAt - Date.now()) / 1000), 1).toString());
+    res.setHeader('x-rate-limit-limit', primaryResult.limit.toString());
+    res.setHeader('x-rate-limit-remaining', primaryResult.remaining.toString());
+    res.setHeader('x-rate-limit-reset', Math.ceil(primaryResult.resetAt / 1000).toString());
+
+    if (blockedResult) {
+      console.warn('AI rate limit exceeded', {
+        requestId: req.requestId || null,
+        userId,
+        routeKey,
+        scope: blockedResult.scope,
+        resetAt: blockedResult.resetAt,
+        blockedUntil: blockedResult.blockedUntil,
+      });
+      const retryAt = blockedResult.blockedUntil ?? blockedResult.resetAt;
+      res.setHeader('retry-after', Math.max(Math.ceil((retryAt - Date.now()) / 1000), 1).toString());
       if (isPolicyGateRequest(req)) {
         req.rateLimitExceeded = true;
-        req.rateLimitResult = result;
+        req.rateLimitResult = blockedResult;
         next();
         return;
       }

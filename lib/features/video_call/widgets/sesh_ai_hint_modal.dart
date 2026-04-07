@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/services/app_analytics_service.dart';
+import 'package:seshly/services/app_error_service.dart';
 import 'package:seshly/services/sesh_ai_api.dart';
 import 'package:seshly/widgets/pressable_scale.dart';
 
@@ -48,11 +50,29 @@ class _SeshAIHintModalState extends State<SeshAIHintModal> {
         _currentHint = response['nextHint']?.toString();
         hintsRemaining--;
       });
-    } catch (error) {
+      await AppAnalyticsService.instance.trackAiUsage(
+        action: 'practice_hint',
+        status: 'success',
+      );
+    } catch (error, stackTrace) {
+      await AppAnalyticsService.instance.trackAiUsage(
+        action: 'practice_hint',
+        status: 'error',
+      );
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'ai',
+        source: 'practice_hint',
+      );
       setState(() => _isAnalyzing = false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hint failed: $error')),
+      AppErrorService.instance.showSnackBar(
+        context,
+        AppErrorService.instance.userMessageFor(
+          error,
+          fallback: 'Hint failed. Please try again.',
+        ),
       );
     }
   }

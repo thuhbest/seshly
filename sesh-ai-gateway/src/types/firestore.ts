@@ -97,7 +97,7 @@ export type AiLogDoc = BaseDoc & {
   path?: string;
   status?: number;
   durationMs?: number;
-  ip?: string | null;
+  ipHash?: string | null;
   userAgent?: string | null;
   error?: string;
   [key: string]: unknown;

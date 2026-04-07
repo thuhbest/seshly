@@ -26,6 +26,19 @@ function assertApiKey(provider: ModelProvider, apiKey: string): void {
   }
 }
 
+async function fetchWithTimeout(input: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.request.timeoutMs);
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function callOpenAi(options: CallTextModelOptions): Promise<string> {
   const apiKey = config.model.openai.apiKey;
   assertApiKey('openai', apiKey);
@@ -45,7 +58,7 @@ async function callOpenAi(options: CallTextModelOptions): Promise<string> {
     body.response_format = { type: 'json_object' };
   }
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const response = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -99,7 +112,7 @@ async function callGoogle(options: CallTextModelOptions): Promise<string> {
     };
   }
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
@@ -131,7 +144,7 @@ async function callOpenAiEmbedding(options: CallEmbeddingOptions): Promise<numbe
   assertApiKey('openai', apiKey);
   const baseUrl = config.model.openai.baseUrl.replace(/\/+$/, '');
 
-  const response = await fetch(`${baseUrl}/embeddings`, {
+  const response = await fetchWithTimeout(`${baseUrl}/embeddings`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -157,7 +170,7 @@ async function callGoogleEmbedding(options: CallEmbeddingOptions): Promise<numbe
   const apiKey = config.model.google.apiKey;
   assertApiKey('google', apiKey);
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:embedContent?key=${apiKey}`,
     {
       method: 'POST',

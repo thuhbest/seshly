@@ -1,4 +1,4 @@
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "./callable";
 import {
   onDocumentCreated,
   onDocumentUpdated,
@@ -31,11 +31,11 @@ const ACHIEVEMENTS_CONFIG: Record<string, AchievementConfig> = {
     rewards: [30, 60, 150],
     names: ["First Answer", "Helpful Student", "Community Hero"],
   },
-  vault_contributor: {
+  studyvault_contributor: {
     field: "vaultUploads",
     thresholds: [1, 5, 20],
     rewards: [40, 80, 200],
-    names: ["First Upload", "Vault Contributor", "Knowledge Keeper"],
+    names: ["First Upload", "StudyVault Contributor", "Knowledge Keeper"],
   },
   focus_master: {
     field: "seshFocusHours",
@@ -83,24 +83,6 @@ function trimPreview(text: string): string {
   const cleaned = (text || "").toString().trim();
   if (cleaned.length <= NOTIFICATION_PREVIEW_LIMIT) return cleaned;
   return `${cleaned.slice(0, NOTIFICATION_PREVIEW_LIMIT - 3)}...`;
-}
-
-/**
- * Builds lightweight search tokens for marketplace items.
- * @param {...string} values - Strings to tokenize.
- * @return {string[]} Unique search tokens.
- */
-function buildSearchTokens(...values: string[]): string[] {
-  const tokens = new Set<string>();
-  for (const value of values) {
-    if (!value) continue;
-    value
-      .toLowerCase()
-      .split(/[^a-z0-9]+/g)
-      .filter((token) => token.length >= 2)
-      .forEach((token) => tokens.add(token));
-  }
-  return Array.from(tokens).slice(0, 30);
 }
 
 /**
@@ -492,121 +474,6 @@ export const onmessagecreated = onDocumentCreated({
   await Promise.all(writes);
 });
 
-export const onmarketplaceitemcreated = onDocumentCreated({
-  document: "marketplace_items/{itemId}",
-  region: REGION,
-}, async (event) => {
-  const snap = event.data;
-  if (!snap) return;
-  const data = snap.data() ?? {};
-
-  const updates: Record<string, unknown> = {};
-  if (!data.createdAt) {
-    updates.createdAt = admin.firestore.FieldValue.serverTimestamp();
-  }
-  if (!data.status) {
-    updates.status = "active";
-  }
-  if (!data.currency) {
-    updates.currency = "ZAR";
-  }
-  if (!data.searchTokens) {
-    const tokens = buildSearchTokens(
-      (data.title ?? "").toString(),
-      (data.description ?? "").toString(),
-      (data.category ?? "").toString(),
-      (data.sellerName ?? "").toString()
-    );
-    if (tokens.length > 0) {
-      updates.searchTokens = tokens;
-    }
-  }
-
-  if (Object.keys(updates).length > 0) {
-    await snap.ref.set(updates, {merge: true});
-  }
-
-  const sellerId = data.sellerId;
-  if (!sellerId) return;
-  await db.collection("users").doc(sellerId).set({
-    marketListings: admin.firestore.FieldValue.increment(1),
-  }, {merge: true});
-});
-
-export const onmarketplaceordercreated = onDocumentCreated({
-  document: "marketplace_orders/{orderId}",
-  region: REGION,
-}, async (event) => {
-  const snap = event.data;
-  if (!snap) return;
-  const data = snap.data() ?? {};
-
-  const updates: Record<string, unknown> = {};
-  if (!data.createdAt) {
-    updates.createdAt = admin.firestore.FieldValue.serverTimestamp();
-  }
-  if (!data.status) {
-    updates.status = "pending";
-  }
-  if (Object.keys(updates).length > 0) {
-    await snap.ref.set(updates, {merge: true});
-  }
-
-  const sellerId = data.sellerId;
-  const buyerId = data.buyerId;
-  const itemId = data.itemId;
-  if (!sellerId || !buyerId || !itemId) return;
-
-  const itemSnap = await db.collection("marketplace_items").doc(itemId).get();
-  const itemData = itemSnap.data() ?? {};
-  const itemTitle = trimPreview((itemData.title ?? "item").toString());
-  const buyerName = await getUserName(buyerId);
-  const body = itemTitle ?
-    `${buyerName} wants to buy "${itemTitle}".` :
-    `${buyerName} wants to buy your item.`;
-
-  await createNotification(sellerId, {
-    type: "market_order",
-    title: "New marketplace order",
-    body,
-    actorId: buyerId,
-    actorName: buyerName,
-    itemId,
-    orderId: event.params?.orderId,
-  });
-});
-
-export const onmarketplaceorderupdated = onDocumentUpdated({
-  document: "marketplace_orders/{orderId}",
-  region: REGION,
-}, async (event) => {
-  const before = event.data?.before.data();
-  const after = event.data?.after.data();
-  if (!before || !after) return;
-  if (before.status === after.status) return;
-
-  const status = after.status;
-  if (status !== "completed") return;
-
-  const sellerId = after.sellerId;
-  const buyerId = after.buyerId;
-  const itemId = after.itemId;
-
-  if (itemId) {
-    await db.collection("marketplace_items").doc(itemId).set({
-      status: "sold",
-      soldAt: admin.firestore.FieldValue.serverTimestamp(),
-      soldTo: buyerId ?? null,
-    }, {merge: true});
-  }
-
-  if (sellerId) {
-    await db.collection("users").doc(sellerId).set({
-      marketSales: admin.firestore.FieldValue.increment(1),
-    }, {merge: true});
-  }
-});
-
 export const onvaultupload = onDocumentCreated({
   document: "vault/{docId}",
   region: REGION,
@@ -686,3 +553,161 @@ export const checkachievements = onCall({region: REGION}, async (request) => {
 });
 
 export {parallelPracticeApi, parallelPracticeAiWorker} from "./parallelPractice";
+export {
+  parallelPracticeV2Api,
+  parallelPracticeV2AiWorker,
+  parallelPracticeThumbnailWorker,
+  livekitWebhook,
+} from "./parallelPracticeV2";
+export {
+  onclassroomparticipantwritten,
+  onclassroomsubmissionwritten,
+} from "./classroomOrchestrator";
+export {
+  onclassroomsessionstatewritten,
+  onclassroomboardparticipantwritten,
+  onclassroomboardchunkcreated,
+} from "./classroomBoards";
+export {
+  onclassroomreliabilityparticipantwritten,
+  onclassroomreliabilitystatewritten,
+} from "./classroomReliability";
+export {
+  onclassroommemoryjobcreated,
+  onclassroomsessioneventmemorycreated,
+  onclassroomaimomentcreated,
+  onclassroomsubmissionmemorycreated,
+  onclassroomtaskmemorywritten,
+  onclassroomboardmemorywritten,
+  onclassroomteachmarkercreated,
+  onclassroomannotationcreated,
+  onclassroomtranscriptpointercreated,
+  onclassroomchatmessagecreated,
+  onclassroommemoryvoicenotecreated as classroomMemoryVoiceNoteCreatedTrigger,
+} from "./classroomMemory";
+export {
+  onclassroomanalyticsactionwritten,
+  onclassroomanalyticsboardchunkwritten,
+  onclassroomanalyticsthumbnailjobwritten as classroomAnalyticsThumbnailJobWrittenFirestoreTrigger,
+  onclassroomanalyticsspotlightwritten,
+  onclassroomanalyticsinterventionwritten as classroomAnalyticsInterventionWrittenFirestoreTrigger,
+  onclassroomanalyticssubmissionwritten as classroomAnalyticsSubmissionWrittenFirestoreTrigger,
+  onclassroomanalyticsparticipantwritten as classroomAnalyticsParticipantWrittenFirestoreTrigger,
+  onclassroomanalyticsteachmarkercreated as classroomAnalyticsTeachMarkerCreatedFirestoreTrigger,
+  onclassroomanalyticsaijobwritten as classroomAnalyticsAiJobWrittenFirestoreTrigger,
+  onclassroomanalyticsaimemoryjobwritten as classroomAnalyticsAiMemoryJobWrittenFirestoreTrigger,
+  onclassroomanalyticssessionpackcreated as classroomAnalyticsSessionPackCreatedFirestoreTrigger,
+  onclassroomanalyticsreliabilityeventcreated as classroomAnalyticsReliabilityEventCreatedFirestoreTrigger,
+} from "./classroomAnalytics";
+export {
+  createTutoringBooking,
+} from "./tutorBookings";
+export {submitTutoringRating} from "./tutorRatings";
+export {startSession, endSession} from "./tutorSessions";
+export {billingTick} from "./tutorBillingTick";
+export {
+  submitTutorApplication,
+  reviewTutorApplication,
+  approveTutorApplication,
+  rejectTutorApplication,
+  suspendTutor,
+  restoreTutor,
+  setTutorPayoutReadiness,
+  runTutorApprovalBackfill,
+  ontutorapprovaluserwritten,
+  ontutorpayoutaccountwritten,
+} from "./tutorApproval";
+export {runTutoringPaymentSchemaBackfill} from "./tutoringPaymentSchemaBackfill";
+export {
+  generateWeeklyTutorPayoutBatch,
+  retryTutorPayoutBatch,
+  requestTutorPayout,
+  approveTutorPayout,
+  rejectTutorPayout,
+  markTutorPayoutProcessing,
+  markTutorPayoutPaid,
+  markTutorPayoutFailed,
+} from "./tutorPayouts";
+export {
+  refreshTutorPayoutDashboardAggregates,
+  listTutorsDueForMondayPayout,
+  getTutorPayoutTotalsByWeek,
+  listBlockedTutorPayoutProfiles,
+  listFailedTutorPayoutAttempts,
+  listDisputedTutorPayables,
+  getTutorPayoutHistoryByTutor,
+  exportTutorPayoutData,
+} from "./tutorPayoutAdmin";
+export {
+  getTutorPayoutDashboard,
+  listTutorPayoutHistory,
+  ontutorpayoutdashboarduserwritten,
+  ontutorpayoutdashboardbalancewritten,
+  ontutorpayoutdashboardprofilewritten,
+  ontutorpayoutdashboardpayoutwritten,
+  ontutorpayoutdashboardpayablewritten,
+} from "./tutorPayoutDashboard";
+export {
+  getSupportedBanksForTutorPayout,
+  submitTutorPayoutDetails,
+  verifyTutorPayoutProfile,
+} from "./tutorPayoutOnboarding";
+export {onorganizationmemberwritten} from "./organizationMembershipMirror";
+export {
+  ensureSeshCreditBootstrap,
+  purchaseSeshCredits,
+  purchaseSeshMinutes,
+  unlockLectureCapture,
+  getSeshFocusStatus,
+  consumeSeshFocusAccess,
+  unlockSeshFocusEarly,
+  purchaseStudyVaultResource,
+  activateGoldTickSubscription,
+  activateOrganizationSubscription,
+} from "./secureEntitlements";
+export {
+  setupTutoringPaymentMethod,
+  saveMockTutoringPaymentMethod,
+  startTutoringPreauth,
+  respondToTutoringBooking,
+} from "./tutoringPayments";
+export {processPaymentEvent} from "./paymentEvents";
+export {simulateMockPaystackWebhook} from "./mockPaystackWebhookSimulator";
+export {
+  createGuestTutoringCustomer,
+  updateGuestTutoringCustomer,
+} from "./guestTutoring";
+export {
+  ontutorsessionoutcomecreated,
+  ontutorsessionreviewcreated,
+  ongoldticksubscriptioncreated,
+  ongoldticksubscriptionupdated,
+  onorganizationsubscriptioncreated,
+  onorganizationsubscriptionupdated,
+  ontutororganizationupdated,
+} from "./tutorTrust";
+export {ontutorrequestcalendarupdated} from "./tutorCalendarSync";
+export {
+  beforeauthusercreated,
+  beforeauthusersignedin,
+  beforeauthemailsent,
+} from "./authHardening";
+export {
+  initializeAccountProfile,
+  syncAccessProfile,
+} from "./authProfileHardening";
+export {
+  createPost,
+  createComment,
+  deleteChatMessage,
+  ensureDirectChat,
+  markChatRead,
+  respondToFriendRequest,
+  sendChatMessage,
+  sendFriendRequest,
+  toggleChatReaction,
+  toggleHelpfulReaction,
+  updateProfileSecure,
+  createStudyVaultResource,
+  searchTutorsSecure,
+} from "./communityHardening";

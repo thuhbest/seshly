@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:seshly/features/sesh/widgets/sesh_credit_widgets.dart';
+import 'package:seshly/services/sesh_credit_service.dart';
 import 'archive_folder_view.dart';
 import 'package:seshly/widgets/pressable_scale.dart';
 
@@ -15,6 +17,7 @@ class _ArchiveViewState extends State<ArchiveView> {
   final Color tealAccent = const Color(0xFF00C09E);
   final Color backgroundColor = const Color(0xFF0F142B);
   final Color cardColor = const Color(0xFF1E243A);
+  final SeshCreditService _seshCreditService = SeshCreditService();
   bool _didSeedDefaults = false;
 
   static const List<int> _folderColors = [
@@ -56,9 +59,17 @@ class _ArchiveViewState extends State<ArchiveView> {
 
     final batch = FirebaseFirestore.instance.batch();
     final defaults = [
-      {'title': 'Mathematics', 'icon': 'architecture', 'color': _folderColors[0]},
+      {
+        'title': 'Mathematics',
+        'icon': 'architecture',
+        'color': _folderColors[0],
+      },
       {'title': 'Physics', 'icon': 'science', 'color': _folderColors[1]},
-      {'title': 'Computer Science', 'icon': 'laptop', 'color': _folderColors[2]},
+      {
+        'title': 'Computer Science',
+        'icon': 'laptop',
+        'color': _folderColors[2],
+      },
     ];
     for (final folder in defaults) {
       final doc = foldersRef.doc();
@@ -85,15 +96,39 @@ class _ArchiveViewState extends State<ArchiveView> {
     return tealAccent;
   }
 
+  Future<void> _openSeshCreditStore(int balance) async {
+    await showSeshCreditPurchaseSheet(
+      context: context,
+      currentBalance: balance,
+      onPurchase: (bundle) async {
+        final nextBalance = await _seshCreditService.purchaseCredits(
+          credits: bundle.credits,
+          source: 'archive_home',
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${bundle.credits} SeshCredits added. Balance: $nextBalance.',
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _showFolderEditor({DocumentSnapshot? doc}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     final bool isEditing = doc != null;
     final data = doc?.data() as Map<String, dynamic>? ?? {};
-    final TextEditingController controller =
-        TextEditingController(text: data['title']?.toString() ?? '');
+    final TextEditingController controller = TextEditingController(
+      text: data['title']?.toString() ?? '',
+    );
     String selectedIcon = data['icon']?.toString() ?? _folderIcons.keys.first;
-    int selectedColor = (data['color'] is int) ? data['color'] as int : _folderColors[2];
+    int selectedColor = (data['color'] is int)
+        ? data['color'] as int
+        : _folderColors[2];
 
     await showModalBottomSheet(
       context: context,
@@ -118,7 +153,11 @@ class _ArchiveViewState extends State<ArchiveView> {
                 children: [
                   Text(
                     isEditing ? 'Edit folder' : 'New folder',
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 14),
                   TextField(
@@ -136,7 +175,13 @@ class _ArchiveViewState extends State<ArchiveView> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text('Icon', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Icon',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 10,
@@ -144,7 +189,8 @@ class _ArchiveViewState extends State<ArchiveView> {
                     children: _folderIcons.entries.map((entry) {
                       final bool selected = selectedIcon == entry.key;
                       return PressableScale(
-                        onTap: () => setModalState(() => selectedIcon = entry.key),
+                        onTap: () =>
+                            setModalState(() => selectedIcon = entry.key),
                         borderRadius: BorderRadius.circular(12),
                         pressedScale: 0.985,
                         child: Container(
@@ -152,22 +198,36 @@ class _ArchiveViewState extends State<ArchiveView> {
                           decoration: BoxDecoration(
                             color: selected ? tealAccent : backgroundColor,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: selected ? tealAccent : Colors.white12),
+                            border: Border.all(
+                              color: selected ? tealAccent : Colors.white12,
+                            ),
                           ),
-                          child: Icon(entry.value, color: selected ? const Color(0xFF0F142B) : Colors.white70),
+                          child: Icon(
+                            entry.value,
+                            color: selected
+                                ? const Color(0xFF0F142B)
+                                : Colors.white70,
+                          ),
                         ),
                       );
                     }).toList(),
                   ),
                   const SizedBox(height: 16),
-                  const Text('Accent color', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Accent color',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 10,
                     children: _folderColors.map((colorValue) {
                       final bool selected = selectedColor == colorValue;
                       return PressableScale(
-                        onTap: () => setModalState(() => selectedColor = colorValue),
+                        onTap: () =>
+                            setModalState(() => selectedColor = colorValue),
                         borderRadius: BorderRadius.circular(999),
                         pressedScale: 0.985,
                         child: Container(
@@ -177,7 +237,9 @@ class _ArchiveViewState extends State<ArchiveView> {
                             color: Color(colorValue),
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: selected ? Colors.white : Colors.transparent,
+                              color: selected
+                                  ? Colors.white
+                                  : Colors.transparent,
                               width: 2,
                             ),
                           ),
@@ -226,7 +288,9 @@ class _ArchiveViewState extends State<ArchiveView> {
                         backgroundColor: tealAccent,
                         foregroundColor: const Color(0xFF0F142B),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                       child: Text(isEditing ? 'Save changes' : 'Create folder'),
                     ),
@@ -247,7 +311,10 @@ class _ArchiveViewState extends State<ArchiveView> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: cardColor,
-        title: const Text('Delete folder?', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Delete folder?',
+          style: TextStyle(color: Colors.white),
+        ),
         content: const Text(
           'This will remove the folder and its notes.',
           style: TextStyle(color: Colors.white54),
@@ -282,7 +349,11 @@ class _ArchiveViewState extends State<ArchiveView> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return const Center(child: Text('Sign in to view your archive', style: TextStyle(color: Colors.white54)));
+      return _statusCard(
+        icon: Icons.folder_off_outlined,
+        title: 'Sign in to view your archive',
+        subtitle: 'Folders, notes, and saved PDFs appear here once you are signed in.',
+      );
     }
 
     final foldersStream = FirebaseFirestore.instance
@@ -296,46 +367,113 @@ class _ArchiveViewState extends State<ArchiveView> {
       stream: foldersStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFF00C09E)));
+          return _statusCard(
+            icon: Icons.folder_copy_outlined,
+            title: 'Loading your archive',
+            subtitle: 'Fetching folders, notes, and saved study material.',
+            trailing: const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFF00C09E),
+              ),
+            ),
+          );
         }
         final docs = snapshot.data!.docs;
         final int totalNotes = docs.fold<int>(
           0,
-          (total, doc) => total + ((doc.data() as Map<String, dynamic>)['noteCount'] as int? ?? 0),
+          (total, doc) =>
+              total +
+              ((doc.data() as Map<String, dynamic>)['noteCount'] as int? ?? 0),
         );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Study Archive',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                ArchiveClickWrapper(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final headerText = const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Your folders',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Lecture capture, notebooks, PDFs, and saved notes live here.',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                );
+
+                final newFolderButton = ArchiveClickWrapper(
                   onTap: () => _showFolderEditor(),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: tealAccent.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.add_rounded, color: Color(0xFF00C09E), size: 16),
+                        Icon(
+                          Icons.add_rounded,
+                          color: Color(0xFF00C09E),
+                          size: 16,
+                        ),
                         SizedBox(width: 6),
-                        Text('New folder', style: TextStyle(color: Color(0xFF00C09E), fontSize: 11, fontWeight: FontWeight.bold)),
+                        Text(
+                          'New folder',
+                          style: TextStyle(
+                            color: Color(0xFF00C09E),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                );
+
+                if (constraints.maxWidth < 560) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      headerText,
+                      const SizedBox(height: 12),
+                      newFolderButton,
+                    ],
+                  );
+                }
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: headerText),
+                    const SizedBox(width: 12),
+                    newFolderButton,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 14),
             Text(
-              '$totalNotes notes',
+              '$totalNotes saved notes',
               style: const TextStyle(color: Colors.white38, fontSize: 12),
             ),
             const SizedBox(height: 18),
@@ -345,7 +483,9 @@ class _ArchiveViewState extends State<ArchiveView> {
                 decoration: BoxDecoration(
                   color: cardColor.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
                 ),
                 child: const Text(
                   'No folders yet. Create your first archive folder.',
@@ -373,7 +513,9 @@ class _ArchiveViewState extends State<ArchiveView> {
                     decoration: BoxDecoration(
                       color: cardColor.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.05),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -390,14 +532,30 @@ class _ArchiveViewState extends State<ArchiveView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text('$noteCount notes', style: const TextStyle(color: Colors.white38, fontSize: 13)),
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                '$noteCount notes',
+                                style: const TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                         PopupMenuButton<String>(
                           color: cardColor,
-                          icon: const Icon(Icons.more_vert, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.more_vert,
+                            color: Colors.white70,
+                          ),
                           onSelected: (value) {
                             if (value == 'edit') {
                               _showFolderEditor(doc: doc);
@@ -408,11 +566,17 @@ class _ArchiveViewState extends State<ArchiveView> {
                           itemBuilder: (context) => [
                             const PopupMenuItem(
                               value: 'edit',
-                              child: Text('Edit', style: TextStyle(color: Colors.white)),
+                              child: Text(
+                                'Edit',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                             const PopupMenuItem(
                               value: 'delete',
-                              child: Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                              child: Text(
+                                'Delete',
+                                style: TextStyle(color: Colors.redAccent),
+                              ),
                             ),
                           ],
                         ),
@@ -421,9 +585,98 @@ class _ArchiveViewState extends State<ArchiveView> {
                   ),
                 );
               }),
+            const SizedBox(height: 20),
+            const Text(
+              'Lecture capture',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Use SeshCredit when you need lecture notes with audio attached.',
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .snapshots(),
+              builder: (context, userSnapshot) {
+                final userData = userSnapshot.data?.data();
+                final balance = _seshCreditService.balanceFrom(userData);
+                return SeshCreditSummaryCard(
+                  balance: balance,
+                  title: 'SeshCredit balance',
+                  subtitle:
+                      'Top up credits only when you need lecture capture or premium note workflows.',
+                  footnote:
+                      '1 lecture note unlock uses 1 credit. Each credit costs R2.',
+                  onBuy: () => _openSeshCreditStore(balance),
+                );
+              },
+            ),
           ],
         );
       },
+    );
+  }
+
+  Widget _statusCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    Widget? trailing,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: cardColor.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: tealAccent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: tealAccent),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 12), trailing],
+        ],
+      ),
     );
   }
 }
@@ -432,7 +685,11 @@ class ArchiveClickWrapper extends StatefulWidget {
   final Widget child;
   final VoidCallback onTap;
 
-  const ArchiveClickWrapper({super.key, required this.child, required this.onTap});
+  const ArchiveClickWrapper({
+    super.key,
+    required this.child,
+    required this.onTap,
+  });
 
   @override
   State<ArchiveClickWrapper> createState() => _ArchiveClickWrapperState();

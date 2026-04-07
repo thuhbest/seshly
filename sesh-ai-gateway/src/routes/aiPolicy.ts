@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 import { callTextModel } from '../services/modelRouter';
 import { aiLogsCollection } from '../services/firestoreService';
+import { buildSchoolOnlyMessage, evaluateAcademicGuard } from '../services/academicGuard';
 import { config } from '../utils/env';
 
 type ContextType =
@@ -233,13 +234,43 @@ async function handlePolicyGate(
 
   let category: Category = 'unknown';
   let intent: Intent = 'other';
+  const academicGuard = evaluateAcademicGuard(text);
 
-  try {
-    const classified = await classifyText(text, contextType, body.contentHint);
-    category = classified.category;
-    intent = classified.intent;
-  } catch (error) {
-    console.error('Policy classification failed', error);
+  if (academicGuard.outcome === 'block') {
+    const response: PolicyGateResponse = {
+      allowed: false,
+      category: academicGuard.category,
+      intent: 'other',
+      recommendTutor: false,
+      reason: 'school_only',
+      nextStep: academicGuard.message,
+    };
+    await logDecision({
+      type: 'policy_gate',
+      userId,
+      contextType,
+      textSnippet: text.slice(0, 200),
+      academicGuardReason: academicGuard.reason,
+      ...response,
+      requestId: req.requestId || null,
+      strictExamMode: config.strictExamMode,
+    });
+    res.json(response);
+    return;
+  }
+
+  if (academicGuard.category === 'school') {
+    category = 'school';
+  }
+
+  if (academicGuard.reason === 'needs_model_review') {
+    try {
+      const classified = await classifyText(text, contextType, body.contentHint);
+      category = classified.category;
+      intent = classified.intent;
+    } catch (error) {
+      console.error('Policy classification failed', error);
+    }
   }
 
   const isPracticeContext = ['practice', 'comment', 'sesh_screen'].includes(contextType);
@@ -267,8 +298,16 @@ async function handlePolicyGate(
       intent,
       recommendTutor: false,
       reason: 'school_only',
-      nextStep:
-        "I'm here to help with school-related questions. Try rephrasing with your class, assignment, or study topic.",
+      nextStep: buildSchoolOnlyMessage(false),
+    };
+  } else if (category === 'unknown') {
+    response = {
+      allowed: false,
+      category,
+      intent,
+      recommendTutor: false,
+      reason: 'school_only',
+      nextStep: buildSchoolOnlyMessage(true),
     };
   } else if (intent === 'socratic_help' && isPracticeContext) {
     response.recommendTutor = shouldRecommendTutor;

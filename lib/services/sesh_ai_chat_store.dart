@@ -25,6 +25,7 @@ class SeshAiChatStore {
       await doc.set({
         'title': title ?? 'Sesh AI',
         'subject': subject ?? '',
+        'pinned': false,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
         'lastMessage': '',

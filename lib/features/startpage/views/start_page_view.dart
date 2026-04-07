@@ -1,34 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart'; 
+import 'package:flutter_svg/flutter_svg.dart';
 import '../controllers/start_page_controller.dart';
 
-// Dummy screen to navigate to
-class NextScreen extends StatelessWidget {
-  const NextScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Next Screen')),
-      body: const Center(
-        child: Text('You made it to the next screen!', style: TextStyle(fontSize: 24)),
-      ),
-    );
-  }
-}
-
-class StartPageView extends StatelessWidget {
-  // Use a simple constructor key
+class StartPageView extends StatefulWidget {
   const StartPageView({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Instantiate the controller for business logic (navigation)
-    final controller = StartPageController(context);
+  State<StartPageView> createState() => _StartPageViewState();
+}
 
-    // Define the colors from the screenshot
-    const Color primaryColor = Color(0xFF00C09E); // The teal/turquoise color
-    const Color backgroundColor = Color(0xFF0F142B); // The dark background
+class _StartPageViewState extends State<StartPageView> {
+  @override
+  Widget build(BuildContext context) {
+    final controller = StartPageController(context);
+    const Color primaryColor = Color(0xFF00C09E);
+    const Color backgroundColor = Color(0xFF0F142B);
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -38,19 +24,17 @@ class StartPageView extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              // 1. App Logo / Icon (ONLY CHANGE MADE HERE)
               SvgPicture.asset(
                 'assets/images/seshly_logo_full.svg',
-                height: 120, // Adjusted height for visibility
+                height: 120,
                 semanticsLabel: 'Seshly Logo',
               ),
               const SizedBox(height: 30),
 
-              // 2. App Name
               const Text(
                 'Seshly',
                 style: TextStyle(
-                  fontFamily: 'Roboto', // Or another elegant font
+                  fontFamily: 'Roboto',
                   fontSize: 48,
                   fontWeight: FontWeight.w500,
                   color: Colors.white,
@@ -58,7 +42,6 @@ class StartPageView extends StatelessWidget {
               ),
               const SizedBox(height: 5),
 
-              // 3. Powered By
               const Text(
                 'Powered by AutoXyrium',
                 style: TextStyle(
@@ -69,7 +52,6 @@ class StartPageView extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // 4. Tagline
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20.0),
                 child: Text(
@@ -82,19 +64,17 @@ class StartPageView extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 100), // Adjust spacing as needed
-
-              // 5. Get Started Button
+              const SizedBox(height: 100),
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
                   onPressed: controller.navigateToNextScreen,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor, // Button background color
-                    foregroundColor: backgroundColor, // Button text/icon color
+                    backgroundColor: primaryColor,
+                    foregroundColor: backgroundColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10), // Rounded corners
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     elevation: 5,
                   ),
@@ -103,12 +83,11 @@ class StartPageView extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white, // Text is white on the screenshot
+                      color: Colors.white,
                     ),
                   ),
                 ),
               ),
-              // Add a small spacer at the bottom for the hidden bar area
               const SizedBox(height: 30),
             ],
           ),

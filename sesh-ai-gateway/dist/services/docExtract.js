@@ -19,11 +19,13 @@ function normalizeVertices(vertices) {
 }
 function getDocAiConfig() {
     const projectId = process.env.DOC_AI_PROJECT_ID ||
+        process.env.DOCAI_PROJECT_ID ||
+        process.env.GOOGLE_PROJECT_ID ||
         process.env.GOOGLE_CLOUD_PROJECT ||
         process.env.GCLOUD_PROJECT ||
         process.env.FIREBASE_PROJECT_ID;
-    const location = process.env.DOC_AI_LOCATION || 'us';
-    const processorId = process.env.DOC_AI_PROCESSOR_ID;
+    const location = process.env.DOC_AI_LOCATION || process.env.DOCAI_LOCATION || 'us';
+    const processorId = process.env.DOC_AI_PROCESSOR_ID || process.env.DOCAI_PROCESSOR_ID;
     const processorVersion = process.env.DOC_AI_PROCESSOR_VERSION || undefined;
     const apiEndpoint = process.env.DOC_AI_API_ENDPOINT ||
         (location === 'us' || location === 'eu' ? `${location}-documentai.googleapis.com` : undefined);

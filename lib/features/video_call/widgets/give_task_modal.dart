@@ -192,9 +192,13 @@ class _GiveTaskModalState extends State<GiveTaskModal> {
   Widget _buildStartButton() {
     return _TactileButton(
       onTap: () {
-        // Logic to transition session to Practice Mode
-        Navigator.pop(context);
-        debugPrint("Starting Practice: ${_taskController.text}");
+        Navigator.pop<Map<String, dynamic>>(context, {
+          'prompt': _taskController.text.trim(),
+          'timerSec': (int.tryParse(_timerController.text.trim()) ?? 10) * 60,
+          'submissionFormat': _selectedFormat,
+          'allowSeshHelp': _allowSeshAI,
+          'checklist': const <String>[],
+        });
       },
       color: tealAccent,
       child: Center(

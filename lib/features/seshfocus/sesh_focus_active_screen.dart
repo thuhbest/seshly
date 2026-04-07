@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:seshly/features/home/view/main_wrapper.dart';
 import 'package:seshly/services/sesh_focus_service.dart';
 
 class SeshFocusActiveScreen extends StatefulWidget {
@@ -37,10 +36,7 @@ class _SeshFocusActiveScreenState extends State<SeshFocusActiveScreen> {
       // Ignore stop failures; we'll still return to the app shell.
     }
     if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const MainWrapper()),
-      (_) => false,
-    );
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   void _scheduleEndSession() {

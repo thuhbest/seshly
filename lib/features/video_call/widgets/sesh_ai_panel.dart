@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:seshly/services/app_analytics_service.dart';
+import 'package:seshly/services/app_error_service.dart';
 import 'package:seshly/services/sesh_ai_api.dart';
 
 class SeshAIPanel extends StatefulWidget {
@@ -115,10 +117,28 @@ class _SeshAIPanelState extends State<SeshAIPanel> {
           ],
         ),
       );
-    } catch (error) {
+      await AppAnalyticsService.instance.trackAiUsage(
+        action: 'session_summary',
+        status: 'success',
+      );
+    } catch (error, stackTrace) {
+      await AppAnalyticsService.instance.trackAiUsage(
+        action: 'session_summary',
+        status: 'error',
+      );
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'ai',
+        source: 'session_summary',
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Summarise failed: $error')),
+      AppErrorService.instance.showSnackBar(
+        context,
+        AppErrorService.instance.userMessageFor(
+          error,
+          fallback: 'Summary generation failed. Please try again.',
+        ),
       );
     } finally {
       if (mounted) setState(() => _busy = false);

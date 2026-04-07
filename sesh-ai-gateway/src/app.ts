@@ -2,23 +2,28 @@ import cors from 'cors';
 import express, { NextFunction, Request, Response } from 'express';
 
 import { authVerifyFirebaseIdToken } from './middleware/authVerifyFirebaseIdToken';
+import { appCheck } from './middleware/appCheck';
+import { payloadGuard } from './middleware/payloadGuard';
 import { rateLimit } from './middleware/rateLimit';
+import { backpressure } from './middleware/backpressure';
 import { costControl } from './middleware/costControl';
 import { requestId } from './middleware/requestId';
 import { logging } from './middleware/logging';
+import { config } from './utils/env';
 import aiPolicyRouter from './routes/aiPolicy';
 import aiChatRouter from './routes/aiChat';
+import aiClassroomMemoryRouter from './routes/aiClassroomMemory';
 import aiNotesRouter from './routes/aiNotes';
 import aiPracticeRouter from './routes/aiPractice';
 import aiSessionRouter from './routes/aiSession';
 import aiCalendarRouter from './routes/aiCalendar';
 import aiVaultRouter from './routes/aiVault';
-import aiAffirmationsRouter from './routes/aiAffirmations';
 import aiTutorsRouter from './routes/aiTutors';
 import { healthRouter } from './routes/health';
 
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy', true);
 
 app.use(
   cors({
@@ -30,23 +35,26 @@ app.use(
 );
 app.options('*', cors());
 
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: `${config.request.maxBodyKilobytes}kb` }));
 app.use(requestId);
 app.use(logging);
+app.use(payloadGuard);
 
 app.use(healthRouter);
 
 app.use(authVerifyFirebaseIdToken);
+app.use(appCheck);
 app.use(rateLimit);
+app.use(backpressure);
 app.use(costControl);
 app.use(aiPolicyRouter);
 app.use(aiChatRouter);
+app.use(aiClassroomMemoryRouter);
 app.use(aiNotesRouter);
 app.use(aiPracticeRouter);
 app.use(aiSessionRouter);
 app.use(aiCalendarRouter);
 app.use(aiVaultRouter);
-app.use(aiAffirmationsRouter);
 app.use(aiTutorsRouter);
 
 app.get('/', (req: Request, res: Response) => {

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // IMPORTANT
 import '../../sign_up_page/view/sign_up_view.dart';
 import '../view/forgot_password_screen.dart'; // Added this import
+import '../../../services/app_analytics_service.dart';
+import '../../../services/app_error_service.dart';
 import '../../../services/auth_service.dart';
 
 class LoginPageController {
@@ -47,11 +49,21 @@ class LoginPageController {
       // NOW WE CAN CATCH FirebaseAuthException DIRECTLY!
       // Use debugPrint instead of print for production
       debugPrint('LoginPageController caught FirebaseAuthException: ${e.code}');
+      await AppAnalyticsService.instance.trackAuthFlow(
+        'login_controller',
+        status: e.code,
+      );
       final errorMessage = _mapFirebaseErrorToHumanMessage(e);
       onError(errorMessage);
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Generic errors
       debugPrint('LoginPageController generic error: $e');
+      await AppErrorService.instance.recordError(
+        e,
+        stackTrace,
+        category: 'auth',
+        source: 'LoginPageController.signIn',
+      );
       final errorMessage = _handleGenericError(e);
       onError(errorMessage);
     }
@@ -85,11 +97,10 @@ class LoginPageController {
       case 'weak-password':
         return 'Password is too weak. Please use at least 6 characters.';
       default:
-        // Try to make the Firebase message more user-friendly
-        if (e.message != null && e.message!.contains('network')) {
-          return 'Network error. Please check your internet connection and try again.';
-        }
-        return 'Login failed: ${e.message ?? "Please check your credentials and try again."}';
+        return AppErrorService.instance.userMessageFor(
+          e,
+          fallback: 'Login failed. Please check your credentials and try again.',
+        );
     }
   }
 

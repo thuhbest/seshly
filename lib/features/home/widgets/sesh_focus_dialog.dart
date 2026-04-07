@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:seshly/services/sesh_focus_service.dart';
+import 'package:seshly/services/secure_entitlements_service.dart';
 import 'package:seshly/widgets/pressable_scale.dart';
 
 class SeshFocusDialog extends StatefulWidget {
@@ -20,6 +19,8 @@ class _SeshFocusDialogState extends State<SeshFocusDialog> {
   final Color tealAccent = const Color(0xFF00C09E);
   final Color cardColor = const Color(0xFF1E243A);
   final Color backgroundColor = const Color(0xFF0F142B);
+  final SecureEntitlementsService _secureEntitlements =
+      SecureEntitlementsService();
 
   int freePasses = 5;
   bool _loadingPasses = true;
@@ -32,24 +33,18 @@ class _SeshFocusDialogState extends State<SeshFocusDialog> {
 
   // 🔥 Logic: Load/Initialize monthly free passes
   Future<void> _loadFreePasses() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    final data = doc.data();
-    
-    // Check if it's a new month to reset passes to 5
-    final lastReset = (data?['lastPassReset'] as Timestamp?)?.toDate();
-    final now = DateTime.now();
-    
-    if (lastReset == null || lastReset.month != now.month || lastReset.year != now.year) {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-        'freeFocusPasses': 5,
-        'lastPassReset': FieldValue.serverTimestamp(),
-      });
-      if (mounted) setState(() { freePasses = 5; _loadingPasses = false; });
-    } else {
-      if (mounted) setState(() { freePasses = data?['freeFocusPasses'] ?? 0; _loadingPasses = false; });
+    try {
+      final status = await _secureEntitlements.fetchSeshFocusStatus();
+      if (mounted) {
+        setState(() {
+          freePasses = status.freeFocusPasses;
+          _loadingPasses = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingPasses = false);
+      }
     }
   }
 
@@ -290,89 +285,33 @@ class _SeshFocusDialogState extends State<SeshFocusDialog> {
 
   void _startFocusSession() async {
   if (selectedMinutes == null) return;
-
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    Navigator.pop(context);
-    return;
-  }
-
-  // Check if user has free passes
-  final doc = await FirebaseFirestore.instance
-      .collection('users')
-      .doc(user.uid)
-      .get();
-
-  final data = doc.data();
-  final currentPasses = data?['freeFocusPasses'] ?? 0;
-
   String resourceUsed = "Free Pass";
-
-  if (currentPasses > 0) {
-    // Use free pass
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .update({
-      'freeFocusPasses': FieldValue.increment(-1),
-      'lastFocusSession': FieldValue.serverTimestamp(),
-    });
-    resourceUsed = "Free Pass";
-  } else {
-    final userXP = data?['xp'] ?? 0;
-    final seshMinutes = data?['seshMinutes'] ?? 0;
-
-    const xpCost = 50;
-    const minuteCost = 10;
-
-    if (userXP >= xpCost) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({
-        'xp': FieldValue.increment(-xpCost),
-        'lastFocusSession': FieldValue.serverTimestamp(),
-      });
-      resourceUsed = "$xpCost XP";
-    } else if (seshMinutes >= minuteCost) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({
-        'seshMinutes': FieldValue.increment(-minuteCost),
-        'lastFocusSession': FieldValue.serverTimestamp(),
-      });
-      resourceUsed = "$minuteCost Sesh Minutes";
-    } else {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Colors.red,
-            content: Text(
-              "No free passes available. Need 50 XP or 10 Sesh Minutes",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
+  try {
+    final result = await _secureEntitlements.consumeSeshFocusAccess(
+      durationMinutes: selectedMinutes!,
+    );
+    resourceUsed = result.resourceUsed;
+    if (mounted) {
+      setState(() => freePasses = result.freeFocusPasses);
+    }
+  } catch (error) {
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text(
+            error.toString(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
             ),
           ),
-        );
-      }
-      return;
+        ),
+      );
     }
+    return;
   }
-
-  // Log focus session
-  await FirebaseFirestore.instance
-      .collection('focusSessions')
-      .add({
-    'userId': user.uid,
-    'duration': selectedMinutes,
-    'timestamp': FieldValue.serverTimestamp(),
-    'usedPass': currentPasses > 0,
-    'resourceUsed': resourceUsed,
-  });
 
   // Start focus service (pins on Android via method channel)
   try {

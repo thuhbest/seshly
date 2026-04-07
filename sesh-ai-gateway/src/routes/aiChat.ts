@@ -122,6 +122,7 @@ async function callPolicyGate(req: Request, payload: PolicyGateInput): Promise<P
     headers: {
       'content-type': 'application/json',
       authorization: authHeader,
+      'x-firebase-appcheck': req.header('x-firebase-appcheck') || req.header('x-firebase-app-check') || '',
     },
     body: JSON.stringify(payload),
   });
@@ -247,7 +248,26 @@ router.post('/ai/chat/socratic', async (req, res) => {
     return;
   }
 
-  const modelOutput = await buildSocraticResponse(message, body.context);
+  let modelOutput: SocraticModelOutput;
+  try {
+    modelOutput = await buildSocraticResponse(message, body.context);
+  } catch (error) {
+    const errText = String(error ?? '');
+    if (errText.includes('insufficient_quota') || errText.includes('OpenAI error 429')) {
+      res.status(429).json({
+        error: 'provider_quota',
+        message: 'AI quota exceeded. Please try again later.',
+        recommendTutor: true,
+      });
+      return;
+    }
+    res.status(502).json({
+      error: 'model_unavailable',
+      message: 'AI model is temporarily unavailable. Please try again.',
+    });
+    return;
+  }
+
   const replyText = buildReplyText(modelOutput);
   const suggestedNextActions =
     modelOutput.suggestedNextActions && modelOutput.suggestedNextActions.length > 0

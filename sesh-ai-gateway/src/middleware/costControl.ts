@@ -55,6 +55,13 @@ export async function costControl(req: Request, res: Response, next: NextFunctio
   const estimatedTotal = inputTokens + maxTokens;
 
   if (inputTokens > maxTokens) {
+    console.warn('AI payload token limit exceeded', {
+      requestId: req.requestId || null,
+      userId,
+      routeKey: getRouteKey(req),
+      inputTokens,
+      maxTokens,
+    });
     res.status(400).json({
       error: 'token_limit_exceeded',
       message: 'Request is too large for this endpoint. Please shorten your input.',
@@ -66,6 +73,13 @@ export async function costControl(req: Request, res: Response, next: NextFunctio
   try {
     const result = await consumeTokens(userId, estimatedTotal, config.dailyTokenBudget);
     if (!result.allowed) {
+      console.warn('AI daily token budget exceeded', {
+        requestId: req.requestId || null,
+        userId,
+        routeKey: getRouteKey(req),
+        estimatedTotal,
+        remaining: result.remaining,
+      });
       buildBudgetResponse(res);
       return;
     }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../../services/app_error_service.dart';
+import '../../../services/auth_service.dart';
+
 /// ===============================
 /// Forgot Password Screen
 /// ===============================
@@ -14,6 +17,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final TextEditingController _emailController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final AuthService _authService = AuthService();
   
   bool _isLoading = false;
   bool _emailSent = false;
@@ -39,9 +43,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: _emailController.text.trim(),
-      );
+      await _authService.sendPasswordResetEmail(_emailController.text.trim());
       
       setState(() {
         _emailSent = true;
@@ -49,33 +51,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         _isLoading = false;
       });
       
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-      switch (e.code) {
-        case 'user-not-found':
-          errorMessage = 'No account found with this email address.';
-          break;
-        case 'invalid-email':
-          errorMessage = 'Please enter a valid email address.';
-          break;
-        case 'too-many-requests':
-          errorMessage = 'Too many attempts. Please try again later.';
-          break;
-        case 'network-request-failed':
-          errorMessage = 'Network error. Please check your connection.';
-          break;
-        default:
-          errorMessage = 'Failed to send reset email. Please try again.';
-      }
-      
+    } on FirebaseAuthException catch (error) {
       setState(() {
-        _errorMessage = errorMessage;
+        _errorMessage = AppErrorService.instance.userMessageFor(
+          error,
+          fallback: 'Failed to send reset email. Please try again.',
+        );
         _isLoading = false;
       });
       
-    } catch (e) {
+    } catch (error) {
       setState(() {
-        _errorMessage = 'An unexpected error occurred. Please try again.';
+        _errorMessage = AppErrorService.instance.userMessageFor(
+          error,
+          fallback: 'Failed to send reset email. Please try again.',
+        );
         _isLoading = false;
       });
     }
@@ -423,7 +413,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   const SizedBox(height: 8),
                   const Text(
                     '• Use your university email address (.ac.za)\n'
-                    '• The reset link expires in 1 hour\n'
+                    '• The reset link expires after a limited time for security\n'
                     '• Contact support if you don\'t receive the email',
                     style: TextStyle(
                       color: Colors.white70,

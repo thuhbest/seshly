@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../services/app_analytics_service.dart';
+import '../../../services/app_error_service.dart';
 import '../../../services/auth_service.dart';
 
 class SignUpController {
@@ -62,10 +64,20 @@ class SignUpController {
         }
       }
     } on FirebaseAuthException catch (e) {
+      await AppAnalyticsService.instance.trackAuthFlow(
+        'sign_up_controller',
+        status: e.code,
+      );
       final errorMessage = _mapFirebaseErrorToHumanMessage(e);
       _showError(errorMessage);
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('SignUpController generic error: $e');
+      await AppErrorService.instance.recordError(
+        e,
+        stackTrace,
+        category: 'auth',
+        source: 'SignUpController.signUp',
+      );
       _showError(_handleGenericError(e));
     }
   }
@@ -93,11 +105,10 @@ class SignUpController {
       case 'missing-ios-bundle-id':
         return 'App configuration error. Please contact support.';
       default:
-        // Try to make the Firebase message more user-friendly
-        if (e.message != null && e.message!.contains('network')) {
-          return 'Network error. Please check your internet connection and try again.';
-        }
-        return 'Registration failed: ${e.message ?? "Please check your information and try again."}';
+        return AppErrorService.instance.userMessageFor(
+          e,
+          fallback: 'Registration failed. Please check your information and try again.',
+        );
     }
   }
 

@@ -125,3 +125,6 @@ app.*.map.json
 .env.*
 .sensitive/
 node_modules
+
+# Keep iOS dependency lockfile trackable for reproducible pod installs.
+!ios/Podfile.lock

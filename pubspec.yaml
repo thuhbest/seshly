@@ -20,33 +20,35 @@ dependencies:
   # ----------------------------
   # FIREBASE CORE
   # ----------------------------
-  firebase_core: ^2.27.0
+  firebase_core: ^3.4.0
 
   # ----------------------------
   # AUTHENTICATION
   # ----------------------------
-  firebase_auth: ^4.17.0
+  firebase_auth: ^5.2.0
   google_sign_in: ^6.2.1 # optional, future social login
 
   # ----------------------------
   # DATABASE
   # ----------------------------
-  cloud_firestore: ^4.15.0
+  cloud_firestore: ^5.4.0
+  cloud_functions: ^5.0.1
 
   # ----------------------------
   # ANALYTICS / GROWTH (FUTURE)
   # ----------------------------
-  firebase_analytics: ^10.8.0
+  firebase_analytics: ^11.3.0
+  firebase_crashlytics: ^4.1.0
 
   # ----------------------------
   # STORAGE (FUTURE: PROFILE PICS, NOTES)
   # ----------------------------
-  firebase_storage: ^11.6.0
+  firebase_storage: ^12.2.0
 
   # ----------------------------
   # NOTIFICATIONS (FUTURE)
   # ----------------------------
-  firebase_messaging: ^14.7.10
+  firebase_messaging: ^15.1.0
 
   # ----------------------------
   # STATE MANAGEMENT (LIKELY)
@@ -75,6 +77,16 @@ dependencies:
   http: ^1.2.2
   google_fonts: ^6.2.1
   flutter_markdown: ^0.7.3
+  flutter_webrtc: ^0.10.8
+  livekit_client: ^2.0.4
+
+dependency_overrides:
+  dart_webrtc:
+    path: third_party/dart_webrtc
+  record_windows:
+    path: third_party/record_windows
+  record_linux:
+    path: third_party/record_linux
 
 dev_dependencies:
   flutter_test:

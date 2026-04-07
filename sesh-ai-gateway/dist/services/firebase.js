@@ -12,6 +12,7 @@ let app = null;
 let firestore = null;
 let storage = null;
 const projectId = process.env.FIREBASE_PROJECT_ID ||
+    process.env.GOOGLE_PROJECT_ID ||
     process.env.GOOGLE_CLOUD_PROJECT ||
     process.env.GCLOUD_PROJECT;
 const storageBucket = process.env.FIREBASE_STORAGE_BUCKET ||

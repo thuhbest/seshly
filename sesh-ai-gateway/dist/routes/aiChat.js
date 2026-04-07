@@ -61,11 +61,12 @@ function parseModelOutput(raw) {
 }
 async function callPolicyGate(req, payload) {
     const authHeader = req.header('authorization') || '';
-    const response = await fetch(`http://127.0.0.1:${env_1.config.port}/ai/policy/gate`, {
+    const response = await fetch(`http://127.0.0.1:${env_1.config.port}/ai/policy/gate/practice`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
             authorization: authHeader,
+            'x-firebase-appcheck': req.header('x-firebase-appcheck') || req.header('x-firebase-app-check') || '',
         },
         body: JSON.stringify(payload),
     });
@@ -78,6 +79,7 @@ async function callPolicyGate(req, payload) {
 async function buildSocraticResponse(message, context) {
     const provider = env_1.config.model.provider;
     const model = provider === 'openai' ? env_1.config.model.openai.model : env_1.config.model.google.model;
+    const maxTokens = env_1.config.maxTokensPerEndpoint['POST /ai/chat/socratic'];
     const system = [
         'You are a Socratic tutor for students.',
         'Return JSON only with keys:',
@@ -95,6 +97,7 @@ async function buildSocraticResponse(message, context) {
         model,
         jsonOnly: true,
         temperature: 0.2,
+        maxTokens,
         messages: [
             { role: 'system', content: system },
             { role: 'user', content: JSON.stringify(userPayload) },
@@ -169,7 +172,26 @@ router.post('/ai/chat/socratic', async (req, res) => {
         res.json(cta);
         return;
     }
-    const modelOutput = await buildSocraticResponse(message, body.context);
+    let modelOutput;
+    try {
+        modelOutput = await buildSocraticResponse(message, body.context);
+    }
+    catch (error) {
+        const errText = String(error ?? '');
+        if (errText.includes('insufficient_quota') || errText.includes('OpenAI error 429')) {
+            res.status(429).json({
+                error: 'provider_quota',
+                message: 'AI quota exceeded. Please try again later.',
+                recommendTutor: true,
+            });
+            return;
+        }
+        res.status(502).json({
+            error: 'model_unavailable',
+            message: 'AI model is temporarily unavailable. Please try again.',
+        });
+        return;
+    }
     const replyText = buildReplyText(modelOutput);
     const suggestedNextActions = modelOutput.suggestedNextActions && modelOutput.suggestedNextActions.length > 0
         ? modelOutput.suggestedNextActions

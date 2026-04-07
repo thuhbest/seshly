@@ -200,6 +200,7 @@ async function callPolicyGate(req: Request, payload: PolicyGateInput): Promise<P
     headers: {
       'content-type': 'application/json',
       authorization: authHeader,
+      'x-firebase-appcheck': req.header('x-firebase-appcheck') || req.header('x-firebase-app-check') || '',
     },
     body: JSON.stringify(payload),
   });

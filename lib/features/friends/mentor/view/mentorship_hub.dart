@@ -24,7 +24,12 @@ class _MentorshipHubState extends State<MentorshipHub> {
   Widget build(BuildContext context) {
     final currentUserId = _service.currentUserId;
     if (currentUserId == null) {
-      return const Center(child: Text('Sign in to use mentorship.', style: TextStyle(color: Colors.white54)));
+      return const Center(
+        child: Text(
+          'Sign in to use mentorship.',
+          style: TextStyle(color: Colors.white54),
+        ),
+      );
     }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -37,9 +42,13 @@ class _MentorshipHubState extends State<MentorshipHub> {
         final optIn = profile?['optIn'] == true;
 
         return StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance.collection('users').doc(currentUserId).snapshots(),
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUserId)
+              .snapshots(),
           builder: (context, userSnap) {
-            final userData = userSnap.data?.data() as Map<String, dynamic>? ?? {};
+            final userData =
+                userSnap.data?.data() as Map<String, dynamic>? ?? {};
             final isAdmin = userData['isMentorshipAdmin'] == true;
             return SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -49,21 +58,41 @@ class _MentorshipHubState extends State<MentorshipHub> {
                   if (isAdmin)
                     Align(
                       alignment: Alignment.centerRight,
-                      child: PressableScale(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const MentorshipAdminView()),
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                        pressedScale: 0.96,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00C09E).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFF00C09E).withValues(alpha: 0.35)),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: PressableScale(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MentorshipAdminView(),
+                            ),
                           ),
-                          child: const Text("Admin insights", style: TextStyle(color: Color(0xFF00C09E), fontWeight: FontWeight.bold)),
+                          borderRadius: BorderRadius.circular(14),
+                          pressedScale: 0.96,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFF00C09E,
+                              ).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: const Color(
+                                  0xFF00C09E,
+                                ).withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: const Text(
+                              "Admin insights",
+                              style: TextStyle(
+                                color: Color(0xFF00C09E),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -104,7 +133,9 @@ class _MentorshipHubState extends State<MentorshipHub> {
       context: context,
       isScrollControlled: true,
       backgroundColor: cardColor,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => MentorshipProfileSheet(
         service: _service,
         existingProfile: existing,
@@ -116,34 +147,58 @@ class _MentorshipHubState extends State<MentorshipHub> {
   Widget _privacyBanner({required VoidCallback onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E243A),
-        borderRadius: BorderRadius.circular(12),
+        color: const Color(0xFF1E243A).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.lock_outline, color: Color(0xFF00C09E), size: 18),
-          const SizedBox(width: 8),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFF00C09E).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.lock_outline,
+              color: Color(0xFF00C09E),
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 12),
           const Expanded(
             child: Text(
               'Opt into privacy-safe analytics to unlock admin insights.',
-              style: TextStyle(color: Colors.white54, fontSize: 12),
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                height: 1.35,
+              ),
             ),
           ),
           PressableScale(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             pressedScale: 0.96,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFF00C09E).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF00C09E).withValues(alpha: 0.35)),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF00C09E).withValues(alpha: 0.35),
+                ),
               ),
-              child: const Text('Enable', style: TextStyle(color: Color(0xFF00C09E), fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Enable',
+                style: TextStyle(
+                  color: Color(0xFF00C09E),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
         ],
@@ -163,18 +218,25 @@ class _OnboardingCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E243A).withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        color: const Color(0xFF1E243A).withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Mentorship", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+          const Text(
+            "Set up mentorship",
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 17,
+            ),
+          ),
           const SizedBox(height: 8),
           const Text(
-            "Create your mentorship profile to get matched with the right mentor or mentee.",
-            style: TextStyle(color: Colors.white54, fontSize: 12),
+            "Create your profile to get matched with the right mentor or mentee.",
+            style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.4),
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -184,7 +246,9 @@ class _OnboardingCard extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: tealAccent,
                 foregroundColor: const Color(0xFF0F142B),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: const Text("Set up mentorship"),
             ),

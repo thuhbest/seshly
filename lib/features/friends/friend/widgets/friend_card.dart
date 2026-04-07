@@ -25,98 +25,115 @@ class FriendCard extends StatelessWidget {
     const Color scaffoldBg = Color(0xFF0F142B);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(15),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: cardColor.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        gradient: LinearGradient(
+          colors: [
+            cardColor.withValues(alpha: 0.82),
+            const Color(0xFF171D31).withValues(alpha: 0.88),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Stack(
             children: [
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 25,
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    child: Text(
-                      name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
-                      style: const TextStyle(color: tealAccent, fontWeight: FontWeight.bold),
-                    ),
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: tealAccent.withValues(alpha: 0.12),
+                child: Text(
+                  name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
+                  style: const TextStyle(
+                    color: tealAccent,
+                    fontWeight: FontWeight.bold,
                   ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: isOnline ? tealAccent : Colors.white24,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: scaffoldBg, width: 2),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        _statusBadge(presenceLabel, isOnline),
-                      ],
-                    ),
-                    Text("$id • $year", style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _iconText(Icons.local_fire_department, "$streak day streak"),
-                        const SizedBox(width: 15),
-                        _iconText(Icons.timer_outlined, "$mins Sesh Mins"),
-                      ],
-                    )
-                  ],
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: isOnline ? tealAccent : Colors.white24,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: scaffoldBg, width: 2),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 15),
-          Row(
-            children: [
-              // Message Button - Now full width
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: onMessage, 
-                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                  label: const Text("Message", style: TextStyle(fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: scaffoldBg,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10), 
-                      side: BorderSide(color: Colors.white.withValues(alpha: 0.05))
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15.5,
+                        ),
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
+                    const SizedBox(width: 10),
+                    _statusBadge(presenceLabel, isOnline),
+                  ],
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  "$id • $year",
+                  style: const TextStyle(color: Colors.white54, fontSize: 11.5),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _metricPill(
+                      Icons.local_fire_department,
+                      "$streak day streak",
+                      const Color(0xFFF87171),
+                    ),
+                    _metricPill(Icons.timer_outlined, "$mins mins", tealAccent),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: onMessage,
+            icon: const Icon(Icons.chat_bubble_outline, size: 16),
+            label: const Text(
+              "Chat",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: scaffoldBg,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
               ),
-            ],
-          )
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
         ],
       ),
     );
@@ -124,10 +141,12 @@ class FriendCard extends StatelessWidget {
 
   Widget _statusBadge(String text, bool isOnline) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: (isOnline ? const Color(0xFF00C09E) : Colors.white24).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(5),
+        color: (isOnline ? const Color(0xFF00C09E) : Colors.white24).withValues(
+          alpha: 0.1,
+        ),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         text,
@@ -140,13 +159,28 @@ class FriendCard extends StatelessWidget {
     );
   }
 
-  Widget _iconText(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.white38, size: 14),
-        const SizedBox(width: 5),
-        Text(text, style: const TextStyle(color: Colors.white38, fontSize: 11)),
-      ],
+  Widget _metricPill(IconData icon, String text, Color accent) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: accent, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: accent,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

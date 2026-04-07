@@ -48,72 +48,82 @@ class _SeshInputBoxState extends State<SeshInputBox> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFF141B2F).withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: tealAccent.withValues(alpha: 0.35),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: tealAccent.withValues(alpha: 0.22)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Ask Sesh Anything",
+            "Ask Sesh",
             style: GoogleFonts.playfairDisplay(
               color: Colors.white,
-              fontSize: 18,
+              fontSize: 22,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 6),
+          Text(
+            "Type the problem, concept, or question you want solved right now.",
+            style: GoogleFonts.spaceGrotesk(
+              color: Colors.white60,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
             ),
             child: TextField(
               controller: _controller,
+              minLines: 3,
+              maxLines: 6,
+              textInputAction: TextInputAction.newline,
               style: GoogleFonts.spaceGrotesk(color: Colors.white),
               decoration: InputDecoration(
                 hintText: "What do you need help with today?",
                 hintStyle: GoogleFonts.spaceGrotesk(color: Colors.white38),
                 border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: _isLoading ? null : _handleAsk,
-              icon: _isLoading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.auto_awesome, size: 18),
-              label: Text(
-                _isLoading ? "Thinking..." : "Get AI Help",
-                style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w600, fontSize: 16),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: tealAccent,
-                foregroundColor: const Color(0xFF0F142B),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Spacer(),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _handleAsk,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.auto_awesome, size: 18),
+                  label: Text(
+                    _isLoading ? "Thinking..." : "Ask Sesh",
+                    style: GoogleFonts.spaceGrotesk(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: tealAccent,
+                    foregroundColor: const Color(0xFF0F142B),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ],
       ),

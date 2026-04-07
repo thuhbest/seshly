@@ -1,9 +1,18 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+
+import 'app_analytics_service.dart';
+import 'app_error_service.dart';
+import 'community_backend_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final CommunityBackendService _communityBackend =
+      CommunityBackendService.instance;
+
+  DateTime? _lastVerificationEmailAt;
 
   // ADD THIS MISSING SIGN IN METHOD
   Future<UserCredential> signIn(String email, String password) async {
@@ -14,6 +23,12 @@ class AuthService {
       );
       final user = result.user;
       if (user != null) {
+        await _communityBackend.syncAccessProfile();
+        await AppAnalyticsService.instance.trackAuthFlow(
+          'sign_in',
+          status: 'ok',
+          emailVerified: user.emailVerified,
+        );
         try {
           await updateDailyStreak(user.uid);
         } catch (_) {
@@ -21,12 +36,69 @@ class AuthService {
         }
       }
       return result;
-    } on FirebaseAuthException {
-      // Re-throw the exception so it can be caught by the controller
+    } on FirebaseAuthException catch (error, stackTrace) {
+      await AppAnalyticsService.instance.trackAuthFlow(
+        'sign_in',
+        status: error.code,
+      );
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'auth',
+        source: 'signIn',
+      );
       rethrow;
-    } catch (e) {
-      throw Exception('An unexpected error occurred: ${e.toString()}');
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'auth',
+        source: 'signIn',
+      );
+      throw Exception('Something went wrong. Please try again.');
     }
+  }
+
+  Future<UserCredential> enterInstantTutorMode() async {
+    try {
+      debugPrint('Instant Tutor Mode: calling signInAnonymously()');
+      final result = await _auth.signInAnonymously();
+      final user = result.user;
+      if (user != null) {
+        debugPrint(
+          'Instant Tutor Mode: signInAnonymously() succeeded for uid=${user.uid}, isAnonymous=${user.isAnonymous}',
+        );
+        _syncInstantTutorModeProfileInBackground(user);
+      } else {
+        debugPrint(
+          'Instant Tutor Mode: signInAnonymously() returned without a user.',
+        );
+      }
+      await AppAnalyticsService.instance.trackAuthFlow(
+        'instant_tutor_enter',
+        status: 'ok',
+      );
+      return result;
+    } on FirebaseAuthException catch (error, stackTrace) {
+      debugPrint(
+        'Instant Tutor Mode sign-in failed [${error.code}]: ${error.message}',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    } catch (error, stackTrace) {
+      debugPrint('Instant Tutor Mode startup failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  void _syncInstantTutorModeProfileInBackground(User user) {
+    ensureInstantTutorModeProfile(user).catchError((error, stackTrace) {
+      debugPrint('Instant Tutor profile sync failed: $error');
+      if (stackTrace is StackTrace) {
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    });
   }
 
   // KEEP ALL YOUR EXISTING METHODS BELOW - DON'T CHANGE THEM
@@ -47,36 +119,99 @@ class AuthService {
       final user = result.user;
       if (user != null) {
         await user.sendEmailVerification();
-        final year = _convertLevelToYear(levelOfStudy);
-        
-        await _db.collection('users').doc(user.uid).set({
-          'uid': user.uid,
-          'fullName': fullName,
-          'fullNameLowercase': fullName.toLowerCase(), 
-          'studentNumber': studentNumber,
-          // 🔥 Added for case-insensitive search by ID
-          'studentNumberLowercase': studentNumber.toLowerCase(),
-          'university': university,
-          'levelOfStudy': levelOfStudy,
-          'email': email,
-          'emailLowercase': email.toLowerCase(),
-          'emailVerified': false,
-          'isDisabled': false,
-          'createdAt': FieldValue.serverTimestamp(),
-          'seshMinutes': 0,
-          'streak': 1,
-          'streakBest': 1,
-          'lastLoginAt': FieldValue.serverTimestamp(),
-          'year': year,
-          'major': '', 
-          'id': studentNumber,
-        });
+        await _communityBackend.initializeAccountProfile(
+          fullName: fullName,
+          studentNumber: studentNumber,
+          university: university,
+          levelOfStudy: levelOfStudy,
+        );
+        await AppAnalyticsService.instance.trackAuthFlow(
+          'sign_up',
+          status: 'ok',
+        );
       }
       return result;
-    } on FirebaseAuthException {
-      rethrow; 
-    } catch (e) {
-      throw Exception('An unexpected error occurred: ${e.toString()}');
+    } on FirebaseAuthException catch (error, stackTrace) {
+      await AppAnalyticsService.instance.trackAuthFlow(
+        'sign_up',
+        status: error.code,
+      );
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'auth',
+        source: 'signUp',
+      );
+      rethrow;
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'auth',
+        source: 'signUp',
+      );
+      throw Exception('Something went wrong. Please try again.');
+    }
+  }
+
+  Future<void> ensureVerifiedStudentAccessProfile(User user) async {
+    if (user.isAnonymous) return;
+    await _communityBackend.syncAccessProfile();
+  }
+
+  Future<void> ensureInstantTutorModeProfile(User user) async {
+    await _communityBackend.syncAccessProfile();
+  }
+
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim());
+      await AppAnalyticsService.instance.trackVerification(
+        action: 'password_reset',
+        status: 'sent',
+      );
+    } on FirebaseAuthException catch (error, stackTrace) {
+      await AppAnalyticsService.instance.trackVerification(
+        action: 'password_reset',
+        status: error.code,
+      );
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'auth',
+        source: 'sendPasswordResetEmail',
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> resendVerificationEmail(User user) async {
+    final now = DateTime.now();
+    if (_lastVerificationEmailAt != null &&
+        now.difference(_lastVerificationEmailAt!) <
+            const Duration(seconds: 60)) {
+      throw Exception('Please wait a moment before requesting another email.');
+    }
+
+    try {
+      await user.sendEmailVerification();
+      _lastVerificationEmailAt = now;
+      await AppAnalyticsService.instance.trackVerification(
+        action: 'email_verification',
+        status: 'resent',
+      );
+    } on FirebaseAuthException catch (error, stackTrace) {
+      await AppAnalyticsService.instance.trackVerification(
+        action: 'email_verification',
+        status: error.code,
+      );
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'auth',
+        source: 'resendVerificationEmail',
+      );
+      rethrow;
     }
   }
 
@@ -98,7 +233,11 @@ class AuthService {
         nextStreak = currentStreak > 0 ? currentStreak : 1;
       } else {
         final DateTime lastLogin = lastLoginAt.toDate();
-        final DateTime lastDay = DateTime(lastLogin.year, lastLogin.month, lastLogin.day);
+        final DateTime lastDay = DateTime(
+          lastLogin.year,
+          lastLogin.month,
+          lastLogin.day,
+        );
         final int diffDays = today.difference(lastDay).inDays;
 
         if (diffDays == 0) {
@@ -132,57 +271,27 @@ class AuthService {
     String? levelOfStudy,
   }) async {
     try {
-      final Map<String, dynamic> updates = {};
-      
-      if (fullName != null) {
-        updates['fullName'] = fullName;
-        updates['fullNameLowercase'] = fullName.toLowerCase(); 
+      if (userId != _auth.currentUser?.uid) {
+        throw Exception('You can only update your own profile.');
       }
-      if (studentNumber != null) {
-        updates['studentNumber'] = studentNumber;
-        // 🔥 Keep searchable field in sync
-        updates['studentNumberLowercase'] = studentNumber.toLowerCase();
-      }
-      if (major != null) updates['major'] = major;
-      if (year != null) updates['year'] = year;
-      if (levelOfStudy != null) {
-        updates['levelOfStudy'] = levelOfStudy;
-        updates['year'] = _convertLevelToYear(levelOfStudy);
-      }
-      
-      if (updates.isNotEmpty) {
-        await _db.collection('users').doc(userId).update(updates);
-      }
-    } catch (e) {
+      await _communityBackend.updateProfile(
+        fullName: fullName,
+        major: major,
+        levelOfStudy: levelOfStudy,
+      );
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'profile',
+        source: 'updateUserProfile',
+      );
       rethrow;
     }
   }
 
-  // KEEP YOUR convertLevelToYear METHOD
-  String _convertLevelToYear(String levelOfStudy) {
-    switch (levelOfStudy.toLowerCase()) {
-      case 'first year':
-      case '1st year':
-        return '1st Year';
-      case 'second year':
-      case '2nd year':
-        return '2nd Year';
-      case 'third year':
-      case '3rd year':
-        return '3rd Year';
-      case 'fourth year':
-      case '4th year':
-        return '4th Year';
-      case 'postgraduate':
-      case 'postgrad':
-        return 'Postgrad';
-      default:
-        return levelOfStudy;
-    }
-  }
-
   // 🔥 UPDATED MIGRATION HELPER
- // 🔥 UPDATED MIGRATION HELPER - THIS IS CRITICAL
+  // 🔥 UPDATED MIGRATION HELPER - THIS IS CRITICAL
   Future<void> addLowerCaseFieldsToExistingUsers() async {
     try {
       final users = await _db.collection('users').get();
@@ -200,7 +309,8 @@ class AuthService {
         if (fullName != null && !data.containsKey('fullNameLowercase')) {
           updates['fullNameLowercase'] = fullName.toLowerCase();
         }
-        if (studentNumber != null && !data.containsKey('studentNumberLowercase')) {
+        if (studentNumber != null &&
+            !data.containsKey('studentNumberLowercase')) {
           updates['studentNumberLowercase'] = studentNumber.toLowerCase();
         }
         if (email != null && !data.containsKey('emailLowercase')) {
@@ -222,14 +332,13 @@ class AuthService {
           print('✅ Batch committed, updated $totalUpdated users so far...');
         }
       }
-      
+
       if (count > 0) {
         await batch.commit();
       }
-      
+
       // ignore: avoid_print
       print('🎉 MIGRATION COMPLETE: $totalUpdated users updated.');
-      
     } catch (e) {
       // ignore: avoid_print
       print('❌ Migration error: $e');

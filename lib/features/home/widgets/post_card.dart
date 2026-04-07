@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:video_player/video_player.dart';
+import 'package:seshly/access/app_access.dart';
+import 'package:seshly/access/access_controller.dart';
+import 'package:seshly/services/app_error_service.dart';
+import 'package:seshly/services/community_backend_service.dart';
 import '../view/question_detail_view.dart';
 import 'package:seshly/widgets/pressable_scale.dart';
 import 'package:seshly/features/tutors/view/find_tutor_view.dart';
@@ -50,6 +54,7 @@ class _PostCardState extends State<PostCard> {
   final Color tealAccent = const Color(0xFF00C09E);
   final Color cardColor = const Color(0xFF1E243A);
   final Color backgroundColor = const Color(0xFF0F142B);
+  final CommunityBackendService _backend = CommunityBackendService.instance;
 
   String get _expandedStorageKey => 'post_expand_${widget.postId}';
 
@@ -61,12 +66,14 @@ class _PostCardState extends State<PostCard> {
         (widget.attachmentUrl!.toLowerCase().contains('.mp4') ||
             widget.attachmentUrl!.toLowerCase().contains('.mov'))) {
       _isVideo = true;
-      _videoController = VideoPlayerController.networkUrl(
-        Uri.parse(widget.attachmentUrl!),
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-      )..initialize().then((_) {
-          if (mounted) setState(() {});
-        });
+      _videoController =
+          VideoPlayerController.networkUrl(
+              Uri.parse(widget.attachmentUrl!),
+              videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+            )
+            ..initialize().then((_) {
+              if (mounted) setState(() {});
+            });
     }
   }
 
@@ -84,7 +91,7 @@ class _PostCardState extends State<PostCard> {
 
   Future<void> _checkIfUserReacted() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null || user.isAnonymous) return;
     final doc = await FirebaseFirestore.instance
         .collection('posts')
         .doc(widget.postId)
@@ -106,7 +113,10 @@ class _PostCardState extends State<PostCard> {
       builder: (dialogContext) => AlertDialog(
         backgroundColor: cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Delete Post?", style: TextStyle(color: Colors.white)),
+        title: const Text(
+          "Delete Post?",
+          style: TextStyle(color: Colors.white),
+        ),
         content: const Text(
           "This will remove your question forever. You cannot undo this action.",
           style: TextStyle(color: Colors.white70),
@@ -114,17 +124,31 @@ class _PostCardState extends State<PostCard> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text("Cancel", style: TextStyle(color: Colors.white38)),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Colors.white38),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () async {
-              await FirebaseFirestore.instance.collection('posts').doc(widget.postId).delete();
+              await FirebaseFirestore.instance
+                  .collection('posts')
+                  .doc(widget.postId)
+                  .delete();
               if (!mounted) return;
               Navigator.of(context, rootNavigator: true).pop();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Post deleted")));
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text("Post deleted")));
             },
-            child: const Text("Delete Forever", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text(
+              "Delete Forever",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -132,35 +156,59 @@ class _PostCardState extends State<PostCard> {
   }
 
   void _showReportSheet() {
-    final List<String> reasons = ["Inappropriate content", "Spam", "Harassment", "Incorrect information", "Other"];
+    final List<String> reasons = [
+      "Inappropriate content",
+      "Spam",
+      "Harassment",
+      "Incorrect information",
+      "Other",
+    ];
     showModalBottomSheet(
       context: context,
       backgroundColor: cardColor,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
       builder: (sheetContext) => Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Report Post", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              "Report Post",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 15),
-            ...reasons.map((reason) => ListTile(
-              title: Text(reason, style: const TextStyle(color: Colors.white70)),
-              onTap: () async {
-                final user = FirebaseAuth.instance.currentUser;
-                await FirebaseFirestore.instance.collection('reports').add({
-                  'postId': widget.postId,
-                  'reporterId': user?.uid,
-                  'reason': reason,
-                  'createdAt': FieldValue.serverTimestamp(),
-                  'status': 'pending',
-                });
-                if (!mounted) return;
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Report submitted. Thank you.")));
-              },
-            )),
+            ...reasons.map(
+              (reason) => ListTile(
+                title: Text(
+                  reason,
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                onTap: () async {
+                  final user = FirebaseAuth.instance.currentUser;
+                  await FirebaseFirestore.instance.collection('reports').add({
+                    'postId': widget.postId,
+                    'reporterId': user?.uid,
+                    'reason': reason,
+                    'createdAt': FieldValue.serverTimestamp(),
+                    'status': 'pending',
+                  });
+                  if (!mounted) return;
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Report submitted. Thank you."),
+                    ),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),
@@ -187,7 +235,10 @@ class _PostCardState extends State<PostCard> {
                 hintStyle: const TextStyle(color: Colors.white38),
                 filled: true,
                 fillColor: backgroundColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -211,7 +262,10 @@ class _PostCardState extends State<PostCard> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text("Cancel", style: TextStyle(color: Colors.white54)),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Colors.white54),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: tealAccent),
@@ -219,7 +273,13 @@ class _PostCardState extends State<PostCard> {
               Navigator.pop(dialogContext);
               await _createRepost(controller.text.trim());
             },
-            child: const Text("Repost", style: TextStyle(color: Color(0xFF0F142B), fontWeight: FontWeight.bold)),
+            child: const Text(
+              "Repost",
+              style: TextStyle(
+                color: Color(0xFF0F142B),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -233,25 +293,33 @@ class _PostCardState extends State<PostCard> {
   }
 
   Future<void> _createRepost(String comment) async {
+    if (!await AccessController.guard(
+      context,
+      capability: AppCapability.repostQuestion,
+    )) {
+      return;
+    }
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please sign in to repost.")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please sign in to repost.")),
+      );
       return;
     }
 
     try {
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      final userData = userDoc.data() ?? {};
-      final authorName = (userData['fullName'] ?? userData['displayName'] ?? "Student").toString();
       final String repostText = comment.trim();
-      final String storedQuestion = repostText.isEmpty ? widget.question : repostText;
+      final String storedQuestion = repostText.isEmpty
+          ? widget.question
+          : repostText;
 
-      await FirebaseFirestore.instance.collection('posts').add({
-        'subject': widget.subject,
-        'question': storedQuestion,
-        'repostText': repostText,
-        'repostOf': {
+      await _backend.createPost(
+        subject: widget.subject,
+        question: storedQuestion,
+        repostText: repostText,
+        repostOf: <String, dynamic>{
           'postId': widget.postId,
           'authorId': widget.authorId,
           'author': widget.author,
@@ -260,52 +328,82 @@ class _PostCardState extends State<PostCard> {
           'attachmentUrl': widget.attachmentUrl,
           'link': widget.link,
         },
-        'isRepost': true,
-        'author': authorName,
-        'authorId': user.uid,
-        'createdAt': FieldValue.serverTimestamp(),
-        'likes': 0,
-        'comments': 0,
-        'isUrgent': false,
-        'attachmentUrl': null,
-        'link': null,
-      });
+      );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Reposted")));
-    } catch (_) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Reposted")));
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'community',
+        source: 'repost_post',
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Could not repost right now.")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppErrorService.instance.userMessageFor(
+              error,
+              fallback: "Could not repost right now.",
+            ),
+          ),
+        ),
+      );
     }
   }
 
   Future<void> _handleHelpful() async {
+    if (!await AccessController.guard(
+      context,
+      capability: AppCapability.reactHelpful,
+    )) {
+      return;
+    }
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     final bool wasReacted = _hasReacted;
     setState(() => _hasReacted = !wasReacted);
-    final postRef = FirebaseFirestore.instance.collection('posts').doc(widget.postId);
-    final reactorRef = postRef.collection('helpful_users').doc(user.uid);
     try {
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        if (!wasReacted) {
-          transaction.set(reactorRef, {'timestamp': FieldValue.serverTimestamp()});
-          transaction.update(postRef, {'likes': FieldValue.increment(1)});
-        } else {
-          transaction.delete(reactorRef);
-          transaction.update(postRef, {'likes': FieldValue.increment(-1)});
-        }
-      });
-    } catch (e) {
+      final nextState = await _backend.toggleHelpfulReaction(widget.postId);
+      if (mounted) {
+        setState(() => _hasReacted = nextState);
+      }
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'community',
+        source: 'toggle_helpful_reaction',
+      );
       if (mounted) setState(() => _hasReacted = wasReacted);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppErrorService.instance.userMessageFor(
+              error,
+              fallback: 'Could not update that reaction.',
+            ),
+          ),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isInstantTutorMode = AccessController.isInstantTutorModeFor(
+      context,
+    );
     final currentUser = FirebaseAuth.instance.currentUser;
     final bool isRepost = widget.repostOf != null;
-    final questionText = isRepost ? (widget.repostText ?? '').trim() : widget.question.trim();
+    final questionText = isRepost
+        ? (widget.repostText ?? '').trim()
+        : widget.question.trim();
     final bool canExpand = questionText.length > 140;
     final Color chipBackground = tealAccent.withValues(alpha: 0.1);
     final Color chipBorder = tealAccent.withValues(alpha: 0.25);
@@ -321,10 +419,10 @@ class _PostCardState extends State<PostCard> {
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2), 
-            blurRadius: 15, 
-            offset: const Offset(0, 8)
-          )
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
         ],
       ),
       child: Column(
@@ -336,23 +434,38 @@ class _PostCardState extends State<PostCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: chipBackground, 
+                    color: chipBackground,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: chipBorder),
                   ),
-                  child: Text(widget.subject, 
-                    style: TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                  child: Text(
+                    widget.subject,
+                    style: TextStyle(
+                      color: tealAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
                 Row(
                   children: [
-                    Text(widget.time, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                    Text(
+                      widget.time,
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 12,
+                      ),
+                    ),
                     const SizedBox(width: 5),
                     _OptionsButton(
-                      onDelete: _showDeleteConfirmation, 
-                      onReport: _showReportSheet, 
-                      isAuthor: widget.authorId == currentUser?.uid
+                      onDelete: _showDeleteConfirmation,
+                      onReport: _showReportSheet,
+                      isAuthor: widget.authorId == currentUser?.uid,
                     ),
                   ],
                 ),
@@ -370,8 +483,14 @@ class _PostCardState extends State<PostCard> {
                     child: Text(
                       questionText,
                       maxLines: _isExpanded ? null : 3,
-                      overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
+                      overflow: _isExpanded
+                          ? TextOverflow.visible
+                          : TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        height: 1.5,
+                      ),
                     ),
                   ),
                   if (canExpand) ...[
@@ -387,7 +506,11 @@ class _PostCardState extends State<PostCard> {
                         ),
                         child: Text(
                           _isExpanded ? 'Show less' : '...more',
-                          style: TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 13),
+                          style: TextStyle(
+                            color: tealAccent,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ),
@@ -398,16 +521,16 @@ class _PostCardState extends State<PostCard> {
                   _buildRepostQuote(),
                   const SizedBox(height: 12),
                 ],
-                
+
                 // 🔥 FIXED AUTHOR BUTTON: isolated animation and static "by "
                 Row(
                   children: [
                     Text(
                       "by ",
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4), 
-                        fontSize: 13, 
-                        fontStyle: FontStyle.italic
+                        color: Colors.white.withValues(alpha: 0.4),
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                     _AuthorButton(
@@ -416,10 +539,20 @@ class _PostCardState extends State<PostCard> {
                       accentFill: chipBackground,
                       accentBorder: chipBorder,
                       onTap: () {
+                        if (isInstantTutorMode) {
+                          AccessController.guard(
+                            context,
+                            capability: AppCapability.viewFullProfile,
+                          );
+                          return;
+                        }
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => ProfileView(userId: widget.authorId, showBack: true),
+                            builder: (_) => ProfileView(
+                              userId: widget.authorId,
+                              showBack: true,
+                            ),
                           ),
                         );
                       },
@@ -433,18 +566,32 @@ class _PostCardState extends State<PostCard> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: PressableScale(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FullScreenMediaViewer(url: widget.attachmentUrl!, isVideo: _isVideo, videoController: _videoController))),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FullScreenMediaViewer(
+                      url: widget.attachmentUrl!,
+                      isVideo: _isVideo,
+                      videoController: _videoController,
+                    ),
+                  ),
+                ),
                 borderRadius: BorderRadius.circular(16),
                 pressedScale: 0.98,
                 child: Hero(
-                  tag: widget.postId, 
+                  tag: widget.postId,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16), 
+                    borderRadius: BorderRadius.circular(16),
                     child: AspectRatio(
-                      aspectRatio: 16 / 9, 
-                      child: _isVideo ? _buildVideoPlayer() : Image.network(widget.attachmentUrl!, fit: BoxFit.cover)
-                    )
-                  )
+                      aspectRatio: 16 / 9,
+                      child: _isVideo
+                          ? _buildVideoPlayer()
+                          : Image.network(
+                              widget.attachmentUrl!,
+                              fit: BoxFit.cover,
+                            ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -455,22 +602,30 @@ class _PostCardState extends State<PostCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 ActionIconButton(
-                  icon: _hasReacted ? Icons.auto_awesome : Icons.auto_awesome_outlined, 
-                  label: "Helpful (${widget.likes})", 
-                  color: _hasReacted ? tealAccent : Colors.white54, 
+                  icon: _hasReacted
+                      ? Icons.auto_awesome
+                      : Icons.auto_awesome_outlined,
+                  label: "Helpful (${widget.likes})",
+                  color: _hasReacted ? tealAccent : Colors.white54,
+                  enabled: !isInstantTutorMode,
                   backgroundColor: chipBackground,
-                  onTap: _handleHelpful
+                  onTap: _handleHelpful,
                 ),
                 ActionIconButton(
-                  icon: Icons.chat_bubble_rounded, 
-                  label: widget.comments.toString(), 
+                  icon: Icons.chat_bubble_rounded,
+                  label: widget.comments.toString(),
                   backgroundColor: chipBackground,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => QuestionDetailView(postId: widget.postId)))
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => QuestionDetailView(postId: widget.postId),
+                    ),
+                  ),
                 ),
                 ActionIconButton(
-                  icon: Icons.person_search_rounded, 
-                  label: "Tutor", 
-                  color: tealAccent, 
+                  icon: Icons.person_search_rounded,
+                  label: "Tutor",
+                  color: tealAccent,
                   backgroundColor: chipBackground,
                   onTap: () => Navigator.push(
                     context,
@@ -481,17 +636,23 @@ class _PostCardState extends State<PostCard> {
                         postId: widget.postId,
                       ),
                     ),
-                  )
+                  ),
                 ),
                 ActionIconButton(
-                  icon: Icons.repeat, 
-                  label: "Repost", 
+                  icon: Icons.repeat,
+                  label: "Repost",
+                  enabled: !isInstantTutorMode,
                   backgroundColor: chipBackground,
-                  onTap: _showRepostDialog
+                  onTap: isInstantTutorMode
+                      ? () => AccessController.guard(
+                          context,
+                          capability: AppCapability.repostQuestion,
+                        )
+                      : _showRepostDialog,
                 ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
@@ -499,7 +660,9 @@ class _PostCardState extends State<PostCard> {
 
   Widget _buildVideoPlayer() {
     if (_videoController == null || !_videoController!.value.isInitialized) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF00C09E)));
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF00C09E)),
+      );
     }
     return VideoPlayer(_videoController!);
   }
@@ -511,7 +674,8 @@ class _PostCardState extends State<PostCard> {
     final String originalQuestion = (data['question'] ?? '').toString();
     final String? originalAttachment = data['attachmentUrl'] as String?;
     final String? originalLink = data['link'] as String?;
-    final bool hasAttachment = originalAttachment != null && originalAttachment.isNotEmpty;
+    final bool hasAttachment =
+        originalAttachment != null && originalAttachment.isNotEmpty;
     final bool hasLink = originalLink != null && originalLink.isNotEmpty;
 
     return Container(
@@ -534,13 +698,21 @@ class _PostCardState extends State<PostCard> {
                 ),
                 child: const Text(
                   "Repost",
-                  style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
               Text(
                 originalSubject,
-                style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -549,7 +721,11 @@ class _PostCardState extends State<PostCard> {
             originalQuestion.isEmpty ? "Original post" : originalQuestion,
             maxLines: 4,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              height: 1.4,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -561,7 +737,8 @@ class _PostCardState extends State<PostCard> {
             Wrap(
               spacing: 6,
               children: [
-                if (hasAttachment) _repostPill(Icons.attachment_rounded, "Attachment"),
+                if (hasAttachment)
+                  _repostPill(Icons.attachment_rounded, "Attachment"),
                 if (hasLink) _repostPill(Icons.link, "Link"),
               ],
             ),
@@ -583,7 +760,10 @@ class _PostCardState extends State<PostCard> {
         children: [
           Icon(icon, color: Colors.white54, size: 12),
           const SizedBox(width: 4),
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white54, fontSize: 10),
+          ),
         ],
       ),
     );
@@ -645,7 +825,11 @@ class _AuthorButtonState extends State<_AuthorButton> {
 class _OptionsButton extends StatefulWidget {
   final VoidCallback onDelete, onReport;
   final bool isAuthor;
-  const _OptionsButton({required this.onDelete, required this.onReport, required this.isAuthor});
+  const _OptionsButton({
+    required this.onDelete,
+    required this.onReport,
+    required this.isAuthor,
+  });
 
   @override
   State<_OptionsButton> createState() => _OptionsButtonState();
@@ -665,11 +849,39 @@ class _OptionsButtonState extends State<_OptionsButton> {
         child: PopupMenuButton(
           icon: const Icon(Icons.more_vert, color: Colors.white38, size: 20),
           color: const Color(0xFF1E243A),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
           itemBuilder: (context) => [
             if (widget.isAuthor)
-              PopupMenuItem(onTap: widget.onDelete, child: const Row(children: [Icon(Icons.delete_outline, color: Colors.redAccent, size: 18), SizedBox(width: 10), Text("Delete", style: TextStyle(color: Colors.redAccent))])),
-            PopupMenuItem(onTap: widget.onReport, child: const Row(children: [Icon(Icons.report_gmailerrorred_rounded, color: Colors.white70, size: 18), SizedBox(width: 10), Text("Report", style: TextStyle(color: Colors.white70))])),
+              PopupMenuItem(
+                onTap: widget.onDelete,
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.delete_outline,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
+                    SizedBox(width: 10),
+                    Text("Delete", style: TextStyle(color: Colors.redAccent)),
+                  ],
+                ),
+              ),
+            PopupMenuItem(
+              onTap: widget.onReport,
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.report_gmailerrorred_rounded,
+                    color: Colors.white70,
+                    size: 18,
+                  ),
+                  SizedBox(width: 10),
+                  Text("Report", style: TextStyle(color: Colors.white70)),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -682,19 +894,30 @@ class FullScreenMediaViewer extends StatelessWidget {
   final bool isVideo;
   final VideoPlayerController? videoController;
 
-  const FullScreenMediaViewer({super.key, required this.url, required this.isVideo, this.videoController});
+  const FullScreenMediaViewer({
+    super.key,
+    required this.url,
+    required this.isVideo,
+    this.videoController,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(backgroundColor: Colors.transparent, iconTheme: const IconThemeData(color: Colors.white)),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
       body: Center(
         child: Hero(
           tag: url,
-          child: isVideo 
-            ? AspectRatio(aspectRatio: videoController!.value.aspectRatio, child: VideoPlayer(videoController!))
-            : Image.network(url),
+          child: isVideo
+              ? AspectRatio(
+                  aspectRatio: videoController!.value.aspectRatio,
+                  child: VideoPlayer(videoController!),
+                )
+              : Image.network(url),
         ),
       ),
     );
@@ -705,6 +928,7 @@ class ActionIconButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
+  final bool enabled;
   final Color? backgroundColor;
   final VoidCallback onTap;
 
@@ -713,13 +937,17 @@ class ActionIconButton extends StatelessWidget {
     required this.icon,
     required this.label,
     this.color = Colors.white54,
+    this.enabled = true,
     this.backgroundColor,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final Color fill = backgroundColor ?? color.withValues(alpha: 25);
+    final Color displayColor = enabled ? color : Colors.white30;
+    final Color fill = enabled
+        ? (backgroundColor ?? color.withValues(alpha: 25))
+        : Colors.white.withValues(alpha: 0.04);
     return PressableScale(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -732,11 +960,18 @@ class ActionIconButton extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(icon, color: color, size: 18),
+            Icon(icon, color: displayColor, size: 18),
             if (label.isNotEmpty) ...[
               const SizedBox(width: 6),
-              Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
-            ]
+              Text(
+                label,
+                style: TextStyle(
+                  color: displayColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/services/app_analytics_service.dart';
+import 'package:seshly/services/app_error_service.dart';
 import 'package:seshly/services/sesh_ai_api.dart';
 
 class AiTutorHelpView extends StatefulWidget {
@@ -69,10 +71,28 @@ class _AiTutorHelpViewState extends State<AiTutorHelpView> {
           ],
         ),
       );
-    } catch (error) {
+      await AppAnalyticsService.instance.trackAiUsage(
+        action: 'question_help',
+        status: 'success',
+      );
+    } catch (error, stackTrace) {
+      await AppAnalyticsService.instance.trackAiUsage(
+        action: 'question_help',
+        status: 'error',
+      );
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'ai',
+        source: 'question_help',
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sesh AI failed: $error')),
+      AppErrorService.instance.showSnackBar(
+        context,
+        AppErrorService.instance.userMessageFor(
+          error,
+          fallback: 'Sesh AI failed. Please try again.',
+        ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);

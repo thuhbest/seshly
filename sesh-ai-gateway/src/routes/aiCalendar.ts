@@ -124,6 +124,7 @@ async function callPolicyGate(req: Request, payload: PolicyGateInput): Promise<P
     headers: {
       'content-type': 'application/json',
       authorization: authHeader,
+      'x-firebase-appcheck': req.header('x-firebase-appcheck') || req.header('x-firebase-app-check') || '',
     },
     body: JSON.stringify(payload),
   });
@@ -208,7 +209,7 @@ router.post('/ai/calendar/importTimetable', async (req, res) => {
   }
 
   const tableRows = buildTablePayload(extracted.pages);
-  const snippet = extracted.fullText.slice(0, 2000);
+  const snippet = extracted.fullText.slice(0, 600);
 
   let policy: PolicyGateResponse;
   try {
@@ -260,17 +261,31 @@ router.post('/ai/calendar/importTimetable', async (req, res) => {
     textSnippet: snippet,
   };
 
-  const modelOutput = await callTextModel({
-    provider,
-    model,
-    jsonOnly: true,
-    temperature: 0.2,
-    maxTokens,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: JSON.stringify(userPayload) },
-    ],
-  });
+  let modelOutput: string;
+  try {
+    modelOutput = await callTextModel({
+      provider,
+      model,
+      jsonOnly: true,
+      temperature: 0.2,
+      maxTokens,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: JSON.stringify(userPayload) },
+      ],
+    });
+  } catch (error) {
+    const errText = String(error ?? '');
+    if (errText.includes('insufficient_quota') || errText.includes('OpenAI error 429')) {
+      res.status(429).json({
+        error: 'provider_quota',
+        message: 'AI quota exceeded. Please try again later.',
+      });
+      return;
+    }
+    res.status(502).json({ error: 'model_unavailable', message: 'AI model unavailable.' });
+    return;
+  }
 
   const parsed = safeJsonParse(modelOutput) ?? {};
   const normalized = normalizeEvents(parsed.events);

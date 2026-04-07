@@ -108,15 +108,37 @@ class _SessionWrapViewState extends State<SessionWrapView> {
           _sectionHeader("Individual Student Packs"),
           const SizedBox(height: 20),
           Expanded(
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 1.2,
-                crossAxisSpacing: 20,
-                mainAxisSpacing: 20,
-              ),
-              itemCount: 4,
-              itemBuilder: (context, index) => _buildStudentPackCard(index),
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('sessions')
+                  .doc(_sessionId)
+                  .collection('sessionPacks')
+                  .orderBy('generatedAt', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return GridView.count(
+                    crossAxisCount: 2,
+                    childAspectRatio: 1.2,
+                    crossAxisSpacing: 20,
+                    mainAxisSpacing: 20,
+                    children: const [
+                      _PendingPackCard(label: 'Session pack queue is empty'),
+                    ],
+                  );
+                }
+                final docs = snapshot.data!.docs;
+                return GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 1.2,
+                    crossAxisSpacing: 20,
+                    mainAxisSpacing: 20,
+                  ),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) => _buildPackCard(docs[index].data()),
+                );
+              },
             ),
           ),
           if (_lastSummaryUrl != null) ...[
@@ -128,8 +150,12 @@ class _SessionWrapViewState extends State<SessionWrapView> {
     );
   }
 
-  Widget _buildStudentPackCard(int index) {
-    final names = ["Luko", "Thuhbest", "Sarah", "Mike"];
+  Widget _buildPackCard(Map<String, dynamic> data) {
+    final studentId = (data['studentId'] ?? '').toString();
+    final title = studentId.isEmpty ? 'Group pack' : 'Student $studentId';
+    final generationStatus = (data['generationStatus'] ?? 'queued').toString();
+    final summary = (data['summary'] ?? 'Pack generated from the classroom memory pipeline.').toString();
+    final artifactKind = (data['artifactKind'] ?? 'notes_only').toString();
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
@@ -141,8 +167,12 @@ class _SessionWrapViewState extends State<SessionWrapView> {
           ListTile(
             dense: true,
             leading: CircleAvatar(backgroundColor: tealAccent, radius: 12),
-            title: Text(names[index], style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-            trailing: Icon(Icons.check_circle, color: tealAccent, size: 18),
+            title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+            trailing: Icon(
+              generationStatus == 'completed' ? Icons.check_circle : Icons.hourglass_top_rounded,
+              color: generationStatus == 'completed' ? tealAccent : Colors.orangeAccent,
+              size: 18,
+            ),
           ),
           Expanded(
             child: Container(
@@ -151,7 +181,15 @@ class _SessionWrapViewState extends State<SessionWrapView> {
                 color: backgroundColor.withValues(alpha: 128),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Center(child: Icon(Icons.article_outlined, color: Colors.white10, size: 32)),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Text(
+                  summary,
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white60, fontSize: 11),
+                ),
+              ),
             ),
           ),
           Padding(
@@ -159,8 +197,11 @@ class _SessionWrapViewState extends State<SessionWrapView> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text("3 Misconceptions identified", style: TextStyle(color: Colors.white38, fontSize: 10)),
-                Text("Ready", style: TextStyle(color: tealAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                Text(artifactKind, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                Text(
+                  generationStatus,
+                  style: TextStyle(color: tealAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
               ],
             ),
           )
@@ -393,6 +434,33 @@ class _SessionWrapViewState extends State<SessionWrapView> {
           border: Border.all(color: isSelected ? tealAccent : Colors.white12),
         ),
         child: Text(label, style: TextStyle(color: isSelected ? backgroundColor : Colors.white60, fontWeight: FontWeight.bold, fontSize: 12)),
+      ),
+    );
+  }
+}
+
+class _PendingPackCard extends StatelessWidget {
+  const _PendingPackCard({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E243A),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white54),
+          ),
+        ),
       ),
     );
   }

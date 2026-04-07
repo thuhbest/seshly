@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:seshly/services/app_error_service.dart';
+import 'package:seshly/services/community_backend_service.dart';
 import '../view/friends_view.dart'; // Import ScaleButton
 
 class FriendRequestsDialog extends StatefulWidget {
@@ -15,6 +17,7 @@ class FriendRequestsDialog extends StatefulWidget {
 class _FriendRequestsDialogState extends State<FriendRequestsDialog> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final CommunityBackendService _backend = CommunityBackendService.instance;
   late Stream<QuerySnapshot> _friendRequestsStream;
 
   @override
@@ -87,31 +90,15 @@ class _FriendRequestsDialogState extends State<FriendRequestsDialog> {
     }
   }
 
-  Future<void> _handleFriendRequest(String requestId, String fromUserId, bool accept) async {
+  Future<void> _handleFriendRequest(String requestId, bool accept) async {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) return;
 
-      // Update the request status
-      await _firestore.collection('friend_requests').doc(requestId).update({
-        'status': accept ? 'accepted' : 'rejected',
-        'respondedAt': FieldValue.serverTimestamp(),
-      });
-
-      // If accepted, add to friends collection
-      if (accept) {
-        final currentUserId = currentUser.uid;
-        
-        // Add to user's friends list
-        await _firestore.collection('users').doc(currentUserId).collection('friends').doc(fromUserId).set({
-          'addedAt': FieldValue.serverTimestamp(),
-        });
-
-        // Add current user to requester's friends list
-        await _firestore.collection('users').doc(fromUserId).collection('friends').doc(currentUserId).set({
-          'addedAt': FieldValue.serverTimestamp(),
-        });
-      }
+      await _backend.respondToFriendRequest(
+        requestId: requestId,
+        action: accept ? 'accept' : 'decline',
+      );
 
       // Call the callback to refresh the friend request count
       if (widget.onRequestHandled != null) {
@@ -127,14 +114,19 @@ class _FriendRequestsDialogState extends State<FriendRequestsDialog> {
           duration: const Duration(seconds: 2),
         ),
       );
-    } catch (e) {
-      debugPrint('Error handling friend request: $e');
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'community',
+        source: 'respond_friend_request',
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to ${accept ? 'accept' : 'decline'} friend request'),
-          backgroundColor: Colors.redAccent,
-          duration: const Duration(seconds: 2),
+      AppErrorService.instance.showSnackBar(
+        context,
+        AppErrorService.instance.userMessageFor(
+          error,
+          fallback: 'Failed to ${accept ? 'accept' : 'decline'} friend request.',
         ),
       );
     }
@@ -241,7 +233,7 @@ class _FriendRequestsDialogState extends State<FriendRequestsDialog> {
                 children: [
                   Expanded(
                     child: ScaleButton(
-                      onTap: () => _handleFriendRequest(requestId, requestData['fromUserID'], true),
+                      onTap: () => _handleFriendRequest(requestId, true),
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
@@ -269,7 +261,7 @@ class _FriendRequestsDialogState extends State<FriendRequestsDialog> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: ScaleButton(
-                      onTap: () => _handleFriendRequest(requestId, requestData['fromUserID'], false),
+                      onTap: () => _handleFriendRequest(requestId, false),
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
@@ -414,9 +406,9 @@ class _FriendRequestsDialogState extends State<FriendRequestsDialog> {
                           size: 48,
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          'Error: ${snapshot.error}',
-                          style: const TextStyle(color: Colors.white54),
+                        const Text(
+                          'Could not load friend requests right now.',
+                          style: TextStyle(color: Colors.white54),
                         ),
                       ],
                     ),
