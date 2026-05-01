@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:seshly/access/access_controller.dart';
+import 'package:seshly/access/tutor_access_policy.dart';
+import 'package:seshly/services/tutoring_backend_service.dart';
+import 'package:seshly/services/tutor_organization_service.dart';
 
 class TutorApplicationView extends StatefulWidget {
   const TutorApplicationView({super.key});
@@ -16,16 +20,20 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
   final TextEditingController _minorSubject2 = TextEditingController();
   final TextEditingController _rateController = TextEditingController();
   final TextEditingController _highestLevelController = TextEditingController();
-  final TextEditingController _qualificationController = TextEditingController();
+  final TextEditingController _qualificationController =
+      TextEditingController();
   final TextEditingController _institutionController = TextEditingController();
   final TextEditingController _fieldController = TextEditingController();
   final TextEditingController _gradYearController = TextEditingController();
   final TextEditingController _yearsExpController = TextEditingController();
-  final TextEditingController _studentsTaughtController = TextEditingController();
-  final TextEditingController _experienceSummaryController = TextEditingController();
+  final TextEditingController _studentsTaughtController =
+      TextEditingController();
+  final TextEditingController _experienceSummaryController =
+      TextEditingController();
   final TextEditingController _languagesController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
-  final TextEditingController _availabilityWindowController = TextEditingController();
+  final TextEditingController _availabilityWindowController =
+      TextEditingController();
   final TextEditingController _orgNameController = TextEditingController();
   final TextEditingController _orgRoleController = TextEditingController();
   final TextEditingController _orgWebsiteController = TextEditingController();
@@ -44,12 +52,34 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
   String _tutorType = "Individual";
   String _teachingMode = "Online";
   String? _status;
+  String _tutoringEligibilityStatus = 'ineligible';
+  String _payoutOnboardingStatus = 'not_started';
+  bool _adminApproval = false;
+  String? _rejectionReason;
+  String? _suspensionReason;
   final List<String> _availabilityDays = [];
 
-  final List<String> _audiences = const ["Varsity Students", "High School", "Both"];
-  final List<String> _tutorTypes = const ["Individual", "Organization", "Family", "Agency"];
+  final List<String> _audiences = const [
+    "Varsity Students",
+    "High School",
+    "Both",
+  ];
+  final List<String> _tutorTypes = const [
+    "Individual",
+    "Organization",
+    "Family",
+    "Agency",
+  ];
   final List<String> _teachingModes = const ["Online", "In-person", "Both"];
-  final List<String> _days = const ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  final List<String> _days = const [
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+    "Sat",
+    "Sun",
+  ];
 
   @override
   void initState() {
@@ -100,15 +130,21 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
           .doc(user.uid)
           .get();
 
-      Map<String, dynamic>? data;
-      if (appDoc.exists) {
-        data = appDoc.data();
-      } else {
-        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        data = (userDoc.data()?['tutorProfile'] as Map<String, dynamic>?) ?? {};
-      }
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final userData = userDoc.data() ?? <String, dynamic>{};
+      final tutorProfile =
+          userData['tutorProfile'] as Map<String, dynamic>? ?? {};
+      final data = appDoc.exists
+          ? {
+              ...tutorProfile,
+              ...(appDoc.data() ?? <String, dynamic>{}),
+            }
+          : tutorProfile;
 
-      if (data != null && data.isNotEmpty) {
+      if (data.isNotEmpty) {
         final mainSubjects = List<String>.from(data['mainSubjects'] ?? []);
         final minorSubjects = List<String>.from(data['minorSubjects'] ?? []);
         if (mainSubjects.isNotEmpty) _mainSubject1.text = mainSubjects[0];
@@ -118,13 +154,16 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
 
         _rateController.text = (data['baseRate'] ?? "").toString();
         _highestLevelController.text = (data['highestLevel'] ?? "").toString();
-        _qualificationController.text = (data['qualification'] ?? "").toString();
+        _qualificationController.text = (data['qualification'] ?? "")
+            .toString();
         _institutionController.text = (data['institution'] ?? "").toString();
         _fieldController.text = (data['fieldOfStudy'] ?? "").toString();
         _gradYearController.text = (data['graduationYear'] ?? "").toString();
         _yearsExpController.text = (data['yearsExperience'] ?? "").toString();
-        _studentsTaughtController.text = (data['studentsTaught'] ?? "").toString();
-        _experienceSummaryController.text = (data['experienceSummary'] ?? "").toString();
+        _studentsTaughtController.text = (data['studentsTaught'] ?? "")
+            .toString();
+        _experienceSummaryController.text = (data['experienceSummary'] ?? "")
+            .toString();
         final languagesRaw = data['languages'];
         if (languagesRaw is List) {
           _languagesController.text = languagesRaw.join(', ');
@@ -132,15 +171,18 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
           _languagesController.text = languagesRaw;
         }
         _locationController.text = (data['location'] ?? "").toString();
-        _availabilityWindowController.text = (data['availabilityWindow'] ?? "").toString();
+        _availabilityWindowController.text = (data['availabilityWindow'] ?? "")
+            .toString();
         _orgNameController.text = (data['organizationName'] ?? "").toString();
         _orgRoleController.text = (data['organizationRole'] ?? "").toString();
-        _orgWebsiteController.text = (data['organizationWebsite'] ?? "").toString();
+        _orgWebsiteController.text = (data['organizationWebsite'] ?? "")
+            .toString();
         _idNumberController.text = (data['idNumber'] ?? "").toString();
         _proofLinkController.text = (data['verificationLink'] ?? "").toString();
         _referenceController.text = (data['referenceContact'] ?? "").toString();
 
-        _targetAudience = (data['targetAudience'] ?? _targetAudience).toString();
+        _targetAudience = (data['targetAudience'] ?? _targetAudience)
+            .toString();
         _tutorType = (data['tutorType'] ?? _tutorType).toString();
         _teachingMode = (data['teachingMode'] ?? _teachingMode).toString();
         final availabilityRaw = data['availabilityDays'];
@@ -148,17 +190,81 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
         if (availabilityRaw is List) {
           _availabilityDays.addAll(List<String>.from(availabilityRaw));
         }
-        _status = (data['status'] ?? _status).toString();
-        if (_status == 'pending') {
-          await _promotePendingTutor(user.uid);
-          _status = 'active';
-        }
+
+        _acceptFee = data['acceptFee'] == true;
+        _acceptConduct = data['acceptConduct'] == true;
+        _confirmAccuracy = data['confirmAccuracy'] == true;
+        _consentVerification = data['consentVerification'] == true;
+
       }
+      _status = _resolveTutorApplicationStatus(data, userData);
+      _tutoringEligibilityStatus = _resolveTutoringEligibilityStatus(
+        data,
+        userData,
+      );
+      _payoutOnboardingStatus = (userData['payoutOnboardingStatus'] ??
+              data['payoutOnboardingStatus'] ??
+              _payoutOnboardingStatus)
+          .toString();
+      _adminApproval =
+          userData['adminApproval'] == true || data['adminApproval'] == true;
+      _rejectionReason = _readOptionalText(
+        data['rejectionReason'] ?? userData['rejectionReason'],
+      );
+      _suspensionReason = _readOptionalText(
+        data['suspensionReason'] ?? userData['suspensionReason'],
+      );
     } catch (_) {
       _showSnack("Could not load tutor profile.");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  String _resolveTutorApplicationStatus(
+    Map<String, dynamic> applicationData,
+    Map<String, dynamic> userData,
+  ) {
+    final String explicit = (applicationData['tutorApplicationStatus'] ??
+            userData['tutorApplicationStatus'] ??
+            applicationData['status'] ??
+            '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    if (explicit.isNotEmpty) {
+      return explicit == 'draft' ? '' : explicit;
+    }
+
+    final String legacy =
+        (userData['tutorStatus'] ?? applicationData['status'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+    if (legacy == 'approved' || legacy == 'active') return 'approved';
+    if (legacy == 'pending') return 'submitted';
+    if (legacy == 'rejected') return 'rejected';
+    if (legacy == 'suspended') return 'suspended';
+    return '';
+  }
+
+  String _resolveTutoringEligibilityStatus(
+    Map<String, dynamic> applicationData,
+    Map<String, dynamic> userData,
+  ) {
+    final String explicit = (userData['tutoringEligibilityStatus'] ??
+            applicationData['tutoringEligibilityStatus'] ??
+            '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    if (explicit.isNotEmpty) return explicit;
+    return _status == 'approved' ? 'eligible' : 'ineligible';
+  }
+
+  String? _readOptionalText(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? null : text;
   }
 
   int _parseRate(String raw) {
@@ -229,7 +335,8 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
       return;
     }
 
-    if (_availabilityDays.isEmpty || _availabilityWindowController.text.trim().isEmpty) {
+    if (_availabilityDays.isEmpty ||
+        _availabilityWindowController.text.trim().isEmpty) {
       _showSnack("Add your availability days and time window.");
       return;
     }
@@ -241,12 +348,12 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
 
     setState(() => _isSubmitting = true);
     try {
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      final userData = userDoc.data() ?? {};
+      final organizationId = TutorOrganizationService.deriveOrganizationId(
+        tutorType: _tutorType,
+        organizationName: _orgNameController.text.trim(),
+        website: _orgWebsiteController.text.trim(),
+      );
       final data = {
-        'userId': user.uid,
-        'fullName': userData['fullName'] ?? user.displayName ?? "Student",
-        'email': user.email ?? "",
         'mainSubjects': mainSubjects,
         'minorSubjects': minorSubjects,
         'baseRate': baseRate,
@@ -254,6 +361,7 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
         'targetAudience': _targetAudience,
         'highestLevel': highestLevel,
         'tutorType': _tutorType,
+        'organizationId': organizationId,
         'organizationName': _orgNameController.text.trim(),
         'organizationRole': _orgRoleController.text.trim(),
         'organizationWebsite': _orgWebsiteController.text.trim(),
@@ -276,43 +384,31 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
         'acceptConduct': _acceptConduct,
         'confirmAccuracy': _confirmAccuracy,
         'consentVerification': _consentVerification,
-        'status': 'active',
-        'updatedAt': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'activatedAt': FieldValue.serverTimestamp(),
       };
 
-      await FirebaseFirestore.instance
-          .collection('tutor_applications')
-          .doc(user.uid)
-          .set(data, SetOptions(merge: true));
-
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'tutorProfile': {
-          'mainSubjects': mainSubjects,
-          'minorSubjects': minorSubjects,
-          'baseRate': baseRate,
-          'displayRate': _displayRate(baseRate),
-          'targetAudience': _targetAudience,
-          'highestLevel': highestLevel,
-          'tutorType': _tutorType,
-          'organizationName': _orgNameController.text.trim(),
-          'teachingMode': _teachingMode,
-          'languages': _parseList(_languagesController.text),
-          'location': _locationController.text.trim(),
-          'availabilityDays': _availabilityDays,
-          'availabilityWindow': _availabilityWindowController.text.trim(),
-          'status': 'active',
-        },
-        'tutorStatus': 'active',
-        'tutorSubjects': [...mainSubjects, ...minorSubjects],
-        'tutorActiveAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      final result = await TutoringBackendService().submitTutorApplication(data);
 
       if (mounted) {
-        setState(() => _status = 'active');
-        _showSnack("You're now a tutor. Go online to appear in search.");
+        setState(() {
+          _status = (result['tutorApplicationStatus'] ?? 'submitted')
+              .toString();
+          _tutoringEligibilityStatus =
+              (result['tutoringEligibilityStatus'] ?? 'ineligible')
+                  .toString();
+          _payoutOnboardingStatus =
+              (result['payoutOnboardingStatus'] ?? 'not_started').toString();
+          _adminApproval = result['adminApproval'] == true;
+          if (_status != 'rejected') _rejectionReason = null;
+          if (_status != 'suspended') _suspensionReason = null;
+        });
+        _showSnack(
+          _adminApproval
+              ? "Application updated. Your tutor account remains approved."
+              : "Application submitted for backend review.",
+        );
       }
+    } on TutoringBackendException catch (error) {
+      _showSnack(error.message);
     } catch (_) {
       _showSnack("Could not submit application.");
     } finally {
@@ -322,25 +418,9 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  Future<void> _promotePendingTutor(String userId) async {
-    await FirebaseFirestore.instance
-        .collection('tutor_applications')
-        .doc(userId)
-        .set({
-      'status': 'active',
-      'activatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    await FirebaseFirestore.instance.collection('users').doc(userId).set({
-      'tutorStatus': 'active',
-      'tutorActiveAt': FieldValue.serverTimestamp(),
-      'tutorProfile': {
-        'status': 'active',
-      },
-    }, SetOptions(merge: true));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -348,6 +428,17 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
     const Color backgroundColor = Color(0xFF0F142B);
     const Color cardColor = Color(0xFF1E243A);
     const Color tealAccent = Color(0xFF00C09E);
+    final access = TutorAccessPolicy.evaluate(
+      AccessController.session(context),
+      surface: TutorAccessSurface.application,
+    );
+
+    if (!access.allowed) {
+      return TutorAccessGate(
+        title: access.title,
+        description: access.description,
+      );
+    }
 
     final int baseRate = _parseRate(_rateController.text);
     final int displayRate = baseRate > 0 ? _displayRate(baseRate) : 0;
@@ -361,7 +452,10 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("Apply as a Tutor", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          "Apply as a Tutor",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: tealAccent))
@@ -370,8 +464,22 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (_status != null) ...[
-                    _infoBanner("Application status: ${_status!.toUpperCase()}"),
+                  if (_status != null && _status!.isNotEmpty) ...[
+                    _infoBanner(
+                      "Application status: ${_status!.toUpperCase()}",
+                    ),
+                    const SizedBox(height: 10),
+                    _infoBanner(
+                      "Tutoring eligibility: ${_tutoringEligibilityStatus.toUpperCase()} • Payout readiness: ${_payoutOnboardingStatus.toUpperCase()}",
+                    ),
+                    if (_rejectionReason != null) ...[
+                      const SizedBox(height: 10),
+                      _infoBanner("Rejection reason: $_rejectionReason"),
+                    ],
+                    if (_suspensionReason != null) ...[
+                      const SizedBox(height: 10),
+                      _infoBanner("Suspension reason: $_suspensionReason"),
+                    ],
                     const SizedBox(height: 14),
                   ],
                   _infoBanner(
@@ -379,16 +487,26 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
                   ),
                   const SizedBox(height: 10),
                   _infoBanner(
-                    "You become a tutor immediately after submitting. Your profile appears to students only while you're online.",
+                    _adminApproval
+                        ? "Your tutor approval is now backend-controlled. You can update application details here, but approval, eligibility, and payout readiness stay server-authoritative."
+                        : "Submitting sends your tutor application to backend review. You cannot appear in tutor search, accept tutoring, or receive payouts until approved server-side.",
                   ),
                   const SizedBox(height: 20),
                   _buildSectionTitle("Tutor type"),
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
-                    children: _tutorTypes.map((type) => _buildChip(type, type == _tutorType, () {
-                      setState(() => _tutorType = type);
-                    })).toList(),
+                    children: _tutorTypes
+                        .map(
+                          (type) => _buildChip(type, type == _tutorType, () {
+                            setState(() => _tutorType = type);
+                          }),
+                        )
+                        .toList(),
+                  ),
+                  const SizedBox(height: 10),
+                  _infoBanner(
+                    "Real organization accounts now live in Tutor Desk. Use this application to become an approved tutor first, then create or join a tutoring organization from the Organization Account section.",
                   ),
                   if (_tutorType != "Individual") ...[
                     const SizedBox(height: 14),
@@ -397,11 +515,20 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
                       cardColor,
                       child: Column(
                         children: [
-                          _buildInputField(_orgNameController, "Organization or family name"),
+                          _buildInputField(
+                            _orgNameController,
+                            "Organization or family name",
+                          ),
                           const SizedBox(height: 10),
-                          _buildInputField(_orgRoleController, "Your role or title"),
+                          _buildInputField(
+                            _orgRoleController,
+                            "Your role or title",
+                          ),
                           const SizedBox(height: 10),
-                          _buildInputField(_orgWebsiteController, "Website or social link"),
+                          _buildInputField(
+                            _orgWebsiteController,
+                            "Website or social link",
+                          ),
                         ],
                       ),
                     ),
@@ -414,17 +541,37 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
                       children: [
                         Row(
                           children: [
-                            Expanded(child: _buildInputField(_mainSubject1, "Main subject 1")),
+                            Expanded(
+                              child: _buildInputField(
+                                _mainSubject1,
+                                "Main subject 1",
+                              ),
+                            ),
                             const SizedBox(width: 12),
-                            Expanded(child: _buildInputField(_mainSubject2, "Main subject 2")),
+                            Expanded(
+                              child: _buildInputField(
+                                _mainSubject2,
+                                "Main subject 2",
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 10),
                         Row(
                           children: [
-                            Expanded(child: _buildInputField(_minorSubject1, "Minor subject 1")),
+                            Expanded(
+                              child: _buildInputField(
+                                _minorSubject1,
+                                "Minor subject 1",
+                              ),
+                            ),
                             const SizedBox(width: 12),
-                            Expanded(child: _buildInputField(_minorSubject2, "Minor subject 2")),
+                            Expanded(
+                              child: _buildInputField(
+                                _minorSubject2,
+                                "Minor subject 2",
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -435,17 +582,24 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
-                    children: _audiences.map((audience) => _buildChip(
-                      audience,
-                      audience == _targetAudience,
-                      () => setState(() => _targetAudience = audience),
-                    )).toList(),
+                    children: _audiences
+                        .map(
+                          (audience) => _buildChip(
+                            audience,
+                            audience == _targetAudience,
+                            () => setState(() => _targetAudience = audience),
+                          ),
+                        )
+                        .toList(),
                   ),
                   const SizedBox(height: 16),
                   _buildSectionTitle("Highest level you can tutor"),
                   _buildInputRow(
                     cardColor,
-                    child: _buildInputField(_highestLevelController, "e.g. 3rd year statistics"),
+                    child: _buildInputField(
+                      _highestLevelController,
+                      "e.g. 3rd year statistics",
+                    ),
                   ),
                   const SizedBox(height: 20),
                   _buildSectionTitle("Qualifications"),
@@ -453,15 +607,29 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
                     cardColor,
                     child: Column(
                       children: [
-                        _buildInputField(_qualificationController, "Highest qualification"),
+                        _buildInputField(
+                          _qualificationController,
+                          "Highest qualification",
+                        ),
                         const SizedBox(height: 10),
                         _buildInputField(_institutionController, "Institution"),
                         const SizedBox(height: 10),
                         Row(
                           children: [
-                            Expanded(child: _buildInputField(_fieldController, "Field of study")),
+                            Expanded(
+                              child: _buildInputField(
+                                _fieldController,
+                                "Field of study",
+                              ),
+                            ),
                             const SizedBox(width: 12),
-                            Expanded(child: _buildInputField(_gradYearController, "Graduation year", keyboardType: TextInputType.number)),
+                            Expanded(
+                              child: _buildInputField(
+                                _gradYearController,
+                                "Graduation year",
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -475,13 +643,29 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
                       children: [
                         Row(
                           children: [
-                            Expanded(child: _buildInputField(_yearsExpController, "Years tutoring", keyboardType: TextInputType.number)),
+                            Expanded(
+                              child: _buildInputField(
+                                _yearsExpController,
+                                "Years tutoring",
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
                             const SizedBox(width: 12),
-                            Expanded(child: _buildInputField(_studentsTaughtController, "Learners helped", keyboardType: TextInputType.number)),
+                            Expanded(
+                              child: _buildInputField(
+                                _studentsTaughtController,
+                                "Learners helped",
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 10),
-                        _buildInputField(_experienceSummaryController, "Experience summary", maxLines: 3),
+                        _buildInputField(
+                          _experienceSummaryController,
+                          "Experience summary",
+                          maxLines: 3,
+                        ),
                       ],
                     ),
                   ),
@@ -490,23 +674,33 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
-                    children: _teachingModes.map((mode) => _buildChip(
-                      mode,
-                      mode == _teachingMode,
-                      () => setState(() => _teachingMode = mode),
-                    )).toList(),
+                    children: _teachingModes
+                        .map(
+                          (mode) => _buildChip(
+                            mode,
+                            mode == _teachingMode,
+                            () => setState(() => _teachingMode = mode),
+                          ),
+                        )
+                        .toList(),
                   ),
                   const SizedBox(height: 16),
                   _buildSectionTitle("Languages"),
                   _buildInputRow(
                     cardColor,
-                    child: _buildInputField(_languagesController, "English, isiZulu, Afrikaans"),
+                    child: _buildInputField(
+                      _languagesController,
+                      "English, isiZulu, Afrikaans",
+                    ),
                   ),
                   const SizedBox(height: 16),
                   _buildSectionTitle("Location / timezone"),
                   _buildInputRow(
                     cardColor,
-                    child: _buildInputField(_locationController, "e.g. Durban, SAST"),
+                    child: _buildInputField(
+                      _locationController,
+                      "e.g. Durban, SAST",
+                    ),
                   ),
                   const SizedBox(height: 16),
                   _buildSectionTitle("Availability"),
@@ -515,37 +709,43 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
                     runSpacing: 8,
                     children: _days.map((day) {
                       final bool selected = _availabilityDays.contains(day);
-                      return _buildChip(
-                        day,
-                        selected,
-                        () {
-                          setState(() {
-                            if (selected) {
-                              _availabilityDays.remove(day);
-                            } else {
-                              _availabilityDays.add(day);
-                            }
-                          });
-                        },
-                      );
+                      return _buildChip(day, selected, () {
+                        setState(() {
+                          if (selected) {
+                            _availabilityDays.remove(day);
+                          } else {
+                            _availabilityDays.add(day);
+                          }
+                        });
+                      });
                     }).toList(),
                   ),
                   const SizedBox(height: 10),
                   _buildInputRow(
                     cardColor,
-                    child: _buildInputField(_availabilityWindowController, "Time window e.g. 16:00 - 20:00"),
+                    child: _buildInputField(
+                      _availabilityWindowController,
+                      "Time window e.g. 16:00 - 20:00",
+                    ),
                   ),
                   const SizedBox(height: 20),
                   _buildSectionTitle("Rate per minute (base)"),
                   _buildInputRow(
                     cardColor,
-                    child: _buildInputField(_rateController, "e.g. 5", keyboardType: TextInputType.number),
+                    child: _buildInputField(
+                      _rateController,
+                      "e.g. 5",
+                      keyboardType: TextInputType.number,
+                    ),
                   ),
                   if (displayRate > 0) ...[
                     const SizedBox(height: 8),
                     Text(
                       "Students see: R$displayRate / min (20% platform fee included).",
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                   const SizedBox(height: 20),
@@ -554,11 +754,20 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
                     cardColor,
                     child: Column(
                       children: [
-                        _buildInputField(_idNumberController, "ID or passport number"),
+                        _buildInputField(
+                          _idNumberController,
+                          "ID or passport number",
+                        ),
                         const SizedBox(height: 10),
-                        _buildInputField(_proofLinkController, "Proof of qualification link"),
+                        _buildInputField(
+                          _proofLinkController,
+                          "Proof of qualification link",
+                        ),
                         const SizedBox(height: 10),
-                        _buildInputField(_referenceController, "Reference contact (email or phone)"),
+                        _buildInputField(
+                          _referenceController,
+                          "Reference contact (email or phone)",
+                        ),
                       ],
                     ),
                   ),
@@ -593,9 +802,17 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
                         backgroundColor: tealAccent,
                         foregroundColor: const Color(0xFF0F142B),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
-                      child: Text(_isSubmitting ? "Submitting..." : "Submit application"),
+                      child: Text(
+                        _isSubmitting
+                            ? "Submitting..."
+                            : _status == 'approved'
+                            ? "Update application"
+                            : "Submit application",
+                      ),
                     ),
                   ),
                 ],
@@ -613,7 +830,10 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
-      child: Text(text, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+      child: Text(
+        text,
+        style: const TextStyle(color: Colors.white70, fontSize: 12),
+      ),
     );
   }
 
@@ -622,7 +842,10 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         text,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -639,8 +862,12 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
     );
   }
 
-  Widget _buildInputField(TextEditingController controller, String hint,
-      {TextInputType? keyboardType, int maxLines = 1}) {
+  Widget _buildInputField(
+    TextEditingController controller,
+    String hint, {
+    TextInputType? keyboardType,
+    int maxLines = 1,
+  }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
@@ -660,9 +887,15 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF00C09E) : const Color(0xFF1E243A).withValues(alpha: 0.5),
+          color: selected
+              ? const Color(0xFF00C09E)
+              : const Color(0xFF1E243A).withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: selected ? const Color(0xFF00C09E) : Colors.white.withValues(alpha: 0.1)),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFF00C09E)
+                : Colors.white.withValues(alpha: 0.1),
+          ),
         ),
         child: Text(
           label,
@@ -676,7 +909,11 @@ class _TutorApplicationViewState extends State<TutorApplicationView> {
     );
   }
 
-  Widget _buildAgreementRow(String text, bool value, ValueChanged<bool> onChanged) {
+  Widget _buildAgreementRow(
+    String text,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),

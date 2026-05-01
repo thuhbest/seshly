@@ -6,11 +6,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
+import 'package:seshly/features/sesh/widgets/sesh_credit_widgets.dart';
+import 'package:seshly/services/app_error_service.dart';
+import 'package:seshly/services/community_backend_service.dart';
+import 'package:seshly/services/sesh_credit_service.dart';
+import 'package:seshly/services/study_vault_service.dart';
 import 'package:seshly/utils/image_picker_util.dart';
 
 enum NoteTool { pen, pencil, highlighter, eraser, text, move }
@@ -355,13 +362,18 @@ class _NoteEditorViewState extends State<NoteEditorView> {
   final TextEditingController _inlineTextController = TextEditingController();
   final FocusNode _inlineTextFocusNode = FocusNode();
   final SpeechToText _speech = SpeechToText();
+  final AudioRecorder _lectureRecorder = AudioRecorder();
+  final SeshCreditService _seshCreditService = SeshCreditService();
+  final CommunityBackendService _communityBackend =
+      CommunityBackendService.instance;
   NoteStroke? _activeStroke;
   bool _isLoading = true;
   bool _isSaving = false;
   bool _hasChanges = false;
   bool _allowPop = false;
   bool _isInlineEditing = false;
-  bool _isListening = false;
+  bool _isLectureRecording = false;
+  bool _isUnlockingLecture = false;
   bool _speechAvailable = false;
   bool _speechInitializing = false;
   bool _isDraggingAsset = false;
@@ -372,6 +384,8 @@ class _NoteEditorViewState extends State<NoteEditorView> {
   double _textFontSize = 18;
   String _noteTitle = 'Note';
   String _noteType = 'canvas';
+  String _noteMode = 'standard';
+  String _lectureStatus = 'Unlock lecture capture to turn this note into a recording workspace.';
   String? _pdfUrl;
   String? _pdfName;
   String? _folderTitle;
@@ -379,8 +393,15 @@ class _NoteEditorViewState extends State<NoteEditorView> {
   NoteTool _activeTool = NoteTool.pen;
   Color _activeColor = const Color(0xFF1F1F1F);
   double _strokeWidth = 3.0;
+  int _cachedSeshCreditBalance = SeshCreditService.welcomeCredits;
+  int _lectureTranscriptWordCount = 0;
   int? _editingTextIndex;
   Offset _inlineTextPosition = const Offset(40, 120);
+  String _lastSpeechText = '';
+  String _currentLectureTranscript = '';
+  DateTime? _lectureRecordingStartedAt;
+  final List<Map<String, dynamic>> _lectureSegments = [];
+  bool _lectureCaptureUnlocked = false;
 
   static const List<Color> _noteColors = [
     Color(0xFF1F1F1F),
@@ -417,6 +438,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     if (_speech.isListening) {
       _speech.stop();
     }
+    _lectureRecorder.dispose();
     _scrollController.dispose();
     _pdfController.dispose();
     super.dispose();
@@ -425,6 +447,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
   Future<void> _loadNote() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+    final balance = await _seshCreditService.ensureBootstrap();
     final folderRef = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -440,14 +463,29 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     final folderData = folderSnap.data();
     final data = noteSnap.data() ?? <String, dynamic>{};
     setState(() {
+      _cachedSeshCreditBalance = balance;
       _folderTitle = folderData?['title']?.toString();
       _noteTitle = (data['title'] ?? 'Note').toString();
       _noteType = (data['type'] ?? 'canvas').toString();
+      _noteMode = (data['noteMode'] ?? 'standard').toString();
+      _lectureCaptureUnlocked = data['lectureCaptureUnlocked'] == true;
+      _lectureStatus = (data['lectureStatus'] ?? '').toString().trim().isEmpty
+          ? (_lectureCaptureUnlocked
+              ? 'Lecture capture unlocked. Hit record when class starts.'
+              : 'Unlock lecture capture to turn this note into a recording workspace.')
+          : data['lectureStatus'].toString();
+      _lectureTranscriptWordCount = (data['lectureTranscriptWordCount'] as num?)?.toInt() ?? 0;
       _canvasHeight = (data['canvasHeight'] as num?)?.toDouble() ?? 1400;
       _canvasWidth = (data['canvasWidth'] as num?)?.toDouble() ?? 360;
       _pageSpacing = (data['pageSpacing'] as num?)?.toDouble() ?? 16;
       _pdfUrl = data['pdfUrl']?.toString();
       _pdfName = data['pdfName']?.toString();
+      _lectureSegments
+        ..clear()
+        ..addAll(
+          ((data['lectureSegments'] as List?) ?? [])
+              .map((entry) => Map<String, dynamic>.from(entry as Map)),
+        );
       _strokes
         ..clear()
         ..addAll(((data['strokes'] as List?) ?? []).map((e) => NoteStroke.fromMap(e as Map<String, dynamic>)));
@@ -484,6 +522,43 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     final cleaned = raw.trim().replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_');
     if (cleaned.isEmpty) return 'seshly_note';
     return cleaned;
+  }
+
+  int _countWords(String text) {
+    final cleaned = text.trim();
+    if (cleaned.isEmpty) return 0;
+    return cleaned.split(RegExp(r'\s+')).length;
+  }
+
+  String _formatDurationMs(int durationMs) {
+    final totalSeconds = (durationMs / 1000).round();
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _refreshCreditBalance() async {
+    final balance = await _seshCreditService.ensureBootstrap();
+    if (!mounted) return;
+    setState(() => _cachedSeshCreditBalance = balance);
+  }
+
+  Future<void> _openSeshCreditStore() async {
+    await showSeshCreditPurchaseSheet(
+      context: context,
+      currentBalance: _cachedSeshCreditBalance,
+      onPurchase: (bundle) async {
+        final nextBalance = await _seshCreditService.purchaseCredits(
+          credits: bundle.credits,
+          source: 'note_editor',
+        );
+        if (!mounted) return;
+        setState(() => _cachedSeshCreditBalance = nextBalance);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${bundle.credits} SeshCredits added. Balance: $nextBalance.')),
+        );
+      },
+    );
   }
 
   void _selectTool(NoteTool tool) {
@@ -542,11 +617,17 @@ class _NoteEditorViewState extends State<NoteEditorView> {
       await noteRef.update({
         'title': _noteTitle,
         'type': _noteType,
+        'noteMode': _noteMode,
         'canvasHeight': _canvasHeight,
         'canvasWidth': _canvasWidth,
         'pageSpacing': _pageSpacing,
         'pdfUrl': _pdfUrl,
         'pdfName': _pdfName,
+        'lectureCaptureUnlocked': _lectureCaptureUnlocked,
+        'lectureStatus': _lectureStatus,
+        'lectureSegments': _lectureSegments,
+        'lectureSegmentCount': _lectureSegments.length,
+        'lectureTranscriptWordCount': _lectureTranscriptWordCount,
         'strokes': _strokes.map((e) => e.toMap()).toList(),
         'texts': _texts.map((e) => e.toMap()).toList(),
         'images': _images.map((e) => e.toMap()).toList(),
@@ -797,14 +878,9 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     if (_speechInitializing) return false;
     setState(() => _speechInitializing = true);
     final available = await _speech.initialize(
-      onStatus: (status) {
-        if (status == 'notListening' && mounted) {
-          setState(() => _isListening = false);
-        }
-      },
+      onStatus: (_) {},
       onError: (_) {
         if (mounted) {
-          setState(() => _isListening = false);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Speech recognition error.')),
           );
@@ -825,28 +901,15 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     return available;
   }
 
-  Future<bool> _chargeForListening() async {
+  Future<bool> _canStartListening() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return false;
-    final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-    bool allowed = false;
-    await FirebaseFirestore.instance.runTransaction((transaction) async {
-      final snapshot = await transaction.get(userRef);
-      final data = snapshot.data() ?? <String, dynamic>{};
-      final int seshMinutes = (data['seshMinutes'] as num?)?.toInt() ?? 0;
-      if (seshMinutes < 1) {
-        allowed = false;
-        return;
-      }
-      transaction.update(userRef, {'seshMinutes': FieldValue.increment(-1)});
-      allowed = true;
-    });
-    if (!allowed && mounted) {
+    if (user != null) return true;
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You need at least 1 sesh to use voice notes.')),
+        const SnackBar(content: Text('Sign in to use lecture capture.')),
       );
     }
-    return allowed;
+    return false;
   }
 
   void _appendSpeechText(String text) {
@@ -861,30 +924,246 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     );
   }
 
-  Future<void> _toggleListening() async {
-    if (_isListening) {
-      await _speech.stop();
-      if (mounted) setState(() => _isListening = false);
+  void _handleSpeechResult(String transcript) {
+    final words = transcript.trim();
+    if (words.isEmpty) return;
+    if (words == _lastSpeechText) return;
+
+    String delta = words;
+    if (_lastSpeechText.isNotEmpty && words.startsWith(_lastSpeechText)) {
+      delta = words.substring(_lastSpeechText.length).trim();
+    }
+
+    _lastSpeechText = words;
+    if (delta.isEmpty) return;
+
+    _currentLectureTranscript = '$_currentLectureTranscript $delta'.trim();
+    _appendSpeechText(delta);
+  }
+
+  Future<bool> _ensureLectureCaptureUnlocked() async {
+    if (_lectureCaptureUnlocked) return true;
+    if (_isUnlockingLecture) return false;
+
+    await _refreshCreditBalance();
+    if (!mounted) return false;
+
+    final action = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: cardColor,
+        title: const Text('Unlock lecture capture', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This note can become a lecture studio: record the audio, attach segments to the note, and pull in live captions where the device supports them.',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.78)),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Cost: 1 SeshCredit. Current balance: $_cachedSeshCreditBalance.',
+              style: const TextStyle(color: Color(0xFF7CF1D6), fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'cancel'),
+            style: TextButton.styleFrom(foregroundColor: Colors.white54),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'buy'),
+            style: TextButton.styleFrom(foregroundColor: Colors.white70),
+            child: const Text('Buy credits'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'unlock'),
+            style: TextButton.styleFrom(foregroundColor: tealAccent),
+            child: const Text('Unlock now'),
+          ),
+        ],
+      ),
+    );
+
+    if (action == 'buy') {
+      await _openSeshCreditStore();
+      if (!mounted) return false;
+      return _ensureLectureCaptureUnlocked();
+    }
+    if (action != 'unlock') return false;
+
+    setState(() => _isUnlockingLecture = true);
+    try {
+      final nextBalance = await _seshCreditService.unlockLectureCapture(
+        folderId: widget.folderId,
+        noteId: widget.noteId,
+        noteTitle: _noteTitle,
+      );
+      if (!mounted) return false;
+      setState(() {
+        _lectureCaptureUnlocked = true;
+        _noteMode = 'lecture';
+        _cachedSeshCreditBalance = nextBalance;
+        _lectureStatus = 'Lecture capture unlocked. Hit record when class starts.';
+        _hasChanges = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lecture capture unlocked for this note.')),
+      );
+      return true;
+    } on SeshCreditException catch (error) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      return false;
+    } finally {
+      if (mounted) setState(() => _isUnlockingLecture = false);
+    }
+  }
+
+  Future<void> _startLectureRecording() async {
+    final allowed = await _canStartListening();
+    if (!allowed) return;
+    final unlocked = await _ensureLectureCaptureUnlocked();
+    if (!unlocked) return;
+
+    if (kIsWeb) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lecture audio capture is available in the app, not the web build.')),
+        );
+      }
       return;
     }
-    final ready = await _ensureSpeechReady();
-    if (!ready) return;
-    final paid = await _chargeForListening();
-    if (!paid) return;
 
+    final hasPermission = await _lectureRecorder.hasPermission();
+    if (!hasPermission) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission is required for lecture capture.')),
+        );
+      }
+      return;
+    }
+
+    final tempDir = await getTemporaryDirectory();
+    final recordingPath = '${tempDir.path}/lecture_${widget.noteId}_${DateTime.now().millisecondsSinceEpoch}.wav';
+    final captionsReady = await _ensureSpeechReady();
+
+    _lastSpeechText = '';
+    _currentLectureTranscript = '';
+    _lectureRecordingStartedAt = DateTime.now();
+
+    await _lectureRecorder.start(
+      const RecordConfig(encoder: AudioEncoder.wav),
+      path: recordingPath,
+    );
+
+    if (captionsReady) {
+      await _speech.listen(
+        onResult: (result) => _handleSpeechResult(result.recognizedWords),
+        listenOptions: SpeechListenOptions(
+          listenMode: ListenMode.dictation,
+        ),
+      );
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _noteMode = 'lecture';
+      _isLectureRecording = true;
+      _lectureStatus = captionsReady
+          ? 'Recording lecture audio and streaming live captions into the page.'
+          : 'Recording lecture audio. Live captions are unavailable on this device, but the segment will attach to the note.';
+    });
     if (_activeTool != NoteTool.text) {
       _selectTool(NoteTool.text);
     }
-    setState(() => _isListening = true);
-    await _speech.listen(
-      onResult: (result) {
-        if (result.recognizedWords.trim().isEmpty) return;
-        _appendSpeechText(result.recognizedWords.trim());
-      },
-      listenOptions: SpeechListenOptions(
-        listenMode: ListenMode.dictation,
-      ),
-    );
+  }
+
+  Future<void> _stopLectureRecording() async {
+    final path = await _lectureRecorder.stop();
+    if (_speech.isListening) {
+      await _speech.stop();
+    }
+    if (mounted) {
+      setState(() {
+        _isLectureRecording = false;
+      });
+    }
+    if (path == null) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    _showLoading('Saving lecture segment...');
+    try {
+      final bytes = await XFile(path).readAsBytes();
+      final segmentId = const Uuid().v4();
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('notes')
+          .child(user.uid)
+          .child('lecture_segments')
+          .child('${widget.noteId}_$segmentId.wav');
+      await storageRef.putData(bytes, SettableMetadata(contentType: 'audio/wav'));
+      final audioUrl = await storageRef.getDownloadURL();
+
+      final durationMs = _lectureRecordingStartedAt == null
+          ? 0
+          : DateTime.now().difference(_lectureRecordingStartedAt!).inMilliseconds;
+      final transcript = _currentLectureTranscript.trim();
+      final wordCount = _countWords(transcript);
+
+      if (!mounted) return;
+      setState(() {
+        _lectureSegments.add({
+          'id': segmentId,
+          'audioUrl': audioUrl,
+          'durationMs': durationMs,
+          'transcript': transcript,
+          'wordCount': wordCount,
+          'createdAt': Timestamp.fromDate(DateTime.now()),
+          'platform': defaultTargetPlatform.name,
+        });
+        _lectureTranscriptWordCount += wordCount;
+        _lectureStatus = 'Saved ${_lectureSegments.length} lecture segments to this note.';
+        _hasChanges = true;
+      });
+      await _saveNote();
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            wordCount > 0
+                ? 'Lecture segment saved with $wordCount captured words.'
+                : 'Lecture segment saved to this note.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save the lecture segment.')),
+        );
+      }
+    } finally {
+      _currentLectureTranscript = '';
+      _lastSpeechText = '';
+      _lectureRecordingStartedAt = null;
+    }
+  }
+
+  Future<void> _toggleListening() async {
+    if (_isLectureRecording) {
+      await _stopLectureRecording();
+      return;
+    }
+    await _startLectureRecording();
   }
 
   void _editTextItem(int index) {
@@ -1075,188 +1354,213 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     }
   }
 
-  Future<void> _shareToVault() async {
+  Future<void> _publishToStudyVault() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    final subjectController = TextEditingController(text: _folderTitle ?? '');
-    final yearController = TextEditingController(text: DateTime.now().year.toString());
-    String selectedType = 'Notes';
 
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: cardColor,
-          title: const Text('Add to Vault', style: TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: subjectController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Subject / Course code',
-                  hintStyle: const TextStyle(color: Colors.white24),
-                  filled: true,
-                  fillColor: backgroundColor,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: yearController,
-                style: const TextStyle(color: Colors.white),
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: 'Year',
-                  hintStyle: const TextStyle(color: Colors.white24),
-                  filled: true,
-                  fillColor: backgroundColor,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: selectedType,
-                  dropdownColor: backgroundColor,
-                  isExpanded: true,
-                  items: ['Notes', 'Past Paper', 'Question Bank']
-                      .map((type) => DropdownMenuItem(value: type, child: Text(type, style: const TextStyle(color: Colors.white))))
-                      .toList(),
-                  onChanged: (value) => setDialogState(() => selectedType = value ?? selectedType),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Publish')),
-          ],
-        ),
-      ),
-    );
-    if (confirmed != true) return;
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
     if (!mounted) return;
-
-    _showLoading('Uploading to Vault...');
-    try {
-      final bytes = await _exportPdfBytes();
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('vault')
-          .child('${user.uid}_${DateTime.now().millisecondsSinceEpoch}.pdf');
-      await storageRef.putData(bytes, SettableMetadata(contentType: 'application/pdf'));
-      final url = await storageRef.getDownloadURL();
-      await FirebaseFirestore.instance.collection('vault').add({
-        'userId': user.uid,
-        'subject': subjectController.text.trim().toUpperCase(),
-        'year': yearController.text.trim(),
-        'type': selectedType,
-        'fileUrl': url,
-        'stars': 0,
-        'starredBy': [],
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added to Vault.')));
-      }
-    } catch (_) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vault upload failed.')));
-      }
-    }
-  }
-
-  Future<void> _sellOnMarketplace() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    final userData = userDoc.data() ?? <String, dynamic>{};
     final titleController = TextEditingController(text: _noteTitle);
     final descriptionController = TextEditingController();
+    final instituteController = TextEditingController(text: (userData['university'] ?? '').toString());
+    final courseNameController = TextEditingController(text: (userData['major'] ?? '').toString());
+    final moduleNameController = TextEditingController(text: _noteTitle);
+    final moduleCodeController = TextEditingController(text: (_folderTitle ?? '').toString());
+    final yearController = TextEditingController(text: (userData['year'] ?? DateTime.now().year.toString()).toString());
     final priceController = TextEditingController();
+    String selectedType = 'Notes';
+    String accessType = 'free';
 
     final bool? confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final rawPrice = priceController.text.replaceAll(RegExp(r'[^0-9]'), '');
-          final basePrice = int.tryParse(rawPrice) ?? 0;
-          final platformFee = (basePrice * 0.10).round();
-          final displayPrice = basePrice + platformFee;
-          return AlertDialog(
-            backgroundColor: cardColor,
-            title: const Text('Sell on marketplace', style: TextStyle(color: Colors.white)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: titleController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Listing title',
-                    hintStyle: const TextStyle(color: Colors.white24),
-                    filled: true,
-                    fillColor: backgroundColor,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final int priceZar = int.tryParse(priceController.text.trim()) ?? 0;
+          final int platformFee = StudyVaultService.platformFeeFromPrice(priceZar);
+          final int sellerNet = StudyVaultService.sellerNetFromPrice(priceZar);
+          final bool isPaid = accessType == 'paid';
+
+          Widget inputField({
+            required TextEditingController controller,
+            required String hint,
+            int maxLines = 1,
+            TextInputType keyboardType = TextInputType.text,
+            ValueChanged<String>? onChanged,
+          }) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: TextField(
+                controller: controller,
+                maxLines: maxLines,
+                keyboardType: keyboardType,
+                onChanged: onChanged,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: hint,
+                  hintStyle: const TextStyle(color: Colors.white24),
+                  filled: true,
+                  fillColor: backgroundColor,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descriptionController,
-                  style: const TextStyle(color: Colors.white),
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    hintText: 'Description',
-                    hintStyle: const TextStyle(color: Colors.white24),
-                    filled: true,
-                    fillColor: backgroundColor,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: priceController,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: TextInputType.number,
-                  onChanged: (_) => setDialogState(() {}),
-                  decoration: InputDecoration(
-                    hintText: 'Price (ZAR)',
-                    hintStyle: const TextStyle(color: Colors.white24),
-                    filled: true,
-                    fillColor: backgroundColor,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
+              ),
+            );
+          }
+
+          Widget pricingOption({
+            required String value,
+            required String title,
+            required String subtitle,
+          }) {
+            final bool selected = accessType == value;
+            return Expanded(
+              child: InkWell(
+                onTap: () => setDialogState(() => accessType = value),
+                borderRadius: BorderRadius.circular(14),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: backgroundColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    color: selected ? tealAccent.withValues(alpha: 0.12) : backgroundColor,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: selected ? tealAccent : Colors.white10,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Seshly stores your notes and releases them after payment.',
-                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: selected ? tealAccent : Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Buyer pays R$displayPrice (includes 10% Seshly fee). You earn R$basePrice.',
-                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        subtitle,
+                        style: const TextStyle(color: Colors.white54, fontSize: 11, height: 1.35),
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
+            );
+          }
+
+          return AlertDialog(
+            backgroundColor: cardColor,
+            title: const Text('Publish to StudyVault', style: TextStyle(color: Colors.white)),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    inputField(controller: titleController, hint: 'Title'),
+                    inputField(
+                      controller: descriptionController,
+                      hint: 'Describe what this note contains and who it helps.',
+                      maxLines: 3,
+                    ),
+                    inputField(controller: instituteController, hint: 'Institute / University'),
+                    inputField(controller: courseNameController, hint: 'Course / Major'),
+                    inputField(controller: moduleNameController, hint: 'Module name'),
+                    inputField(controller: moduleCodeController, hint: 'Module code / subject'),
+                    inputField(
+                      controller: yearController,
+                      hint: 'Academic year',
+                      keyboardType: TextInputType.number,
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: backgroundColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: selectedType,
+                          dropdownColor: backgroundColor,
+                          isExpanded: true,
+                          style: const TextStyle(color: Colors.white),
+                          items: StudyVaultService.resourceTypes
+                              .map(
+                                (type) => DropdownMenuItem<String>(
+                                  value: type,
+                                  child: Text(type),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) => setDialogState(() => selectedType = value ?? selectedType),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        pricingOption(
+                          value: 'free',
+                          title: 'Free',
+                          subtitle: 'Anyone can open this resource immediately.',
+                        ),
+                        const SizedBox(width: 10),
+                        pricingOption(
+                          value: 'paid',
+                          title: 'Paid',
+                          subtitle: 'Set the public price. Seshly keeps 20%.',
+                        ),
+                      ],
+                    ),
+                    if (isPaid) ...[
+                      const SizedBox(height: 12),
+                      inputField(
+                        controller: priceController,
+                        hint: 'Price (ZAR)',
+                        keyboardType: TextInputType.number,
+                        onChanged: (_) => setDialogState(() {}),
+                      ),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: backgroundColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Paid StudyVault breakdown',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Learner pays R$priceZar. Seshly keeps R$platformFee. You receive R$sellerNet.',
+                              style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.4),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('List')),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Publish'),
+              ),
             ],
           );
         },
@@ -1265,60 +1569,79 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     if (confirmed != true) return;
     if (!mounted) return;
 
-    final basePrice = int.tryParse(priceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    if (basePrice <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid price.')));
+    final int priceZar = int.tryParse(priceController.text.trim()) ?? 0;
+    if (accessType == 'paid' && priceZar <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid paid price to publish this note.')),
+      );
       return;
     }
-    final platformFee = (basePrice * 0.10).round();
-    final displayPrice = basePrice + platformFee;
 
-    _showLoading('Creating listing...');
+    _showLoading('Publishing to StudyVault...');
     try {
       final bytes = await _exportPdfBytes();
       final storageRef = FirebaseStorage.instance
           .ref()
-          .child('marketplace_items')
+          .child('study_vault')
           .child('${user.uid}_${DateTime.now().millisecondsSinceEpoch}.pdf');
       await storageRef.putData(bytes, SettableMetadata(contentType: 'application/pdf'));
-      final fileUrl = await storageRef.getDownloadURL();
+      final url = await storageRef.getDownloadURL();
 
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      final userData = userDoc.data() ?? {};
-      final sellerName = (userData['fullName'] ?? userData['displayName'] ?? 'Student').toString();
-
-      await FirebaseFirestore.instance.collection('marketplace_items').add({
-        'title': titleController.text.trim(),
-        'description': descriptionController.text.trim(),
-        'price': displayPrice,
-        'currency': 'ZAR',
-        'category': 'Notes',
-        'isDigital': true,
-        'sellerId': user.uid,
-        'sellerName': sellerName,
-        'imageUrl': null,
-        'status': 'active',
-        'fileUrl': fileUrl,
-        'fileName': '${_noteTitle.replaceAll(' ', '_')}.pdf',
-        'fileType': 'pdf',
-        'sellerPrice': basePrice,
-        'platformFee': platformFee,
-        'priceIncludesFee': true,
-        'listingType': 'notes',
-        'fulfillment': 'seshly',
-        'sourceNoteId': widget.noteId,
-        'sourceFolderId': widget.folderId,
-        'createdAt': FieldValue.serverTimestamp(),
+      final moduleCode = moduleCodeController.text.trim().toUpperCase();
+      final title = titleController.text.trim();
+      final description = descriptionController.text.trim();
+      final institute = instituteController.text.trim();
+      final courseName = courseNameController.text.trim();
+      final moduleName = moduleNameController.text.trim();
+      final academicYear = yearController.text.trim();
+      final isPaid = accessType == 'paid';
+      await _communityBackend.createStudyVaultResource(<String, dynamic>{
+        'title': title,
+        'description': description,
+        'subject': moduleCode,
+        'moduleCode': moduleCode,
+        'moduleName': moduleName,
+        'courseName': courseName,
+        'institute': institute,
+        'academicYear': academicYear,
+        'resourceType': selectedType,
+        'accessType': accessType,
+        'priceZar': isPaid ? priceZar : 0,
+        'fileUrl': url,
+        'filePath': storageRef.fullPath,
+        'fileName': '${_safeFileName(_noteTitle)}.pdf',
       });
-
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Listing created.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isPaid
+                  ? 'Note published to StudyVault as a paid resource.'
+                  : 'Note published to StudyVault as a free resource.',
+            ),
+          ),
+        );
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'study_vault',
+        source: 'publish_note_to_study_vault',
+      );
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not create listing.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppErrorService.instance.userMessageFor(
+                error,
+                fallback: 'StudyVault publish failed.',
+              ),
+            ),
+          ),
+        );
       }
     }
   }
@@ -1364,26 +1687,240 @@ class _NoteEditorViewState extends State<NoteEditorView> {
             ),
             const SizedBox(height: 10),
             _ActionTile(
-              icon: Icons.cloud_upload_outlined,
-              title: 'Add to Vault',
-              subtitle: 'Share for free with the community.',
+              icon: Icons.auto_stories_outlined,
+              title: 'Publish to StudyVault',
+              subtitle: 'Choose free or paid and publish as an academic resource.',
               onTap: () {
                 Navigator.pop(context);
-                _shareToVault();
-              },
-            ),
-            const SizedBox(height: 10),
-            _ActionTile(
-              icon: Icons.storefront_outlined,
-              title: 'Sell on marketplace',
-              subtitle: 'Create a paid listing from this note.',
-              onTap: () {
-                Navigator.pop(context);
-                _sellOnMarketplace();
+                _publishToStudyVault();
               },
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildLectureCaptureCard() {
+    final accent = _isLectureRecording ? Colors.redAccent : tealAccent;
+    final statusTitle = _isLectureRecording
+        ? 'Lecture capture live'
+        : _lectureCaptureUnlocked
+            ? 'Lecture capture unlocked'
+            : 'Unlock lecture capture';
+    final actionLabel = _isLectureRecording
+        ? 'Stop lecture'
+        : _lectureCaptureUnlocked
+            ? 'Start lecture'
+            : 'Unlock for 1 credit';
+    final transcriptLabel = _lectureTranscriptWordCount == 0
+        ? 'No captured words yet'
+        : '$_lectureTranscriptWordCount captured words';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF141B2F),
+            accent.withValues(alpha: 0.18),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _isLectureRecording ? Icons.graphic_eq_rounded : Icons.mic_external_on_outlined,
+                  color: accent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      statusTitle,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _lectureStatus,
+                      style: const TextStyle(color: Colors.white60, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _lectureMetric(
+                  label: 'SeshCredit',
+                  value: '$_cachedSeshCreditBalance left',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _lectureMetric(
+                  label: 'Segments',
+                  value: '${_lectureSegments.length} saved',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _lectureMetric(
+                  label: 'Transcript',
+                  value: transcriptLabel,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _isUnlockingLecture ? null : _toggleListening,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accent,
+                    foregroundColor: const Color(0xFF0F142B),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                  child: _isUnlockingLecture
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F142B)),
+                        )
+                      : Text(
+                          actionLabel,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _openSeshCreditStore,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                  child: const Text('Buy credits'),
+                ),
+              ),
+            ],
+          ),
+          if (_lectureSegments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Recent lecture segments',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._lectureSegments.reversed.take(2).map((segment) {
+                    final transcript = (segment['transcript'] ?? '').toString().trim();
+                    final durationMs = (segment['durationMs'] as num?)?.toInt() ?? 0;
+                    final wordCount = (segment['wordCount'] as num?)?.toInt() ?? 0;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              _formatDurationMs(durationMs),
+                              style: const TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  transcript.isEmpty ? 'Audio segment saved without live captions.' : transcript,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.white70, fontSize: 11.5),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$wordCount captured words',
+                                  style: const TextStyle(color: Colors.white38, fontSize: 10.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _lectureMetric({
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10.5)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11.5),
+          ),
+        ],
       ),
     );
   }
@@ -1397,6 +1934,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
       ),
       child: Column(
         children: [
+          _buildLectureCaptureCard(),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -1445,10 +1983,18 @@ class _NoteEditorViewState extends State<NoteEditorView> {
                   onTap: () => _addImage(scale, yOffset),
                 ),
                 _ToolButton(
-                  icon: _isListening ? Icons.mic : Icons.mic_none,
-                  label: _isListening ? 'Listening' : 'Listen',
-                  selected: _isListening,
-                  activeColor: Colors.redAccent,
+                  icon: _isLectureRecording
+                      ? Icons.stop_circle_outlined
+                      : _lectureCaptureUnlocked
+                          ? Icons.mic_external_on_outlined
+                          : Icons.lock_open_outlined,
+                  label: _isLectureRecording
+                      ? 'Stop'
+                      : _lectureCaptureUnlocked
+                          ? 'Lecture'
+                          : 'Unlock',
+                  selected: _isLectureRecording || _lectureCaptureUnlocked,
+                  activeColor: _isLectureRecording ? Colors.redAccent : tealAccent,
                   onTap: _toggleListening,
                 ),
                 _ToolButton(
@@ -1550,7 +2096,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                'Voice notes cost 1 sesh per session.',
+                'Voice capture is enabled for faster note building.',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
               ),
             ),

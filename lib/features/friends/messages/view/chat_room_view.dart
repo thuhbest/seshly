@@ -8,6 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:seshly/features/calendar/models/calendar_event.dart';
+import 'package:seshly/services/app_error_service.dart';
+import 'package:seshly/services/community_backend_service.dart';
 import 'package:seshly/features/video_call/view/parallel_practice_view.dart';
 import 'package:seshly/widgets/pressable_scale.dart';
 
@@ -36,10 +38,26 @@ class _ChatRoomViewState extends State<ChatRoomView> {
   bool _isRecording = false;
   bool _showEmojiPicker = false;
   String? _playingMessageId;
-  final List<String> _emojiOptions = const ['😀', '😂', '😍', '😮', '😢', '😡', '👍', '🙏', '🔥', '💯', '🎯', '✅'];
+  final CommunityBackendService _backend = CommunityBackendService.instance;
+  final List<String> _emojiOptions = const [
+    '😀',
+    '😂',
+    '😍',
+    '😮',
+    '😢',
+    '😡',
+    '👍',
+    '🙏',
+    '🔥',
+    '💯',
+    '🎯',
+    '✅',
+  ];
 
   bool get _supportsVoiceNotes =>
-      !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
   @override
   void initState() {
@@ -54,9 +72,17 @@ class _ChatRoomViewState extends State<ChatRoomView> {
   }
 
   void _markAsRead() async {
-    await FirebaseFirestore.instance.collection('chats').doc(widget.chatId).update({
-      'unreadCounts.$currentUserId': 0,
-    });
+    if (currentUserId.isEmpty) return;
+    try {
+      await _backend.markChatRead(widget.chatId);
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'community',
+        source: 'mark_chat_read',
+      );
+    }
   }
 
   @override
@@ -75,38 +101,34 @@ class _ChatRoomViewState extends State<ChatRoomView> {
     _messageController.clear();
     setState(() => _showEmojiPicker = false);
 
-    // 1. Add message document
-    await FirebaseFirestore.instance
-        .collection('chats')
-        .doc(widget.chatId)
-        .collection('messages')
-        .add({
-      'senderId': currentUserId,
-      'text': text,
-      'type': 'text',
-      'timestamp': FieldValue.serverTimestamp(),
-      'status': 'sent',
-      'reactions': {},
-      'deletedFor': [],
-    });
-
-    // 2. Identify receiver and update chat preview + unread count
-    final chatDoc = await FirebaseFirestore.instance.collection('chats').doc(widget.chatId).get();
-    final List participants = chatDoc.data()?['participants'] ?? [];
-    final String receiverId = participants.firstWhere((id) => id != currentUserId, orElse: () => '');
-
-    final Map<String, dynamic> updates = {
-      'lastMessage': text,
-      'lastMessageTime': FieldValue.serverTimestamp(),
-    };
-
-    if (receiverId.isNotEmpty) {
-      updates['unreadCounts.$receiverId'] = FieldValue.increment(1); // Increments receiver's badge
+    try {
+      await _backend.sendTextChatMessage(chatId: widget.chatId, text: text);
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'community',
+        source: 'send_chat_message',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppErrorService.instance.userMessageFor(
+              error,
+              fallback: 'Could not send your message.',
+            ),
+          ),
+        ),
+      );
     }
-
-    await FirebaseFirestore.instance.collection('chats').doc(widget.chatId).update(updates);
-
-    _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
   }
 
   Future<void> _startRecording() async {
@@ -117,12 +139,15 @@ class _ChatRoomViewState extends State<ChatRoomView> {
     final hasPermission = await _recorder.hasPermission();
     if (!hasPermission) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Microphone permission denied.")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Microphone permission denied.")),
+      );
       return;
     }
 
     final dir = await getTemporaryDirectory();
-    final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final path =
+        '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
     await _recorder.start(
       const RecordConfig(encoder: AudioEncoder.aacLc),
@@ -141,58 +166,58 @@ class _ChatRoomViewState extends State<ChatRoomView> {
   Future<void> _sendVoiceMessage(String filePath) async {
     try {
       final bytes = await XFile(filePath).readAsBytes();
-      final messageRef = FirebaseFirestore.instance
-          .collection('chats')
-          .doc(widget.chatId)
-          .collection('messages')
-          .doc();
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('chat_voice_notes')
           .child(widget.chatId)
-          .child('${messageRef.id}.m4a');
+          .child('${DateTime.now().millisecondsSinceEpoch}_$currentUserId.m4a');
 
-      await storageRef.putData(bytes, SettableMetadata(contentType: 'audio/m4a'));
+      await storageRef.putData(
+        bytes,
+        SettableMetadata(contentType: 'audio/m4a'),
+      );
       final audioUrl = await storageRef.getDownloadURL();
 
-      await messageRef.set({
-        'senderId': currentUserId,
-        'type': 'voice',
-        'audioUrl': audioUrl,
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': 'sent',
-        'reactions': {},
-        'deletedFor': [],
-      });
-
-      final chatDoc = await FirebaseFirestore.instance.collection('chats').doc(widget.chatId).get();
-      final List participants = chatDoc.data()?['participants'] ?? [];
-      final String receiverId = participants.firstWhere((id) => id != currentUserId, orElse: () => '');
-
-      final Map<String, dynamic> updates = {
-        'lastMessage': 'Voice note',
-        'lastMessageTime': FieldValue.serverTimestamp(),
-      };
-
-      if (receiverId.isNotEmpty) {
-        updates['unreadCounts.$receiverId'] = FieldValue.increment(1);
-      }
-
-      await FirebaseFirestore.instance.collection('chats').doc(widget.chatId).update(updates);
+      await _backend.sendVoiceChatMessage(
+        chatId: widget.chatId,
+        audioUrl: audioUrl,
+        audioPath: storageRef.fullPath,
+      );
 
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'community',
+        source: 'send_voice_chat_message',
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to send voice note.")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppErrorService.instance.userMessageFor(
+              error,
+              fallback: "Failed to send voice note.",
+            ),
+          ),
+        ),
+      );
     }
   }
 
   void _showVoiceNotSupported() {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Voice notes are available on mobile only right now.")),
+      const SnackBar(
+        content: Text("Voice notes are available on mobile only right now."),
+      ),
     );
   }
 
@@ -207,7 +232,9 @@ class _ChatRoomViewState extends State<ChatRoomView> {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1E243A),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (sheetContext) {
         final navigator = Navigator.of(sheetContext);
         return Padding(
@@ -216,12 +243,19 @@ class _ChatRoomViewState extends State<ChatRoomView> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Chat background", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              const Text(
+                "Chat background",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 10,
                 children: colors.map((color) {
-                  final bool selected = color.toARGB32() == currentColor.toARGB32();
+                  final bool selected =
+                      color.toARGB32() == currentColor.toARGB32();
                   return PressableScale(
                     onTap: () async {
                       await _setBackgroundColor(color);
@@ -236,7 +270,12 @@ class _ChatRoomViewState extends State<ChatRoomView> {
                       decoration: BoxDecoration(
                         color: color,
                         shape: BoxShape.circle,
-                        border: Border.all(color: selected ? const Color(0xFF00C09E) : Colors.white24, width: 2),
+                        border: Border.all(
+                          color: selected
+                              ? const Color(0xFF00C09E)
+                              : Colors.white24,
+                          width: 2,
+                        ),
                       ),
                     ),
                   );
@@ -249,7 +288,10 @@ class _ChatRoomViewState extends State<ChatRoomView> {
                   if (!mounted) return;
                   navigator.pop();
                 },
-                child: const Text("Reset to default", style: TextStyle(color: Colors.white54)),
+                child: const Text(
+                  "Reset to default",
+                  style: TextStyle(color: Colors.white54),
+                ),
               ),
             ],
           ),
@@ -278,28 +320,88 @@ class _ChatRoomViewState extends State<ChatRoomView> {
     final int end = selection.end < 0 ? text.length : selection.end;
     final newText = text.replaceRange(start, end, emoji);
     _messageController.text = newText;
-    _messageController.selection = TextSelection.collapsed(offset: start + emoji.length);
+    _messageController.selection = TextSelection.collapsed(
+      offset: start + emoji.length,
+    );
   }
 
-  Future<void> _toggleReaction(String messageId, String emoji, bool hasReacted) async {
-    final ref = FirebaseFirestore.instance
-        .collection('chats')
-        .doc(widget.chatId)
-        .collection('messages')
-        .doc(messageId);
-    if (hasReacted) {
-      await ref.update({'reactions.$emoji': FieldValue.arrayRemove([currentUserId])});
-    } else {
-      await ref.update({'reactions.$emoji': FieldValue.arrayUnion([currentUserId])});
+  Future<void> _toggleReaction(
+    String messageId,
+    String emoji,
+    bool hasReacted,
+  ) async {
+    try {
+      await _backend.toggleChatReaction(
+        chatId: widget.chatId,
+        messageId: messageId,
+        emoji: emoji,
+      );
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'community',
+        source: 'toggle_chat_reaction',
+      );
+      if (!mounted) return;
+      AppErrorService.instance.showSnackBar(
+        context,
+        AppErrorService.instance.userMessageFor(
+          error,
+          fallback: 'Could not update that reaction.',
+        ),
+      );
+      if (hasReacted) {
+        return;
+      }
     }
   }
 
-  void _showMessageActions(String messageId, Map<String, dynamic> data, bool isMe) {
+  Future<void> _deleteMessage({
+    required String messageId,
+    required bool isMine,
+  }) async {
+    try {
+      await _backend.deleteChatMessage(
+        chatId: widget.chatId,
+        messageId: messageId,
+      );
+      if (!mounted) return;
+      AppErrorService.instance.showSnackBar(
+        context,
+        isMine ? 'Message deleted.' : 'Message removed from your chat.',
+        backgroundColor: const Color(0xFF1E243A),
+      );
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'community',
+        source: 'delete_chat_message',
+      );
+      if (!mounted) return;
+      AppErrorService.instance.showSnackBar(
+        context,
+        AppErrorService.instance.userMessageFor(
+          error,
+          fallback: 'Could not update that message right now.',
+        ),
+      );
+    }
+  }
+
+  void _showMessageActions(
+    String messageId,
+    Map<String, dynamic> data,
+    bool isMe,
+  ) {
     final String text = (data['text'] ?? '').toString();
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1E243A),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (sheetContext) {
         return Padding(
           padding: const EdgeInsets.all(16),
@@ -312,8 +414,10 @@ class _ChatRoomViewState extends State<ChatRoomView> {
                   return PressableScale(
                     onTap: () {
                       Navigator.pop(sheetContext);
-                      final reactions = data['reactions'] as Map<String, dynamic>? ?? {};
-                      final List<dynamic> users = reactions[emoji] as List<dynamic>? ?? [];
+                      final reactions =
+                          data['reactions'] as Map<String, dynamic>? ?? {};
+                      final List<dynamic> users =
+                          reactions[emoji] as List<dynamic>? ?? [];
                       final bool hasReacted = users.contains(currentUserId);
                       _toggleReaction(messageId, emoji, hasReacted);
                     },
@@ -326,33 +430,31 @@ class _ChatRoomViewState extends State<ChatRoomView> {
               const SizedBox(height: 16),
               if (text.isNotEmpty)
                 ListTile(
-                  leading: const Icon(Icons.event_available, color: Colors.white70),
-                  title: const Text("Add to calendar", style: TextStyle(color: Colors.white)),
+                  leading: const Icon(
+                    Icons.event_available,
+                    color: Colors.white70,
+                  ),
+                  title: const Text(
+                    "Add to calendar",
+                    style: TextStyle(color: Colors.white),
+                  ),
                   onTap: () async {
                     Navigator.pop(sheetContext);
                     await _addToCalendar(text);
                   },
                 ),
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.white70),
-                title: Text(isMe ? "Delete for everyone" : "Remove for me", style: const TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.white70,
+                ),
+                title: Text(
+                  isMe ? "Delete for everyone" : "Remove for me",
+                  style: const TextStyle(color: Colors.white),
+                ),
                 onTap: () async {
                   Navigator.pop(sheetContext);
-                  if (isMe) {
-                    await FirebaseFirestore.instance
-                        .collection('chats')
-                        .doc(widget.chatId)
-                        .collection('messages')
-                        .doc(messageId)
-                        .delete();
-                  } else {
-                    await FirebaseFirestore.instance
-                        .collection('chats')
-                        .doc(widget.chatId)
-                        .collection('messages')
-                        .doc(messageId)
-                        .update({'deletedFor': FieldValue.arrayUnion([currentUserId])});
-                  }
+                  await _deleteMessage(messageId: messageId, isMine: isMe);
                 },
               ),
             ],
@@ -371,10 +473,19 @@ class _ChatRoomViewState extends State<ChatRoomView> {
     );
     if (!mounted) return;
     if (date == null) return;
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
     if (!mounted) return;
     if (time == null) return;
-    final start = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final start = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
     final end = start.add(const Duration(hours: 1));
 
     await FirebaseFirestore.instance
@@ -382,18 +493,20 @@ class _ChatRoomViewState extends State<ChatRoomView> {
         .doc(currentUserId)
         .collection('calendarEvents')
         .add({
-      'title': text.isEmpty ? "Tutoring session" : text,
-      'start': Timestamp.fromDate(start.toUtc()),
-      'end': Timestamp.fromDate(end.toUtc()),
-      'location': widget.chatTitle,
-      'type': 'Meeting',
-      'colorHex': EventTypePalette.colorHexForType('Meeting'),
-      'source': 'manual',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+          'title': text.isEmpty ? "Tutoring session" : text,
+          'start': Timestamp.fromDate(start.toUtc()),
+          'end': Timestamp.fromDate(end.toUtc()),
+          'location': widget.chatTitle,
+          'type': 'Meeting',
+          'colorHex': EventTypePalette.colorHexForType('Meeting'),
+          'source': 'manual',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Added to calendar.")));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("Added to calendar.")));
   }
 
   Future<void> _togglePlayback(String messageId, String? audioUrl) async {
@@ -421,9 +534,12 @@ class _ChatRoomViewState extends State<ChatRoomView> {
           .doc(widget.chatId)
           .snapshots(),
       builder: (context, settingsSnap) {
-        final settings = settingsSnap.data?.data() as Map<String, dynamic>? ?? {};
+        final settings =
+            settingsSnap.data?.data() as Map<String, dynamic>? ?? {};
         final int? bgValue = settings['backgroundColor'] as int?;
-        final Color backgroundColor = bgValue != null ? Color(bgValue) : defaultBackgroundColor;
+        final Color backgroundColor = bgValue != null
+            ? Color(bgValue)
+            : defaultBackgroundColor;
 
         return Scaffold(
           backgroundColor: backgroundColor,
@@ -442,30 +558,46 @@ class _ChatRoomViewState extends State<ChatRoomView> {
                     color: Colors.white.withValues(alpha: 0.05),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 28),
+                  child: const Icon(
+                    Icons.chevron_left_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                 ),
               ),
             ),
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.chatTitle, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(
+                  widget.chatTitle,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 _buildPresenceLine(tealAccent),
               ],
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.palette_outlined, color: Colors.white70),
-                onPressed: () => _showBackgroundPicker(backgroundColor),
+              _appBarAction(
+                icon: Icons.palette_outlined,
+                onTap: () => _showBackgroundPicker(backgroundColor),
               ),
-              IconButton(
-                icon: const Icon(Icons.videocam_outlined, color: Colors.white70),
-                onPressed: () => Navigator.push(
+              _appBarAction(
+                icon: Icons.videocam_outlined,
+                onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ParallelPracticeView()),
+                  MaterialPageRoute(
+                    builder: (_) => ParallelPracticeView(
+                      title: widget.chatTitle,
+                      subject: 'Live tutoring',
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 8),
             ],
           ),
           body: Column(
@@ -479,19 +611,30 @@ class _ChatRoomViewState extends State<ChatRoomView> {
                       .orderBy('timestamp', descending: true)
                       .snapshots(),
                   builder: (context, snapshot) {
-                    if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: tealAccent));
+                    if (!snapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: tealAccent),
+                      );
+                    }
 
                     final messages = snapshot.data!.docs;
 
                     return ListView.builder(
                       controller: _scrollController,
                       reverse: true,
-                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 20,
+                      ),
                       itemCount: messages.length,
                       itemBuilder: (context, index) {
                         final doc = messages[index];
                         final data = doc.data() as Map<String, dynamic>;
-                        final deletedFor = (data['deletedFor'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                        final deletedFor =
+                            (data['deletedFor'] as List?)
+                                ?.map((e) => e.toString())
+                                .toList() ??
+                            [];
                         if (deletedFor.contains(currentUserId)) {
                           return const SizedBox.shrink();
                         }
@@ -508,7 +651,9 @@ class _ChatRoomViewState extends State<ChatRoomView> {
                   padding: const EdgeInsets.all(12),
                   decoration: const BoxDecoration(
                     color: Color(0xFF1E243A),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
                   ),
                   child: GridView.count(
                     crossAxisCount: 8,
@@ -517,7 +662,12 @@ class _ChatRoomViewState extends State<ChatRoomView> {
                         onTap: () => _insertEmoji(emoji),
                         borderRadius: BorderRadius.circular(10),
                         pressedScale: 0.9,
-                        child: Center(child: Text(emoji, style: const TextStyle(fontSize: 20))),
+                        child: Center(
+                          child: Text(
+                            emoji,
+                            style: const TextStyle(fontSize: 20),
+                          ),
+                        ),
                       );
                     }).toList(),
                   ),
@@ -533,12 +683,18 @@ class _ChatRoomViewState extends State<ChatRoomView> {
     if (widget.isGroup) {
       return Text(
         "Group chat",
-        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.5),
+          fontSize: 12,
+        ),
       );
     }
 
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('chats').doc(widget.chatId).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('chats')
+          .doc(widget.chatId)
+          .snapshots(),
       builder: (context, chatSnap) {
         final chatData = chatSnap.data?.data() as Map<String, dynamic>? ?? {};
         final participants = chatData['participants'] as List<dynamic>? ?? [];
@@ -553,25 +709,40 @@ class _ChatRoomViewState extends State<ChatRoomView> {
         if (otherUserId == null) {
           return Text(
             "Last seen recently",
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.4),
+              fontSize: 12,
+            ),
           );
         }
 
         return StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance.collection('users').doc(otherUserId).snapshots(),
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(otherUserId)
+              .snapshots(),
           builder: (context, userSnap) {
-            final userData = userSnap.data?.data() as Map<String, dynamic>? ?? {};
-            final Timestamp? lastSeen = userData['lastSeenAt'] as Timestamp? ?? userData['lastLoginAt'] as Timestamp?;
+            final userData =
+                userSnap.data?.data() as Map<String, dynamic>? ?? {};
+            final Timestamp? lastSeen =
+                userData['lastSeenAt'] as Timestamp? ??
+                userData['lastLoginAt'] as Timestamp?;
             bool isOnline = userData['isOnline'] == true;
             if (!isOnline && lastSeen != null) {
-              final minutes = DateTime.now().difference(lastSeen.toDate()).inMinutes;
+              final minutes = DateTime.now()
+                  .difference(lastSeen.toDate())
+                  .inMinutes;
               if (minutes <= 2) {
                 isOnline = true;
               }
             }
 
-            final String label = isOnline ? "Online" : "Last seen ${_timeAgo(lastSeen)}";
-            final Color labelColor = isOnline ? tealAccent : Colors.white.withValues(alpha: 0.4);
+            final String label = isOnline
+                ? "Online"
+                : "Last seen ${_timeAgo(lastSeen)}";
+            final Color labelColor = isOnline
+                ? tealAccent
+                : Colors.white.withValues(alpha: 0.4);
 
             return Row(
               children: [
@@ -611,11 +782,18 @@ class _ChatRoomViewState extends State<ChatRoomView> {
     final String? audioUrl = data['audioUrl'] as String?;
     final String status = (data['status'] ?? 'sent').toString();
     final Timestamp? time = data['timestamp'] as Timestamp?;
-    final Map<String, dynamic> reactions = data['reactions'] as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> reactions =
+        data['reactions'] as Map<String, dynamic>? ?? {};
     final Color outgoingBubble = tealAccent.withValues(alpha: 0.85);
-    final Color incomingBubble = const Color(0xFF1E243A).withValues(alpha: 0.85);
-    final Color bubbleTextColor = isMe ? const Color(0xFF0F142B) : Colors.white.withValues(alpha: 0.92);
-    final Color metaColor = isMe ? const Color(0xFF0F142B).withValues(alpha: 0.55) : Colors.white38;
+    final Color incomingBubble = const Color(
+      0xFF1E243A,
+    ).withValues(alpha: 0.85);
+    final Color bubbleTextColor = isMe
+        ? const Color(0xFF0F142B)
+        : Colors.white.withValues(alpha: 0.92);
+    final Color metaColor = isMe
+        ? const Color(0xFF0F142B).withValues(alpha: 0.55)
+        : Colors.white38;
     final BorderRadius bubbleRadius = BorderRadius.only(
       topLeft: Radius.circular(isMe ? 16 : 6),
       topRight: Radius.circular(isMe ? 6 : 16),
@@ -635,22 +813,28 @@ class _ChatRoomViewState extends State<ChatRoomView> {
         onLongPress: () => _showMessageActions(messageId, data, isMe),
         pressedScale: 0.99,
         child: Column(
-          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: isMe
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
             Container(
               margin: const EdgeInsets.only(bottom: 6),
-              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.75,
+              ),
               padding: const EdgeInsets.fromLTRB(14, 10, 12, 8),
               decoration: BoxDecoration(
                 color: isMe ? outgoingBubble : incomingBubble,
                 borderRadius: bubbleRadius,
-                border: isMe ? null : Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                border: isMe
+                    ? null
+                    : Border.all(color: Colors.white.withValues(alpha: 0.06)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
-                  )
+                  ),
                 ],
               ),
               child: Column(
@@ -665,8 +849,12 @@ class _ChatRoomViewState extends State<ChatRoomView> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            _playingMessageId == messageId ? Icons.pause_circle_filled : Icons.play_circle_fill,
-                            color: isMe ? const Color(0xFF0F142B) : Colors.white,
+                            _playingMessageId == messageId
+                                ? Icons.pause_circle_filled
+                                : Icons.play_circle_fill,
+                            color: isMe
+                                ? const Color(0xFF0F142B)
+                                : Colors.white,
                             size: 24,
                           ),
                           const SizedBox(width: 8),
@@ -695,10 +883,7 @@ class _ChatRoomViewState extends State<ChatRoomView> {
                     children: [
                       Text(
                         formattedTime,
-                        style: TextStyle(
-                          color: metaColor,
-                          fontSize: 10,
-                        ),
+                        style: TextStyle(color: metaColor, fontSize: 10),
                       ),
                       if (isMe) ...[
                         const SizedBox(width: 4),
@@ -724,7 +909,9 @@ class _ChatRoomViewState extends State<ChatRoomView> {
 
   Widget _buildReactionsRow(Map<String, dynamic> reactions) {
     final items = reactions.entries
-        .where((entry) => entry.value is List && (entry.value as List).isNotEmpty)
+        .where(
+          (entry) => entry.value is List && (entry.value as List).isNotEmpty,
+        )
         .toList();
     if (items.isEmpty) return const SizedBox.shrink();
 
@@ -736,7 +923,9 @@ class _ChatRoomViewState extends State<ChatRoomView> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: hasReacted ? const Color(0xFF00C09E).withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.08),
+            color: hasReacted
+                ? const Color(0xFF00C09E).withValues(alpha: 0.2)
+                : Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -744,7 +933,10 @@ class _ChatRoomViewState extends State<ChatRoomView> {
             children: [
               Text(entry.key, style: const TextStyle(fontSize: 12)),
               const SizedBox(width: 4),
-              Text(users.length.toString(), style: const TextStyle(color: Colors.white70, fontSize: 10)),
+              Text(
+                users.length.toString(),
+                style: const TextStyle(color: Colors.white70, fontSize: 10),
+              ),
             ],
           ),
         );
@@ -757,7 +949,9 @@ class _ChatRoomViewState extends State<ChatRoomView> {
     final bool supportsVoiceNotes = _supportsVoiceNotes;
     final Color actionColor = hasText
         ? tealAccent
-        : (_isRecording ? Colors.redAccent : (supportsVoiceNotes ? tealAccent : Colors.white24));
+        : (_isRecording
+              ? Colors.redAccent
+              : (supportsVoiceNotes ? tealAccent : Colors.white24));
     return Container(
       padding: const EdgeInsets.fromLTRB(15, 0, 15, 25),
       child: Row(
@@ -776,7 +970,10 @@ class _ChatRoomViewState extends State<ChatRoomView> {
                     onTap: _toggleEmojiPicker,
                     borderRadius: BorderRadius.circular(14),
                     pressedScale: 0.9,
-                    child: Icon(Icons.sentiment_satisfied_alt_rounded, color: Colors.white.withValues(alpha: 0.3)),
+                    child: Icon(
+                      Icons.sentiment_satisfied_alt_rounded,
+                      color: Colors.white.withValues(alpha: 0.3),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -784,13 +981,12 @@ class _ChatRoomViewState extends State<ChatRoomView> {
                       controller: _messageController,
                       style: const TextStyle(color: Colors.white),
                       decoration: const InputDecoration(
-                        hintText: "Type a message...",
+                        hintText: "Write a message...",
                         hintStyle: TextStyle(color: Colors.white24),
                         border: InputBorder.none,
                       ),
                     ),
                   ),
-                  Icon(Icons.attach_file_rounded, color: Colors.white.withValues(alpha: 0.3)),
                 ],
               ),
             ),
@@ -821,14 +1017,36 @@ class _ChatRoomViewState extends State<ChatRoomView> {
                 hasText
                     ? Icons.send_rounded
                     : (_isRecording
-                        ? Icons.stop_rounded
-                        : (supportsVoiceNotes ? Icons.mic_rounded : Icons.mic_off_rounded)),
+                          ? Icons.stop_rounded
+                          : (supportsVoiceNotes
+                                ? Icons.mic_rounded
+                                : Icons.mic_off_rounded)),
                 color: const Color(0xFF0F142B),
                 size: 22,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _appBarAction({required IconData icon, required VoidCallback onTap}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: PressableScale(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        pressedScale: 0.92,
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.white70, size: 20),
+        ),
       ),
     );
   }

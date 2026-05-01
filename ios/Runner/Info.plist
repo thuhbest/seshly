@@ -45,7 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Seshly needs camera access for tutoring calls.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Allow access to record voice notes.</string>
+	<string>Seshly needs microphone access for tutoring calls and voice notes.</string>
 </dict>
 </plist>

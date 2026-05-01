@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:seshly/widgets/pressable_scale.dart';
 
 class SeshFeatureCard extends StatelessWidget {
@@ -6,6 +7,7 @@ class SeshFeatureCard extends StatelessWidget {
   final String description;
   final String buttonText;
   final IconData icon;
+  final VoidCallback? onTap;
 
   const SeshFeatureCard({
     super.key,
@@ -13,6 +15,7 @@ class SeshFeatureCard extends StatelessWidget {
     required this.description,
     required this.buttonText,
     required this.icon,
+    this.onTap,
   });
 
   @override
@@ -21,21 +24,32 @@ class SeshFeatureCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E243A).withValues(alpha: 0.8),
+        color: const Color(0xFF141B2F).withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: Colors.white.withValues(alpha: 0.08),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF7CF1D6), Color(0xFF00C09E)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: const Color(0xFF00C09E), size: 28),
+            child: Icon(icon, color: const Color(0xFF0F142B), size: 26),
           ),
           const SizedBox(width: 15),
           Expanded(
@@ -44,39 +58,44 @@ class SeshFeatureCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: GoogleFonts.playfairDisplay(
                     color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   description,
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 12,
+                  style: GoogleFonts.spaceGrotesk(
+                    color: Colors.white70,
+                    fontSize: 12.5,
                   ),
                 ),
               ],
             ),
           ),
           PressableScale(
-            onTap: () {},
+            onTap: onTap,
             borderRadius: BorderRadius.circular(10),
             pressedScale: 0.96,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF202945), Color(0xFF131A33)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
               ),
               child: Text(
                 buttonText,
-                style: const TextStyle(
+                style: GoogleFonts.spaceGrotesk(
                   color: Colors.white,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12.5,
                 ),
               ),
             ),

@@ -1,9 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:seshly/services/app_error_service.dart';
+import 'package:seshly/services/community_backend_service.dart';
 import 'package:seshly/widgets/responsive.dart';
 import 'package:seshly/utils/image_picker_util.dart';
 
@@ -24,6 +25,7 @@ class _NewQuestionViewState extends State<NewQuestionView> {
   String? _linkAttachment; // 🔥 Stores the URL link
   bool isCustomSubject = false;
   bool isPosting = false;
+  final CommunityBackendService _backend = CommunityBackendService.instance;
 
   final List<String> subjects = [
     "Mathematics",
@@ -133,11 +135,10 @@ class _NewQuestionViewState extends State<NewQuestionView> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      final realName = userDoc.data()?['fullName'] ?? "Seshly User";
       final finalSubject = isCustomSubject ? _customSubjectController.text.trim() : selectedSubject!;
 
       String? imageUrl;
+      String? imagePath;
 
       if (_imageBytes != null) {
         final storageRef = FirebaseStorage.instance
@@ -149,25 +150,32 @@ class _NewQuestionViewState extends State<NewQuestionView> {
             .putData(_imageBytes!, SettableMetadata(contentType: 'image/jpeg'))
             .timeout(const Duration(seconds: 20));
         imageUrl = await snap.ref.getDownloadURL();
+        imagePath = snap.ref.fullPath;
       }
 
-      await FirebaseFirestore.instance.collection('posts').add({
-        'subject': finalSubject,
-        'question': _questionController.text.trim(),
-        'author': realName,
-        'authorId': user.uid,
-        'createdAt': FieldValue.serverTimestamp(),
-        'likes': 0,
-        'comments': 0,
-        'isUrgent': false,
-        'attachmentUrl': imageUrl,
-        'link': _linkAttachment, // 🔥 Now saving the link to Firestore
-      });
+      await _backend.createPost(
+        subject: finalSubject,
+        question: _questionController.text.trim(),
+        link: _linkAttachment,
+        attachmentUrl: imageUrl,
+        attachmentPath: imagePath,
+      );
 
       if (mounted) Navigator.pop(context);
-    } catch (e) {
-      debugPrint("Error: $e");
-      _showError("Failed to post. Check connection or CORS.");
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'community',
+        source: 'create_post',
+      );
+      if (!mounted) return;
+      _showError(
+        AppErrorService.instance.userMessageFor(
+          error,
+          fallback: 'Failed to post. Please try again.',
+        ),
+      );
     } finally {
       if (mounted) setState(() => isPosting = false);
     }

@@ -1,0 +1,15 @@
+# IMPORTANT: Do not commit key.properties with real signing keys
+# This is a template showing the structure needed for Android release builds
+#
+# To set up your Android signing key:
+# 1. Generate a keystore file (if you don't have one):
+#    keytool -genkey -v -keystore seshly-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias seshly
+#
+# 2. Copy key.properties.example to key.properties
+# 3. Update the values with your actual paths and passwords
+# 4. key.properties will be gitignored automatically
+
+storeFile=path/to/seshly-release-key.jks
+storePassword=your_keystore_password
+keyAlias=seshly
+keyPassword=your_key_password

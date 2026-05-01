@@ -1,0 +1,1343 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isInstantTutorMode() {
+      return isSignedIn() && (
+        request.auth.token.firebase.sign_in_provider == 'anonymous' ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accessTier == 'instant_tutor'
+        )
+      );
+    }
+
+    function hasVerifiedEmail() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isVerifiedStudent() {
+      return hasVerifiedEmail() && !isInstantTutorMode();
+    }
+
+    function isOwnUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isOwnGuestTutoringCustomer(guestId) {
+      return isSignedIn() && request.auth.uid == guestId;
+    }
+
+    function isPlatformAdmin() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
+        request.auth.token.platformRole == 'admin'
+      );
+    }
+
+    function hasProtectedUserMutations() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'admin',
+        'role',
+        'platformRole',
+        'accountType',
+        'accessTier',
+        'accessMode',
+        'instantTutorAccess',
+        'instantTutorAccessMode',
+        'email',
+        'emailLowercase',
+        'emailVerified',
+        'fullName',
+        'fullNameLowercase',
+        'middleName',
+        'age',
+        'major',
+        'studentNumber',
+        'studentNumberLowercase',
+        'university',
+        'levelOfStudy',
+        'year',
+        'bio',
+        'bioModerationStatus',
+        'bioModerationFlags',
+        'profilePic',
+        'profilePicPath',
+        'tutorProfile',
+        'tutorSubjects',
+        'tutorStatus',
+        'tutorStatusUpdatedAt',
+        'tutorApplicationStatus',
+        'tutoringEligibilityStatus',
+        'payoutOnboardingStatus',
+        'adminApproval',
+        'adminApprovalAt',
+        'adminApprovalBy',
+        'rejectionReason',
+        'suspensionReason',
+        'tutoringSearchVisible',
+        'tutoringSearchVisibilityReason',
+        'tutoringApprovalVersion',
+        'tutoringApprovalNormalizedAt',
+        'tutorApplicationSubmittedAt',
+        'tutorApplicationReviewedAt',
+        'tutorApprovedAt',
+        'tutorSuspendedAt',
+        'tutorRestoredAt',
+        'tutorStats',
+        'organizationMembership',
+        'goldTick',
+        'walletBalanceZar',
+        'walletHoldZar',
+        'walletCurrency',
+        'walletSpentZar',
+        'walletPayoutPendingZar',
+        'walletEarningsTotalZar',
+        'walletUpdatedAt',
+        'seshMinutes',
+        'seshCreditBalance',
+        'seshCreditCurrency',
+        'seshCreditValueZar',
+        'seshCreditPurchasedTotal',
+        'seshCreditUsedTotal',
+        'seshCreditSpendTotalZar',
+        'seshCreditIntroGranted',
+        'seshCreditIntroCredits',
+        'seshCreditUpdatedAt',
+        'studyVaultUploadCount',
+        'studyVaultSalesCount',
+        'studyVaultRevenueZar',
+        'studyVaultPurchaseCount',
+        'studyVaultSpendTotalZar',
+        'seshFocusHours',
+        'freeFocusPasses',
+        'focusEmergencyPasses',
+        'lastPassReset',
+        'lastFocusReset',
+        'lastFocusSession',
+        'xp',
+        'achievements',
+        'postCount',
+        'totalReplies',
+        'vaultUploads',
+        'temporaryPaymentSetupStatus',
+        'temporaryPaymentProvider',
+        'temporaryPaymentMethodId',
+        'temporaryPaymentRegistrationId',
+        'temporaryPaymentProviderReference',
+        'temporaryPaymentAuthorizationCode',
+        'temporaryPaymentAuthorizationReference',
+        'temporaryPaymentPreauthReference',
+        'temporaryPaymentCustomerCode',
+        'temporaryPaymentReusableAuthorizationCode',
+        'temporaryPaymentStatus',
+        'temporaryCardBrand',
+        'temporaryCardLast4',
+        'temporaryCardExpMonth',
+        'temporaryCardExpYear',
+        'temporaryCardHolder',
+        'temporaryPaymentScope',
+        'temporaryPaymentUpdatedAt',
+        'billingSetupStatus',
+        'billingProvider',
+        'billingDefaultPaymentMethodId',
+        'billingRegistrationId',
+        'billingProviderReference',
+        'billingAuthorizationCode',
+        'billingAuthorizationReference',
+        'billingPreauthReference',
+        'billingCustomerCode',
+        'billingReusableAuthorizationCode',
+        'billingStatus',
+        'billingCardBrand',
+        'billingCardLast4',
+        'billingCardExpMonth',
+        'billingCardExpYear',
+        'billingCardHolder',
+        'billingAuthorizationMode',
+        'billingSpendTotalZar',
+        'billingLastChargeAt',
+        'billingUpdatedAt',
+      ]);
+    }
+
+    function hasUnsafeProtectedUserCreateValues() {
+      return (
+        (request.resource.data.admin == true) ||
+        (request.resource.data.role != null) ||
+        (request.resource.data.platformRole != null) ||
+        (request.resource.data.accountType != null) ||
+        (request.resource.data.accessTier != null) ||
+        (request.resource.data.accessMode != null) ||
+        (request.resource.data.instantTutorAccess != null) ||
+        (request.resource.data.instantTutorAccessMode != null) ||
+        (request.resource.data.email != null) ||
+        (request.resource.data.emailLowercase != null) ||
+        (request.resource.data.emailVerified == true) ||
+        (request.resource.data.fullName != null) ||
+        (request.resource.data.fullNameLowercase != null) ||
+        (request.resource.data.middleName != null) ||
+        (request.resource.data.age != null) ||
+        (request.resource.data.major != null) ||
+        (request.resource.data.studentNumber != null) ||
+        (request.resource.data.studentNumberLowercase != null) ||
+        (request.resource.data.university != null) ||
+        (request.resource.data.levelOfStudy != null) ||
+        (request.resource.data.year != null) ||
+        (request.resource.data.bio != null) ||
+        (request.resource.data.bioModerationStatus != null) ||
+        (request.resource.data.bioModerationFlags != null) ||
+        (request.resource.data.profilePic != null) ||
+        (request.resource.data.profilePicPath != null) ||
+        (request.resource.data.adminApproval == true) ||
+        (request.resource.data.adminApprovalAt != null) ||
+        (request.resource.data.adminApprovalBy != null) ||
+        (request.resource.data.tutorApplicationStatus != null &&
+          request.resource.data.tutorApplicationStatus != 'draft') ||
+        (request.resource.data.tutoringEligibilityStatus != null &&
+          request.resource.data.tutoringEligibilityStatus != 'ineligible') ||
+        (request.resource.data.payoutOnboardingStatus != null &&
+          request.resource.data.payoutOnboardingStatus != 'not_started') ||
+        (request.resource.data.tutorStatus != null &&
+          request.resource.data.tutorStatus != '') ||
+        (request.resource.data.organizationMembership != null) ||
+        (request.resource.data.goldTick != null) ||
+        (request.resource.data.walletBalanceZar != null &&
+          request.resource.data.walletBalanceZar != 0 &&
+          request.resource.data.walletBalanceZar != 0.0) ||
+        (request.resource.data.walletHoldZar != null &&
+          request.resource.data.walletHoldZar != 0 &&
+          request.resource.data.walletHoldZar != 0.0) ||
+        (request.resource.data.walletSpentZar != null &&
+          request.resource.data.walletSpentZar != 0 &&
+          request.resource.data.walletSpentZar != 0.0) ||
+        (request.resource.data.walletPayoutPendingZar != null &&
+          request.resource.data.walletPayoutPendingZar != 0 &&
+          request.resource.data.walletPayoutPendingZar != 0.0) ||
+        (request.resource.data.walletEarningsTotalZar != null &&
+          request.resource.data.walletEarningsTotalZar != 0 &&
+          request.resource.data.walletEarningsTotalZar != 0.0) ||
+        (request.resource.data.seshMinutes != null &&
+          request.resource.data.seshMinutes != 0) ||
+        (request.resource.data.seshCreditBalance != null &&
+          request.resource.data.seshCreditBalance != 0 &&
+          request.resource.data.seshCreditBalance != 3) ||
+        (request.resource.data.seshCreditPurchasedTotal != null &&
+          request.resource.data.seshCreditPurchasedTotal != 0) ||
+        (request.resource.data.seshCreditUsedTotal != null &&
+          request.resource.data.seshCreditUsedTotal != 0) ||
+        (request.resource.data.seshCreditSpendTotalZar != null &&
+          request.resource.data.seshCreditSpendTotalZar != 0 &&
+          request.resource.data.seshCreditSpendTotalZar != 0.0) ||
+        (request.resource.data.seshCreditIntroGranted != null &&
+          request.resource.data.seshCreditIntroGranted != true) ||
+        (request.resource.data.seshCreditIntroCredits != null &&
+          request.resource.data.seshCreditIntroCredits != 3) ||
+        (request.resource.data.studyVaultUploadCount != null &&
+          request.resource.data.studyVaultUploadCount != 0) ||
+        (request.resource.data.studyVaultSalesCount != null &&
+          request.resource.data.studyVaultSalesCount != 0) ||
+        (request.resource.data.studyVaultRevenueZar != null &&
+          request.resource.data.studyVaultRevenueZar != 0 &&
+          request.resource.data.studyVaultRevenueZar != 0.0) ||
+        (request.resource.data.studyVaultPurchaseCount != null &&
+          request.resource.data.studyVaultPurchaseCount != 0) ||
+        (request.resource.data.studyVaultSpendTotalZar != null &&
+          request.resource.data.studyVaultSpendTotalZar != 0 &&
+          request.resource.data.studyVaultSpendTotalZar != 0.0) ||
+        (request.resource.data.seshFocusHours != null &&
+          request.resource.data.seshFocusHours != 0) ||
+        (request.resource.data.freeFocusPasses != null &&
+          request.resource.data.freeFocusPasses != 5 &&
+          request.resource.data.freeFocusPasses != 0) ||
+        (request.resource.data.focusEmergencyPasses != null &&
+          request.resource.data.focusEmergencyPasses != 2 &&
+          request.resource.data.focusEmergencyPasses != 0) ||
+        (request.resource.data.lastPassReset != null) ||
+        (request.resource.data.lastFocusReset != null) ||
+        (request.resource.data.lastFocusSession != null) ||
+        (request.resource.data.xp != null && request.resource.data.xp != 0) ||
+        (request.resource.data.achievements != null) ||
+        (request.resource.data.postCount != null && request.resource.data.postCount != 0) ||
+        (request.resource.data.totalReplies != null && request.resource.data.totalReplies != 0) ||
+        (request.resource.data.vaultUploads != null && request.resource.data.vaultUploads != 0)
+      );
+    }
+
+    function hasProtectedOrganizationMutations() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'adminUserIds',
+        'billingOwnerUserId',
+        'subscriptionProductName',
+        'subscriptionPriceZar',
+        'subscriptionCurrency',
+        'subscriptionBillingPeriod',
+        'subscriptionStatus',
+        'subscriptionPaymentMethodSummary',
+        'subscriptionCurrentPeriodStart',
+        'subscriptionCurrentPeriodEnd',
+        'premiumFeaturesEnabled',
+        'brandingUnlocked',
+        'analyticsDashboardEnabled',
+        'memberManagementEnabled',
+        'futurePayoutControlsEnabled',
+        'ratingAvg10',
+        'ratingCount',
+        'ratingTotal10',
+        'goldTickEligible',
+        'memberTutorCount',
+        'activeTutorCount',
+        'goldTickTutorCount',
+        'verificationStatus',
+      ]);
+    }
+
+    function hasProtectedNoteCreateValues() {
+      return request.resource.data.lectureCaptureUnlocked == true ||
+        request.resource.data.lectureCaptureUnlockedAt != null;
+    }
+
+    function hasProtectedNoteMutations() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'lectureCaptureUnlocked',
+        'lectureCaptureUnlockedAt',
+      ]);
+    }
+
+    function isParticipant(sessionId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/sessions/$(sessionId)/participants/$(request.auth.uid));
+    }
+
+    function roleFor(sessionId) {
+      return get(/databases/$(database)/documents/sessions/$(sessionId)/participants/$(request.auth.uid)).data.role;
+    }
+
+    function isTutor(sessionId) {
+      return isParticipant(sessionId) && (roleFor(sessionId) in ['primaryTutor', 'coTutor']);
+    }
+
+    function isChatParticipant(chatId) {
+      return isSignedIn() &&
+        request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+    }
+
+    function isMentorshipParticipant(mentorshipId) {
+      return isSignedIn() &&
+        request.auth.uid in get(/databases/$(database)/documents/mentorships/$(mentorshipId)).data.participants;
+    }
+
+    function isStudyVaultAccessType(accessType) {
+      return accessType in ['free', 'paid'];
+    }
+
+    function isStudyVaultResourceType(resourceType) {
+      return resourceType in ['Notes', 'Book', 'Past Paper', 'Question Bank', 'Study Guide'];
+    }
+
+    function studyVaultPath(resourceId) {
+      return /databases/$(database)/documents/vault/$(resourceId);
+    }
+
+    function studyVaultPurchasePath(resourceId) {
+      return /databases/$(database)/documents/vault_purchase_intents/$(resourceId + '_' + request.auth.uid);
+    }
+
+    function sessionPaymentIntentPath(intentId) {
+      return /databases/$(database)/documents/session_payment_intents/$(intentId);
+    }
+
+    function tutorRequestPath(requestId) {
+      return /databases/$(database)/documents/tutor_requests/$(requestId);
+    }
+
+    function userPath(userId) {
+      return /databases/$(database)/documents/users/$(userId);
+    }
+
+    function organizationPath(orgId) {
+      return /databases/$(database)/documents/tutor_organizations/$(orgId);
+    }
+
+    function organizationMemberPath(orgId, userId) {
+      return /databases/$(database)/documents/tutor_organizations/$(orgId)/members/$(userId);
+    }
+
+    function boardPath(sessionId, boardId) {
+      return /databases/$(database)/documents/sessions/$(sessionId)/boards/$(boardId);
+    }
+
+    function webrtcSignalPath(sessionId, pairId) {
+      return /databases/$(database)/documents/sessions/$(sessionId)/webrtcSignaling/$(pairId);
+    }
+
+    function boardExists(sessionId, boardId) {
+      return exists(boardPath(sessionId, boardId));
+    }
+
+    function boardOwnerId(sessionId, boardId) {
+      return get(boardPath(sessionId, boardId)).data.ownerId;
+    }
+
+    function boardVisibilityScope(sessionId, boardId) {
+      return get(boardPath(sessionId, boardId)).data.visibilityScope;
+    }
+
+    function boardOwnershipState(sessionId, boardId) {
+      return get(boardPath(sessionId, boardId)).data.ownershipState;
+    }
+
+    function canReadBoard(sessionId, boardId) {
+      return isParticipant(sessionId) && boardExists(sessionId, boardId) && (
+        isTutor(sessionId) ||
+        boardVisibilityScope(sessionId, boardId) == 'class' ||
+        (
+          boardVisibilityScope(sessionId, boardId) == 'ownerAndTutors' &&
+          boardOwnerId(sessionId, boardId) == request.auth.uid
+        )
+      );
+    }
+
+    function canWriteBoard(sessionId, boardId) {
+      return isParticipant(sessionId) && boardExists(sessionId, boardId) && (
+        (
+          isTutor(sessionId) &&
+          boardOwnershipState(sessionId, boardId) in ['tutorOwned', 'coEditable']
+        ) ||
+        (
+          !isTutor(sessionId) &&
+          boardOwnerId(sessionId, boardId) == request.auth.uid &&
+          boardOwnershipState(sessionId, boardId) in ['studentOwned', 'coEditable']
+        )
+      );
+    }
+
+    function canReadSubmission(sessionId) {
+      return isTutor(sessionId) || resource.data.studentId == request.auth.uid;
+    }
+
+    function canReadIntervention(sessionId) {
+      return isTutor(sessionId) ||
+        resource.data.studentId == request.auth.uid ||
+        resource.data.createdBy == request.auth.uid;
+    }
+
+    function canReadAiMoment(sessionId) {
+      return isTutor(sessionId) ||
+        resource.data.visibilityScope == 'class' ||
+        resource.data.studentId == request.auth.uid;
+    }
+
+    function canReadTutorAnnotation(sessionId) {
+      return isTutor(sessionId) || resource.data.studentId == request.auth.uid;
+    }
+
+    function canReadVoiceNote(sessionId) {
+      return isTutor(sessionId) ||
+        resource.data.createdBy == request.auth.uid ||
+        resource.data.studentId == request.auth.uid ||
+        (
+          resource.data.targetType == 'student' &&
+          resource.data.targetId == request.auth.uid
+        );
+    }
+
+    function canReadAiOutput(sessionId) {
+      return isTutor(sessionId) ||
+        resource.data.createdBy == request.auth.uid ||
+        resource.data.studentId == request.auth.uid ||
+        resource.data.accessScope == 'class';
+    }
+
+    function canReadSessionPack(sessionId) {
+      return isTutor(sessionId) ||
+        resource.data.studentId == request.auth.uid ||
+        resource.data.accessScope == 'class';
+    }
+
+    function canReadWebRtcSignal(sessionId, pairId) {
+      return isParticipant(sessionId) &&
+        exists(webrtcSignalPath(sessionId, pairId)) &&
+        request.auth.uid in get(webrtcSignalPath(sessionId, pairId)).data.members;
+    }
+
+    function isApprovedTutorUser(userId) {
+      return exists(userPath(userId)) &&
+        (
+          (
+            get(userPath(userId)).data.tutorApplicationStatus == 'approved' &&
+            get(userPath(userId)).data.tutoringEligibilityStatus == 'eligible' &&
+            get(userPath(userId)).data.adminApproval == true &&
+            get(userPath(userId)).data.accountType != 'instant_tutor' &&
+            get(userPath(userId)).data.accessTier != 'instant_tutor'
+          ) ||
+          (
+            get(userPath(userId)).data.tutorStatus in ['approved', 'active'] &&
+            get(userPath(userId)).data.accountType != 'instant_tutor' &&
+            get(userPath(userId)).data.accessTier != 'instant_tutor'
+          )
+        );
+    }
+
+    function isRequesterApprovedTutor() {
+      return isVerifiedStudent() &&
+        isApprovedTutorUser(request.auth.uid);
+    }
+
+    function isOwnTutorOrPlatformAdmin(tutorId) {
+      return isSignedIn() &&
+        (request.auth.uid == tutorId || isPlatformAdmin());
+    }
+
+    function isOrganizationAdmin(orgId) {
+      return isVerifiedStudent() &&
+        exists(organizationMemberPath(orgId, request.auth.uid)) &&
+        get(organizationMemberPath(orgId, request.auth.uid)).data.status == 'active' &&
+        get(organizationMemberPath(orgId, request.auth.uid)).data.approvalState == 'approved' &&
+        get(organizationMemberPath(orgId, request.auth.uid)).data.role in ['owner', 'admin'];
+    }
+
+    function organizationIdForMembershipWrite() {
+      let nextMembership = request.resource.data.organizationMembership;
+      let prevMembership = resource.data.organizationMembership;
+      return nextMembership != null &&
+          nextMembership.organizationId is string &&
+          nextMembership.organizationId != ''
+        ? nextMembership.organizationId
+        : (
+            prevMembership != null &&
+            prevMembership.organizationId is string
+              ? prevMembership.organizationId
+              : ''
+          );
+    }
+
+    function isOrganizationMembershipMirrorAdminUpdate(userId) {
+      return isVerifiedStudent() &&
+        !isOwnUser(userId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['organizationMembership']) &&
+        organizationIdForMembershipWrite() != '' &&
+        isOrganizationAdmin(organizationIdForMembershipWrite());
+    }
+
+    function isValidOrganizationCreate(orgId) {
+      return isRequesterApprovedTutor() &&
+        request.resource.data.organizationId == orgId &&
+        request.resource.data.ownerUserId == request.auth.uid &&
+        request.resource.data.billingOwnerUserId == request.auth.uid &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.subscriptionProductName == 'Organization Account' &&
+        request.resource.data.subscriptionPriceZar == 250 &&
+        request.resource.data.subscriptionCurrency == 'ZAR' &&
+        request.resource.data.subscriptionBillingPeriod == 'monthly' &&
+        request.resource.data.adminUserIds is list &&
+        request.auth.uid in request.resource.data.adminUserIds;
+    }
+
+    function isValidOrganizationMemberPayload(orgId, userId) {
+      return request.resource.data.organizationId == orgId &&
+        request.resource.data.tutorId == userId &&
+        request.resource.data.role in ['owner', 'admin', 'member'] &&
+        request.resource.data.status in ['pending', 'active', 'inactive', 'removed', 'invited'] &&
+        request.resource.data.approvalState in ['none', 'pending', 'approved', 'rejected'];
+    }
+
+    function isValidOrganizationJoinRequestCreate(userId) {
+      return isRequesterApprovedTutor() &&
+        request.auth.uid == userId &&
+        request.resource.data.tutorId == userId &&
+        request.resource.data.requestedRole == 'member' &&
+        request.resource.data.status == 'pending';
+    }
+
+    function isValidOrganizationInvitePayload(orgId) {
+      return request.resource.data.organizationId == orgId &&
+        request.resource.data.inviteeEmail is string &&
+        request.resource.data.inviteeEmail.size() > 0 &&
+        request.resource.data.requestedRole in ['member', 'admin'] &&
+        request.resource.data.status in ['pending', 'cancelled'];
+    }
+
+    function isValidOrganizationSubscriptionCreate(orgId) {
+      return isOrganizationAdmin(orgId) &&
+        request.resource.data.organizationId == orgId &&
+        request.resource.data.productName == 'Organization Account' &&
+        request.resource.data.priceZar == 250 &&
+        request.resource.data.currency == 'ZAR' &&
+        request.resource.data.billingPeriod == 'monthly' &&
+        request.resource.data.paymentMethodType == 'card';
+    }
+
+    function isValidOrganizationSubscriptionUpdate(orgId) {
+      return isOrganizationAdmin(orgId) &&
+        resource.data.organizationId == orgId &&
+        request.resource.data.organizationId == resource.data.organizationId &&
+        request.resource.data.productName == resource.data.productName &&
+        request.resource.data.priceZar == resource.data.priceZar &&
+        request.resource.data.currency == resource.data.currency &&
+        request.resource.data.billingPeriod == resource.data.billingPeriod &&
+        request.resource.data.paymentMethodType == resource.data.paymentMethodType;
+    }
+
+    function isGoldTickEligibleUser(userId) {
+      return exists(userPath(userId)) &&
+        get(userPath(userId)).data.goldTick.eligibilityStatus == 'eligible';
+    }
+
+    function isValidTutorReview(reviewId) {
+      return isSignedIn() &&
+        request.resource.data.paymentIntentId is string &&
+        exists(sessionPaymentIntentPath(request.resource.data.paymentIntentId)) &&
+        request.resource.data.requestId is string &&
+        exists(tutorRequestPath(request.resource.data.requestId)) &&
+        request.resource.data.raterId == request.auth.uid &&
+        request.resource.data.payerId == request.auth.uid &&
+        request.resource.data.studentId == request.auth.uid &&
+        get(sessionPaymentIntentPath(request.resource.data.paymentIntentId)).data.studentId == request.auth.uid &&
+        get(sessionPaymentIntentPath(request.resource.data.paymentIntentId)).data.tutorId == request.resource.data.tutorId &&
+        get(tutorRequestPath(request.resource.data.requestId)).data.studentId == request.auth.uid &&
+        get(tutorRequestPath(request.resource.data.requestId)).data.tutorId == request.resource.data.tutorId &&
+        get(tutorRequestPath(request.resource.data.requestId)).data.status in ['completed', 'ended_due_to_insufficient_funds'] &&
+        get(sessionPaymentIntentPath(request.resource.data.paymentIntentId)).data.reviewStatus == 'pending' &&
+        get(sessionPaymentIntentPath(request.resource.data.paymentIntentId)).data.reviewEligible == true &&
+        request.resource.data.stars is int &&
+        request.resource.data.stars >= 1 &&
+        request.resource.data.stars <= 5 &&
+        (request.resource.data.rating10 is int || request.resource.data.rating10 is float) &&
+        request.resource.data.rating10 >= 1 &&
+        request.resource.data.rating10 <= 10 &&
+        request.resource.data.reviewText is string &&
+        request.resource.data.status == 'submitted';
+    }
+
+    function isValidGoldTickSubscriptionCreate(tutorId) {
+      return isVerifiedStudent() &&
+        request.auth.uid == tutorId &&
+        request.resource.data.tutorId == tutorId &&
+        request.resource.data.productName == 'Gold Tick' &&
+        request.resource.data.priceZar == 30 &&
+        request.resource.data.currency == 'ZAR' &&
+        request.resource.data.billingPeriod == 'monthly' &&
+        request.resource.data.paymentMethodType == 'card' &&
+        isGoldTickEligibleUser(tutorId);
+    }
+
+    function isValidGoldTickSubscriptionUpdate(tutorId) {
+      return isVerifiedStudent() &&
+        request.auth.uid == tutorId &&
+        resource.data.tutorId == tutorId &&
+        request.resource.data.tutorId == resource.data.tutorId &&
+        request.resource.data.productName == resource.data.productName &&
+        request.resource.data.priceZar == resource.data.priceZar &&
+        request.resource.data.currency == resource.data.currency &&
+        request.resource.data.billingPeriod == resource.data.billingPeriod &&
+        request.resource.data.paymentMethodType == resource.data.paymentMethodType;
+    }
+
+    function matchesStudyVaultPricing(data) {
+      return (
+        data.accessType == 'free' &&
+        data.isPaid == false &&
+        data.priceZar == 0 &&
+        data.platformFeeZar == 0 &&
+        data.sellerNetZar == 0
+      ) || (
+        data.accessType == 'paid' &&
+        data.isPaid == true &&
+        data.priceZar is int &&
+        data.priceZar > 0 &&
+        data.platformFeeZar is int &&
+        data.platformFeeZar >= 0 &&
+        data.sellerNetZar is int &&
+        data.sellerNetZar >= 0 &&
+        data.priceZar == data.platformFeeZar + data.sellerNetZar
+      );
+    }
+
+    function isValidStudyVaultPayload(data) {
+      return isStudyVaultAccessType(data.accessType) &&
+        isStudyVaultResourceType(data.resourceType) &&
+        data.type == data.resourceType &&
+        data.currency == 'ZAR' &&
+        data.platformCommissionPercent == 20 &&
+        matchesStudyVaultPricing(data);
+    }
+
+    function isStudyVaultOwnerCreate() {
+      return isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.ownerId == request.auth.uid &&
+        request.resource.data.uploaderId == request.auth.uid &&
+        isValidStudyVaultPayload(request.resource.data);
+    }
+
+    function isStudyVaultOwnerUpdate() {
+      return isSignedIn() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.ownerId == resource.data.ownerId &&
+        request.resource.data.uploaderId == resource.data.uploaderId &&
+        request.resource.data.purchaseCount == resource.data.purchaseCount &&
+        request.resource.data.purchasedBy == resource.data.purchasedBy &&
+        isValidStudyVaultPayload(request.resource.data);
+    }
+
+    function isStudyVaultStarUpdate() {
+      return isSignedIn() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stars', 'starredBy']) &&
+        request.resource.data.stars is int &&
+        (
+          (
+            !(request.auth.uid in resource.data.starredBy) &&
+            request.auth.uid in request.resource.data.starredBy &&
+            request.resource.data.stars == resource.data.stars + 1
+          ) || (
+            request.auth.uid in resource.data.starredBy &&
+            !(request.auth.uid in request.resource.data.starredBy) &&
+            request.resource.data.stars == resource.data.stars - 1
+          )
+        );
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if isParticipant(sessionId);
+      allow write: if false;
+
+      match /participants/{userId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /sessionState/{docId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /invites/{inviteId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /boards/{boardId} {
+        allow read: if canReadBoard(sessionId, boardId);
+        allow write: if false;
+      }
+
+      match /boardRoutes/{participantId} {
+        allow read: if isTutor(sessionId) || (isParticipant(sessionId) && request.auth.uid == participantId);
+        allow write: if false;
+      }
+
+      match /boardCommands/{commandId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /boardEventChunks/{chunkId} {
+        allow read: if canReadBoard(sessionId, resource.data.boardId);
+        allow create, update: if
+          isParticipant(sessionId) &&
+          request.resource.data.writerId == request.auth.uid &&
+          request.resource.data.boardId is string &&
+          canWriteBoard(sessionId, request.resource.data.boardId);
+        allow delete: if false;
+      }
+
+      match /boardSnapshots/{snapshotId} {
+        allow read: if isTutor(sessionId) ||
+          (
+            isParticipant(sessionId) && (
+              resource.data.visibilityScope == 'class' ||
+              resource.data.ownerId == request.auth.uid ||
+              resource.data.studentId == request.auth.uid
+            )
+          );
+        allow write: if false;
+      }
+
+      match /thumbnails/{boardId} {
+        allow read: if isTutor(sessionId) ||
+          (isParticipant(sessionId) && resource.data.studentId == request.auth.uid);
+        allow write: if false;
+      }
+
+      match /thumbnailJobs/{jobId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /idempotency/{key} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /tasks/{taskId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /submissions/{submissionId} {
+        allow read: if isParticipant(sessionId) && canReadSubmission(sessionId);
+        allow write: if false;
+      }
+
+      match /interventions/{id} {
+        allow read: if isParticipant(sessionId) && canReadIntervention(sessionId);
+        allow write: if false;
+      }
+
+      match /aiMoments/{momentId} {
+        allow read: if isParticipant(sessionId) && canReadAiMoment(sessionId);
+        allow write: if false;
+      }
+
+      match /spotlightHistory/{auditId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /tags/{tagId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /teachMarkers/{markerId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /tutorAnnotations/{annotationId} {
+        allow read: if isParticipant(sessionId) && canReadTutorAnnotation(sessionId);
+        allow write: if false;
+      }
+
+      match /transcriptPointers/{pointerId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /voiceNotes/{noteId} {
+        allow read: if isParticipant(sessionId) && canReadVoiceNote(sessionId);
+        allow write: if false;
+      }
+
+      match /chat/{messageId} {
+        allow read: if isParticipant(sessionId);
+        allow create: if isParticipant(sessionId) && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false;
+      }
+
+      match /aiJobs/{jobId} {
+        allow read: if isTutor(sessionId) || resource.data.createdBy == request.auth.uid;
+        allow write: if false;
+      }
+
+      match /aiOutputs/{outputId} {
+        allow read: if isParticipant(sessionId) && canReadAiOutput(sessionId);
+        allow write: if false;
+      }
+
+      match /aiCaptureFrames/{frameId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /aiMemoryJobs/{jobId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /aiMemory/{docId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /reliabilityEvents/{eventId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /reliabilityMetrics/{metricId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /analyticsEvents/{eventId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /analyticsMetrics/{metricId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /analyticsExports/{docId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /sessionPacks/{packId} {
+        allow read: if isParticipant(sessionId) && canReadSessionPack(sessionId);
+        allow write: if false;
+      }
+
+      match /recordings/{recordingId} {
+        allow read: if isTutor(sessionId);
+        allow write: if false;
+      }
+
+      match /heatmap/{heatId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /sessionEvents/{eventId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /orchestratorActions/{actionId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /webrtcSignaling/{pairId} {
+        allow read: if canReadWebRtcSignal(sessionId, pairId);
+        allow create, update: if isParticipant(sessionId) &&
+          request.resource.data.from == request.auth.uid &&
+          request.resource.data.members is list &&
+          request.resource.data.members.size() == 2 &&
+          request.auth.uid in request.resource.data.members;
+        allow delete: if false;
+
+        match /iceCandidates/{candidateId} {
+          allow read: if canReadWebRtcSignal(sessionId, pairId);
+          allow create: if canReadWebRtcSignal(sessionId, pairId) &&
+            request.resource.data.from == request.auth.uid;
+          allow update, delete: if false;
+        }
+      }
+
+      match /laserEvents/{userId} {
+        allow read: if isParticipant(sessionId);
+        allow create, update: if isParticipant(sessionId) && request.auth.uid == userId;
+        allow delete: if false;
+      }
+
+      match /seshHelpUsage/{docId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+
+      match /seshHelpTasks/{docId} {
+        allow read: if isParticipant(sessionId);
+        allow write: if false;
+      }
+    }
+
+    match /users/{userId} {
+      allow read: if isVerifiedStudent() || isOwnUser(userId) || isPlatformAdmin();
+      allow create: if isOwnUser(userId) && !hasUnsafeProtectedUserCreateValues();
+      allow update: if (isOwnUser(userId) && !hasProtectedUserMutations()) ||
+        isOrganizationMembershipMirrorAdminUpdate(userId);
+      allow delete: if isOwnUser(userId);
+
+      match /friends/{friendId} {
+        allow read: if isVerifiedStudent();
+        allow create, update, delete: if isOwnUser(userId) && isVerifiedStudent();
+      }
+
+      match /notifications/{notificationId} {
+        allow read, write: if isOwnUser(userId) && isVerifiedStudent();
+      }
+
+      match /fcmTokens/{tokenId} {
+        allow read, write: if isOwnUser(userId) && isVerifiedStudent();
+      }
+
+      match /chatSettings/{chatId} {
+        allow read, write: if isOwnUser(userId) && isVerifiedStudent();
+      }
+
+      match /calendarEvents/{eventId} {
+        allow read, write: if isOwnUser(userId) && isVerifiedStudent();
+      }
+
+      match /timetables/{timetableId} {
+        allow read, write: if isOwnUser(userId) && isVerifiedStudent();
+      }
+
+      match /aiSessions/{sessionId} {
+        allow read, write: if isOwnUser(userId) && isVerifiedStudent();
+
+        match /boardSnapshots/{snapshotId} {
+          allow read, write: if isOwnUser(userId) && isVerifiedStudent();
+        }
+      }
+
+      match /note_folders/{folderId} {
+        allow read, write: if isOwnUser(userId) && isVerifiedStudent();
+
+        match /notes/{noteId} {
+          allow read: if isOwnUser(userId) && isVerifiedStudent();
+          allow create: if isOwnUser(userId) &&
+            isVerifiedStudent() &&
+            !hasProtectedNoteCreateValues();
+          allow update: if isOwnUser(userId) &&
+            isVerifiedStudent() &&
+            !hasProtectedNoteMutations();
+          allow delete: if isOwnUser(userId) && isVerifiedStudent();
+        }
+      }
+
+      match /ai_threads/{threadId} {
+        allow read, write: if isOwnUser(userId) && isVerifiedStudent();
+
+        match /messages/{messageId} {
+          allow read, write: if isOwnUser(userId) && isVerifiedStudent();
+        }
+      }
+
+      match /temporary_payment_methods/{paymentMethodId} {
+        allow read: if isOwnUser(userId);
+        allow write: if false;
+      }
+
+      match /payment_methods/{paymentMethodId} {
+        allow read: if isOwnUser(userId);
+        allow write: if false;
+      }
+
+      match /payment_transactions/{paymentId} {
+        allow read: if isOwnUser(userId) && isVerifiedStudent();
+        allow write: if false;
+      }
+
+      match /wallet_transactions/{transactionId} {
+        allow read: if isOwnUser(userId) && isVerifiedStudent();
+        allow write: if false;
+      }
+
+      match /seshcredit_transactions/{transactionId} {
+        allow read: if isOwnUser(userId) && isVerifiedStudent();
+        allow write: if false;
+      }
+
+      match /settings/{settingsId} {
+        allow read, write: if isOwnUser(userId) && isVerifiedStudent();
+      }
+
+      match /practiceSets/{setId} {
+        allow read, write: if isOwnUser(userId) && isVerifiedStudent();
+      }
+    }
+
+    match /posts/{postId} {
+      allow read: if isVerifiedStudent();
+      allow create: if false;
+      allow update, delete: if isVerifiedStudent() && resource.data.authorId == request.auth.uid;
+
+      match /comments/{commentId} {
+        allow read: if isVerifiedStudent();
+        allow create: if false;
+        allow update, delete: if isVerifiedStudent() && resource.data.authorId == request.auth.uid;
+      }
+
+      match /helpful_users/{userId} {
+        allow read: if isVerifiedStudent();
+        allow write: if false;
+      }
+    }
+
+    match /friend_requests/{requestId} {
+      allow read: if isVerifiedStudent() &&
+        (resource.data.fromUserID == request.auth.uid || resource.data.toUserID == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    match /chats/{chatId} {
+      allow read: if isVerifiedStudent() &&
+        request.auth.uid in resource.data.participants;
+      allow create, update, delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isVerifiedStudent() && isChatParticipant(chatId);
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /mentorship_profiles/{userId} {
+      allow read: if isVerifiedStudent();
+      allow create, update, delete: if isOwnUser(userId) && isVerifiedStudent();
+    }
+
+    match /mentorships/{mentorshipId} {
+      allow create: if isVerifiedStudent() &&
+        (request.resource.data.mentorId == request.auth.uid ||
+          request.resource.data.menteeId == request.auth.uid);
+      allow read, update, delete: if isVerifiedStudent() &&
+        (resource.data.mentorId == request.auth.uid ||
+          resource.data.menteeId == request.auth.uid);
+
+      match /checkins/{checkinId} {
+        allow read, write: if isVerifiedStudent() && isMentorshipParticipant(mentorshipId);
+      }
+
+      match /goals/{goalId} {
+        allow read, write: if isVerifiedStudent() && isMentorshipParticipant(mentorshipId);
+      }
+
+      match /interventions/{interventionId} {
+        allow read, write: if isVerifiedStudent() && isMentorshipParticipant(mentorshipId);
+      }
+    }
+
+    match /vault/{docId} {
+      allow read: if isVerifiedStudent();
+      allow create: if false;
+      allow update: if isVerifiedStudent() && isStudyVaultStarUpdate();
+      allow delete: if isVerifiedStudent() && resource.data.userId == request.auth.uid;
+    }
+
+    match /vault_purchase_intents/{intentId} {
+      allow read: if isVerifiedStudent() &&
+        (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    match /tutor_applications/{userId} {
+      allow read: if (isOwnUser(userId) && isVerifiedStudent()) || isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /tutor_search_profiles/{tutorId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /guest_tutoring_customers/{guestId} {
+      allow read: if isOwnGuestTutoringCustomer(guestId) || isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /tutor_requests/{requestId} {
+      allow read: if isSignedIn() &&
+        (resource.data.studentId == request.auth.uid || resource.data.tutorId == request.auth.uid);
+      allow write: if false;
+      allow delete: if false;
+    }
+
+    match /session_payment_intents/{intentId} {
+      allow read: if isSignedIn() &&
+        (resource.data.studentId == request.auth.uid || resource.data.tutorId == request.auth.uid);
+      allow write: if false;
+      allow delete: if false;
+    }
+
+    match /tutoring_sessions/{sessionId} {
+      allow read: if isSignedIn() &&
+        (resource.data.studentId == request.auth.uid || resource.data.tutorId == request.auth.uid);
+      allow write: if false;
+
+      match /participants/{participantId} {
+        allow read: if isSignedIn() &&
+          (get(/databases/$(database)/documents/tutoring_sessions/$(sessionId)).data.studentId == request.auth.uid ||
+            get(/databases/$(database)/documents/tutoring_sessions/$(sessionId)).data.tutorId == request.auth.uid);
+        allow write: if false;
+      }
+
+      match /billing_ticks/{tickId} {
+        allow read: if isPlatformAdmin();
+        allow write: if false;
+      }
+    }
+
+    match /tutor_session_outcomes/{outcomeId} {
+      allow read: if isSignedIn() &&
+        (resource.data.studentId == request.auth.uid || resource.data.tutorId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /tutor_session_settlements/{settlementId} {
+      allow read: if isOwnTutorOrPlatformAdmin(resource.data.tutorId);
+      allow write: if false;
+    }
+
+    match /tutor_session_reviews/{reviewId} {
+      allow read: if isSignedIn() &&
+        (
+          resource.data.studentId == request.auth.uid ||
+          resource.data.payerId == request.auth.uid ||
+          resource.data.raterId == request.auth.uid ||
+          resource.data.guestId == request.auth.uid ||
+          resource.data.tutorId == request.auth.uid
+        );
+      allow create: if false;
+      allow update, delete: if false;
+    }
+
+    match /guest_tutoring_session_tokens/{tokenId} {
+      allow read: if isSignedIn() &&
+        (resource.data.guestId == request.auth.uid || isPlatformAdmin());
+      allow write: if false;
+    }
+
+    match /payment_events/{eventId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /security_audit_logs/{logId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /moderation_events/{eventId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /monitoring_events/{eventId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /product_analytics/{eventId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /security_rate_limits/{docId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /content_fingerprints/{docId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /entitlement_idempotency/{docId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /tutor_balances/{tutorId} {
+      allow read: if isOwnTutorOrPlatformAdmin(tutorId);
+      allow write: if false;
+    }
+
+    match /tutor_payout_accounts/{accountId} {
+      allow read: if isOwnTutorOrPlatformAdmin(resource.data.tutorId);
+      allow create, update: if false;
+      allow delete: if false;
+    }
+
+    match /tutor_payouts/{payoutId} {
+      allow read: if isOwnTutorOrPlatformAdmin(resource.data.tutorId);
+      allow write: if false;
+
+      match /allocations/{allocationId} {
+        allow read: if isOwnTutorOrPlatformAdmin(resource.data.tutorId);
+        allow write: if false;
+      }
+    }
+
+    match /tutor_payout_events/{eventId} {
+      allow read: if isOwnTutorOrPlatformAdmin(resource.data.tutorId);
+      allow write: if false;
+    }
+
+    match /tutor_payout_dashboards/{tutorId} {
+      allow read: if isOwnTutorOrPlatformAdmin(tutorId);
+      allow write: if false;
+    }
+
+    match /admin_tutor_payout_dashboard/{docId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /gold_tick_subscriptions/{tutorId} {
+      allow read: if isSignedIn() && (request.auth.uid == tutorId || isPlatformAdmin());
+      allow create, update: if false;
+      allow delete: if false;
+    }
+
+    match /organization_subscriptions/{orgId} {
+      allow read: if isOrganizationAdmin(orgId) || isPlatformAdmin();
+      allow create, update: if false;
+      allow delete: if false;
+    }
+
+    match /tutor_organizations/{orgId} {
+      allow read: if isSignedIn();
+      allow create: if isValidOrganizationCreate(orgId);
+      allow update: if isOrganizationAdmin(orgId) &&
+        request.resource.data.organizationId == resource.data.organizationId &&
+        request.resource.data.ownerUserId == resource.data.ownerUserId &&
+        !hasProtectedOrganizationMutations();
+      allow delete: if false;
+
+      match /members/{userId} {
+        allow read: if isSignedIn();
+        allow create: if isValidOrganizationMemberPayload(orgId, userId) && (
+          isOrganizationAdmin(orgId) ||
+          (
+            request.auth.uid == userId &&
+            getAfter(organizationPath(orgId)).data.ownerUserId == request.auth.uid &&
+            request.resource.data.role == 'owner'
+          )
+        );
+        allow update: if isOrganizationAdmin(orgId) &&
+          isValidOrganizationMemberPayload(orgId, userId) &&
+          request.resource.data.organizationId == resource.data.organizationId &&
+          request.resource.data.tutorId == resource.data.tutorId;
+        allow delete: if false;
+      }
+
+      match /join_requests/{userId} {
+        allow read: if isSignedIn() &&
+          (request.auth.uid == userId || isOrganizationAdmin(orgId));
+        allow create: if isValidOrganizationJoinRequestCreate(userId);
+        allow update: if false;
+        allow delete: if isSignedIn() &&
+          (request.auth.uid == userId || isOrganizationAdmin(orgId));
+      }
+
+      match /invites/{inviteId} {
+        allow read: if isOrganizationAdmin(orgId);
+        allow create: if isOrganizationAdmin(orgId) &&
+          isValidOrganizationInvitePayload(orgId);
+        allow update: if isOrganizationAdmin(orgId) &&
+          isValidOrganizationInvitePayload(orgId) &&
+          request.resource.data.organizationId == resource.data.organizationId;
+        allow delete: if false;
+      }
+    }
+
+    match /reports/{reportId} {
+      allow create: if isVerifiedStudent();
+      allow read, update, delete: if false;
+    }
+
+    match /focusSessions/{sessionId} {
+      allow read: if isVerifiedStudent() && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if false;
+    }
+
+    match /templates/{tutorId} {
+      allow read, write: if isOwnUser(tutorId) && isRequesterApprovedTutor();
+
+      match /items/{templateId} {
+        allow read, write: if isOwnUser(tutorId) && isRequesterApprovedTutor();
+      }
+    }
+  }
+}

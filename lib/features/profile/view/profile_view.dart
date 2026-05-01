@@ -4,13 +4,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:seshly/access/access_controller.dart';
+import 'package:seshly/features/admin/view/tutor_review_admin_view.dart';
+import 'package:seshly/services/app_error_service.dart';
+import 'package:seshly/services/community_backend_service.dart';
+import 'package:seshly/services/platform_admin_service.dart';
 import '../widgets/stats_grid.dart';
 import '../widgets/achievement_card.dart';
-import '../widgets/tutor_banner.dart';
 import 'package:seshly/features/home/widgets/post_card.dart';
+import 'instant_tutor_mode_account_view.dart';
 import 'settings_view.dart';
-import 'tutor_application_view.dart';
-import 'tutor_stats_view.dart';
 import 'package:seshly/utils/image_picker_util.dart';
 import 'package:seshly/widgets/responsive.dart';
 
@@ -18,11 +21,7 @@ class ProfileView extends StatefulWidget {
   final String? userId;
   final bool showBack;
 
-  const ProfileView({
-    super.key,
-    this.userId,
-    this.showBack = false,
-  });
+  const ProfileView({super.key, this.userId, this.showBack = false});
 
   @override
   State<ProfileView> createState() => _ProfileViewState();
@@ -32,19 +31,30 @@ class _ProfileViewState extends State<ProfileView> {
   final Color tealAccent = const Color(0xFF00C09E);
   final Color backgroundColor = const Color(0xFF0F142B);
   final Color cardColor = const Color(0xFF1E243A);
+  final PlatformAdminService _platformAdminService =
+      const PlatformAdminService();
+  final CommunityBackendService _backend = CommunityBackendService.instance;
+  late final Future<bool> _platformAdminFuture =
+      _platformAdminService.isCurrentUserPlatformAdmin(forceRefresh: true);
   bool _isUploadingImage = false;
 
   // 🔥 ACTION: Change Profile Picture
   Future<void> _updateProfilePicture() async {
     try {
-      final result = await pickImageBytes(source: ImageSource.gallery, imageQuality: 50);
+      final result = await pickImageBytes(
+        source: ImageSource.gallery,
+        imageQuality: 50,
+      );
       if (result == null) return;
 
       setState(() => _isUploadingImage = true);
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      final storageRef = FirebaseStorage.instance.ref().child('profile_pics').child('${user.uid}.jpg');
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_pics')
+          .child('${user.uid}.jpg');
 
       await storageRef.putData(
         result.bytes,
@@ -52,11 +62,32 @@ class _ProfileViewState extends State<ProfileView> {
       );
 
       final url = await storageRef.getDownloadURL();
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'profilePic': url});
+      await _backend.updateProfile(
+        profilePicUrl: url,
+        profilePicPath: storageRef.fullPath,
+      );
 
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile picture updated!")));
-    } catch (e) {
-      debugPrint("Upload error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Profile picture updated!")),
+        );
+      }
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'profile',
+        source: 'update_profile_picture',
+      );
+      if (mounted) {
+        AppErrorService.instance.showSnackBar(
+          context,
+          AppErrorService.instance.userMessageFor(
+            error,
+            fallback: 'Could not update your profile picture.',
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isUploadingImage = false);
     }
@@ -64,36 +95,59 @@ class _ProfileViewState extends State<ProfileView> {
 
   // 🔥 ACTION: Full Screen Viewer
   void _viewFullProfilePic(String? url, String name) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent, 
-        elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(context)),
-      ),
-      body: Center(
-        child: Hero(
-          tag: 'profile_pic',
-          child: url != null 
-            ? Image.network(url, fit: BoxFit.contain) 
-            : Text(name.isNotEmpty ? name[0] : "S", style: const TextStyle(color: Colors.white, fontSize: 100)),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          body: Center(
+            child: Hero(
+              tag: 'profile_pic',
+              child: url != null
+                  ? Image.network(url, fit: BoxFit.contain)
+                  : Text(
+                      name.isNotEmpty ? name[0] : "S",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 100,
+                      ),
+                    ),
+            ),
+          ),
         ),
       ),
-    )));
+    );
   }
 
   // 🔥 ACTION: Bio Editor
   void _showBioEditor(String currentBio) {
-    final TextEditingController bioController = TextEditingController(text: currentBio);
+    final TextEditingController bioController = TextEditingController(
+      text: currentBio,
+    );
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: cardColor,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
           return Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 20,
+              right: 20,
+              top: 20,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,22 +155,44 @@ class _ProfileViewState extends State<ProfileView> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text("Edit Bio", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text("${bioController.text.length}/1000", 
-                      style: TextStyle(color: bioController.text.length >= 1000 ? Colors.red : Colors.white24, fontSize: 12)),
+                    const Text(
+                      "Edit Bio",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      "${bioController.text.length}/1000",
+                      style: TextStyle(
+                        color: bioController.text.length >= 1000
+                            ? Colors.red
+                            : Colors.white24,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 15),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 15),
-                  decoration: BoxDecoration(color: backgroundColor, borderRadius: BorderRadius.circular(15)),
+                  decoration: BoxDecoration(
+                    color: backgroundColor,
+                    borderRadius: BorderRadius.circular(15),
+                  ),
                   child: TextField(
                     controller: bioController,
                     maxLines: 8,
                     maxLength: 1000,
                     style: const TextStyle(color: Colors.white),
                     onChanged: (val) => setModalState(() {}),
-                    decoration: const InputDecoration(hintText: "Tell your academic story...", hintStyle: TextStyle(color: Colors.white24), border: InputBorder.none, counterText: ""),
+                    decoration: const InputDecoration(
+                      hintText: "Tell your academic story...",
+                      hintStyle: TextStyle(color: Colors.white24),
+                      border: InputBorder.none,
+                      counterText: "",
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -124,12 +200,43 @@ class _ProfileViewState extends State<ProfileView> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () async {
-                      final navigator = Navigator.of(context); 
-                      await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser?.uid).update({'bio': bioController.text.trim()});
-                      if (mounted) navigator.pop(); 
+                      final navigator = Navigator.of(context);
+                      try {
+                        await _backend.updateProfile(
+                          bio: bioController.text.trim(),
+                        );
+                        if (mounted) navigator.pop();
+                      } catch (error, stackTrace) {
+                        await AppErrorService.instance.recordError(
+                          error,
+                          stackTrace,
+                          category: 'profile',
+                          source: 'update_bio',
+                        );
+                        if (!context.mounted) return;
+                        AppErrorService.instance.showSnackBar(
+                          context,
+                          AppErrorService.instance.userMessageFor(
+                            error,
+                            fallback: 'Could not save your bio.',
+                          ),
+                        );
+                      }
                     },
-                    style: ElevatedButton.styleFrom(backgroundColor: tealAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 15)),
-                    child: const Text("Save Bio", style: TextStyle(color: Color(0xFF0F142B), fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: tealAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                    ),
+                    child: const Text(
+                      "Save Bio",
+                      style: TextStyle(
+                        color: Color(0xFF0F142B),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -146,18 +253,33 @@ class _ProfileViewState extends State<ProfileView> {
     final user = FirebaseAuth.instance.currentUser;
     final String? targetUserId = widget.userId ?? user?.uid;
     final bool isSelf = targetUserId != null && targetUserId == user?.uid;
+    if (isSelf && AccessController.isInstantTutorModeFor(context)) {
+      return const InstantTutorModeAccountView();
+    }
     if (targetUserId == null) {
       return const Scaffold(
         backgroundColor: Color(0xFF0F142B),
-        body: Center(child: Text("Please sign in.", style: TextStyle(color: Colors.white54))),
+        body: Center(
+          child: Text(
+            "Please sign in.",
+            style: TextStyle(color: Colors.white54),
+          ),
+        ),
       );
     }
     return Scaffold(
       backgroundColor: backgroundColor,
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(targetUserId).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(targetUserId)
+            .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF00C09E)));
+          if (!snapshot.hasData) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF00C09E)),
+            );
+          }
           final userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
           final String name = userData['fullName'] ?? "Seshly User";
 
@@ -166,7 +288,12 @@ class _ProfileViewState extends State<ProfileView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(userData, name, isSelf: isSelf, showBack: widget.showBack || !isSelf),
+                _buildHeader(
+                  userData,
+                  name,
+                  isSelf: isSelf,
+                  showBack: widget.showBack || !isSelf,
+                ),
                 Padding(
                   padding: pagePadding(context),
                   child: Column(
@@ -174,22 +301,36 @@ class _ProfileViewState extends State<ProfileView> {
                     children: [
                       const SizedBox(height: 20),
                       _buildBioSection(userData['bio'] ?? "", isSelf: isSelf),
+                      if (isSelf) ...[
+                        const SizedBox(height: 16),
+                        _buildPlatformAdminEntry(),
+                      ],
                       const SizedBox(height: 30),
                       _buildActivityActionButtons(targetUserId),
                       const SizedBox(height: 20),
                       _buildXpCard(userData),
-                      if (isSelf) ...[
-                        const SizedBox(height: 16),
-                        _buildTutorBanner(userData),
-                      ],
                       const SizedBox(height: 30),
-                      const Text("Student Stats", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      const Text(
+                        "Student Stats",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 15),
                       StatsGrid(userId: targetUserId),
                       const SizedBox(height: 35),
-                      
+
                       // 🔥 ACHIEVEMENTS SECTION (FIXED: Re-added for visibility)
-                      const Text("Achievements", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                      const Text(
+                        "Achievements",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 20),
                       _buildAchievementGrid(userData),
                       const SizedBox(height: 120),
@@ -204,10 +345,24 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  Widget _buildHeader(Map<String, dynamic> userData, String name, {required bool isSelf, required bool showBack}) {
+  Widget _buildHeader(
+    Map<String, dynamic> userData,
+    String name, {
+    required bool isSelf,
+    required bool showBack,
+  }) {
     return Container(
       padding: const EdgeInsets.only(top: 60, left: 25, right: 25, bottom: 30),
-      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [const Color(0xFF163E44).withValues(alpha: 0.8), backgroundColor])),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFF163E44).withValues(alpha: 0.8),
+            backgroundColor,
+          ],
+        ),
+      ),
       child: Column(
         children: [
           Row(
@@ -227,10 +382,68 @@ class _ProfileViewState extends State<ProfileView> {
                   Stack(
                     children: [
                       GestureDetector(
-                        onTap: () => _viewFullProfilePic(userData['profilePic'], name),
-                        child: Hero(tag: 'profile_pic', child: Container(decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: tealAccent.withValues(alpha: 0.2), width: 4)), child: CircleAvatar(radius: 65, backgroundColor: tealAccent.withValues(alpha: 0.05), backgroundImage: userData['profilePic'] != null ? NetworkImage(userData['profilePic']) : null, child: userData['profilePic'] == null ? Text(name.isNotEmpty ? name[0] : "S", style: TextStyle(color: tealAccent, fontSize: 45, fontWeight: FontWeight.bold)) : null))),
+                        onTap: () =>
+                            _viewFullProfilePic(userData['profilePic'], name),
+                        child: Hero(
+                          tag: 'profile_pic',
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: tealAccent.withValues(alpha: 0.2),
+                                width: 4,
+                              ),
+                            ),
+                            child: CircleAvatar(
+                              radius: 65,
+                              backgroundColor: tealAccent.withValues(
+                                alpha: 0.05,
+                              ),
+                              backgroundImage: userData['profilePic'] != null
+                                  ? NetworkImage(userData['profilePic'])
+                                  : null,
+                              child: userData['profilePic'] == null
+                                  ? Text(
+                                      name.isNotEmpty ? name[0] : "S",
+                                      style: TextStyle(
+                                        color: tealAccent,
+                                        fontSize: 45,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                          ),
+                        ),
                       ),
-                      Positioned(top: 5, right: 5, child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: tealAccent, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10)]), child: Text(userData['levelOfStudy'] ?? "N/A", style: const TextStyle(color: Color(0xFF0F142B), fontSize: 10, fontWeight: FontWeight.bold)))),
+                      Positioned(
+                        top: 5,
+                        right: 5,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: tealAccent,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            userData['levelOfStudy'] ?? "N/A",
+                            style: const TextStyle(
+                              color: Color(0xFF0F142B),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
                       if (isSelf)
                         Positioned(
                           bottom: 0,
@@ -239,12 +452,26 @@ class _ProfileViewState extends State<ProfileView> {
                             onTap: _updateProfilePicture,
                             child: Container(
                               padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(color: cardColor, shape: BoxShape.circle, border: Border.all(color: backgroundColor, width: 2)),
-                              child: Icon(Icons.add_a_photo_rounded, size: 18, color: tealAccent),
+                              decoration: BoxDecoration(
+                                color: cardColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: backgroundColor,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.add_a_photo_rounded,
+                                size: 18,
+                                color: tealAccent,
+                              ),
                             ),
                           ),
                         ),
-                      if (_isUploadingImage && isSelf) const Positioned.fill(child: CircularProgressIndicator(color: Colors.white)),
+                      if (_isUploadingImage && isSelf)
+                        const Positioned.fill(
+                          child: CircularProgressIndicator(color: Colors.white),
+                        ),
                     ],
                   ),
                 ],
@@ -258,13 +485,85 @@ class _ProfileViewState extends State<ProfileView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
+                ),
                 if (isSelf)
-                  Text(FirebaseAuth.instance.currentUser?.email ?? "", style: TextStyle(color: tealAccent.withValues(alpha: 0.7), fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text(
+                    FirebaseAuth.instance.currentUser?.email ?? "",
+                    style: TextStyle(
+                      color: tealAccent.withValues(alpha: 0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 const SizedBox(height: 12),
-                Text("Student No: ${userData['studentNumber'] ?? "Not Set"}", style: const TextStyle(color: Colors.white38, fontSize: 13)),
+                Text(
+                  "Student No: ${userData['studentNumber'] ?? "Not Set"}",
+                  style: const TextStyle(color: Colors.white38, fontSize: 13),
+                ),
                 const SizedBox(height: 4),
-                Row(children: [const Icon(Icons.account_balance_rounded, color: Colors.white24, size: 14), const SizedBox(width: 6), Text(userData['university'] ?? "University Not Set", style: const TextStyle(color: Colors.white54, fontSize: 13))]),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.account_balance_rounded,
+                      color: Colors.white24,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      userData['university'] ?? "University Not Set",
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.school_outlined,
+                      color: Colors.white24,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      "${userData['levelOfStudy'] ?? 'Level not set'} • ${userData['year'] ?? 'Year not set'}",
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                if ((userData['major'] ?? '').toString().trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.menu_book_rounded,
+                        color: Colors.white24,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        userData['major'].toString(),
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -276,11 +575,114 @@ class _ProfileViewState extends State<ProfileView> {
   Widget _buildBioSection(String bio, {required bool isSelf}) {
     return GestureDetector(
       onTap: isSelf ? () => _showBioEditor(bio) : null,
-      child: Container(width: double.infinity, padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: cardColor.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withValues(alpha: 0.05))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("Bio", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)), if (isSelf) Icon(Icons.notes_rounded, color: tealAccent, size: 18)]),
-        const SizedBox(height: 10),
-        Text(bio.isEmpty ? "Share your academic journey with the community..." : bio, maxLines: 50, style: const TextStyle(color: Colors.white38, fontSize: 14, height: 1.6)),
-      ])),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: cardColor.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "Bio",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+                if (isSelf)
+                  Icon(Icons.notes_rounded, color: tealAccent, size: 18),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              bio.isEmpty
+                  ? "Share your academic journey with the community..."
+                  : bio,
+              maxLines: 50,
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 14,
+                height: 1.6,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlatformAdminEntry() {
+    return FutureBuilder<bool>(
+      future: _platformAdminFuture,
+      builder: (context, snapshot) {
+        if (snapshot.data != true) {
+          return const SizedBox.shrink();
+        }
+
+        return GestureDetector(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TutorReviewAdminView()),
+          ),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: cardColor.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: tealAccent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.admin_panel_settings_outlined,
+                    color: tealAccent,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Tutor Review Admin",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        "Review tutor applications, normalize records, and manage approval and payout readiness.",
+                        style: TextStyle(
+                          color: Colors.white60,
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: Colors.white54),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -310,23 +712,38 @@ class _ProfileViewState extends State<ProfileView> {
               color: tealAccent.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.auto_awesome_rounded, color: tealAccent, size: 22),
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              color: tealAccent,
+              size: 22,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Total XP", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const Text(
+                  "Total XP",
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   "$xp XP",
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  "Earn XP from questions, answers, vault uploads, focus sessions, and achievement bonuses.",
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11, height: 1.3),
+                  "Earn XP from questions, answers, StudyVault uploads, focus sessions, and achievement bonuses.",
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 11,
+                    height: 1.3,
+                  ),
                 ),
               ],
             ),
@@ -336,57 +753,96 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  Widget _buildTutorBanner(Map<String, dynamic> userData) {
-    final Map<String, dynamic> tutorProfile = (userData['tutorProfile'] as Map<String, dynamic>?) ?? {};
-    final String rawStatus = (userData['tutorStatus'] ?? tutorProfile['status'] ?? '').toString();
-    final String status = rawStatus.toLowerCase();
-    final bool isTutor = status == 'active' || status == 'approved';
-    final String? statusLabel = rawStatus.isNotEmpty ? rawStatus : null;
-
-    return TutorBanner(
-      title: isTutor ? "Tutor Stats" : "Apply as a Tutor",
-      subtitle: isTutor
-          ? "Track sessions, ratings, and manage your availability."
-          : "Join the tutor community and appear in search when online.",
-      status: statusLabel,
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => isTutor ? const TutorStatsView() : const TutorApplicationView(),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildActivityActionButtons(String uid) {
     return Row(
       children: [
-        Expanded(child: _ActivityButton(label: "Questions Asked", icon: Icons.chat_bubble_outline_rounded, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => UserPostsView(userId: uid))))),
+        Expanded(
+          child: _ActivityButton(
+            label: "Questions Asked",
+            icon: Icons.chat_bubble_outline_rounded,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => UserPostsView(userId: uid)),
+            ),
+          ),
+        ),
         const SizedBox(width: 15),
-        Expanded(child: _ActivityButton(label: "Answers Given", icon: Icons.auto_awesome_mosaic_rounded, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => UserAnswersView(userId: uid))))),
+        Expanded(
+          child: _ActivityButton(
+            label: "Answers Given",
+            icon: Icons.auto_awesome_mosaic_rounded,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => UserAnswersView(userId: uid)),
+            ),
+          ),
+        ),
       ],
     );
   }
 
   // 🔥 ACHIEVEMENT GRID Logic restored here
   Widget _buildAchievementGrid(Map<String, dynamic> data) {
-    final int bestStreak = (data['streakBest'] as int?) ?? (data['streak'] as int?) ?? 0;
+    final int bestStreak =
+        (data['streakBest'] as int?) ?? (data['streak'] as int?) ?? 0;
+    final int xp = (data['xp'] as num?)?.toInt() ?? 0;
+    final int seshCreditBalance =
+        (data['seshCreditBalance'] as num?)?.toInt() ?? 0;
+    final int studyVaultPurchases =
+        (data['studyVaultPurchaseCount'] as num?)?.toInt() ?? 0;
+    final double studyVaultSpend =
+        (data['studyVaultSpendTotalZar'] as num?)?.toDouble() ?? 0;
     return GridView.count(
-      shrinkWrap: true, 
+      shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2, 
-      mainAxisSpacing: 15, 
-      crossAxisSpacing: 15, 
+      crossAxisCount: 2,
+      mainAxisSpacing: 15,
+      crossAxisSpacing: 15,
       childAspectRatio: 0.9,
       children: [
-        AchievementCard(icon: Icons.volunteer_activism_outlined, title: "Helpful Student", desc: "${data['totalReplies'] ?? 0} helpful reactions", isUnlocked: (data['totalReplies'] ?? 0) > 0),
-        AchievementCard(icon: Icons.cloud_upload_outlined, title: "Vault Contributor", desc: "${data['vaultUploads'] ?? 0} documents shared", isUnlocked: (data['vaultUploads'] ?? 0) > 0),
-        AchievementCard(icon: Icons.storefront_outlined, title: "Market Master", desc: "Sold ${data['marketSales'] ?? 0} items", isUnlocked: (data['marketSales'] ?? 0) > 0),
-        AchievementCard(icon: Icons.timer_outlined, title: "Focus Titan", desc: "${data['seshFocusHours'] ?? 0} hrs in SeshFocus", isUnlocked: (data['seshFocusHours'] ?? 0) > 0),
-        AchievementCard(icon: Icons.local_fire_department_outlined, title: "Streak Legend", desc: "Best streak: $bestStreak days", isUnlocked: bestStreak > 0),
-        AchievementCard(icon: Icons.bolt_outlined, title: "Power User", desc: "${data['seshMinutes'] ?? 0} SeshMinutes used", isUnlocked: (data['seshMinutes'] ?? 0) > 0),
+        AchievementCard(
+          icon: Icons.workspace_premium_outlined,
+          title: "Velocity Builder",
+          desc: "$xp XP earned across study, contribution, and focus systems.",
+          isUnlocked: xp >= 100,
+        ),
+        AchievementCard(
+          icon: Icons.cloud_upload_outlined,
+          title: "StudyVault Architect",
+          desc:
+              "${(data['studyVaultUploadCount'] ?? data['vaultUploads'] ?? 0)} resources shared into the academic learning network.",
+          isUnlocked:
+              ((data['studyVaultUploadCount'] ?? data['vaultUploads'] ?? 0)
+                  as num) >
+              0,
+        ),
+        AchievementCard(
+          icon: Icons.mic_external_on_outlined,
+          title: "Lecture Capture Pro",
+          desc:
+              "$seshCreditBalance SeshCredits ready for lecture-note capture and replay.",
+          isUnlocked: seshCreditBalance > 0,
+        ),
+        AchievementCard(
+          icon: Icons.timer_outlined,
+          title: "Focus Operator",
+          desc:
+              "${data['seshFocusHours'] ?? 0} hours locked in with SeshFocus.",
+          isUnlocked: (data['seshFocusHours'] ?? 0) > 0,
+        ),
+        AchievementCard(
+          icon: Icons.local_fire_department_outlined,
+          title: "Streak Sovereign",
+          desc: "Best streak: $bestStreak days of sustained academic motion.",
+          isUnlocked: bestStreak >= 3,
+        ),
+        AchievementCard(
+          icon: Icons.collections_bookmark_outlined,
+          title: "Resource Collector",
+          desc:
+              "$studyVaultPurchases premium StudyVault unlocks with R${studyVaultSpend.toStringAsFixed(0)} invested in academic resources.",
+          isUnlocked: studyVaultPurchases > 0 || studyVaultSpend > 0,
+        ),
       ],
     );
   }
@@ -403,14 +859,52 @@ class UserPostsView extends StatelessWidget {
     const Color tealAccent = Color(0xFF00C09E);
     return Scaffold(
       backgroundColor: backgroundColor,
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, centerTitle: true, leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white), onPressed: () => Navigator.pop(context)), title: const Text("My Questions", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "My Questions",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+      ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('posts').where('authorId', isEqualTo: userId).orderBy('createdAt', descending: true).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('posts')
+            .where('authorId', isEqualTo: userId)
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) return const Center(child: Text("Error loading posts", style: TextStyle(color: Colors.white)));
-          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: tealAccent));
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text(
+                "Error loading posts",
+                style: TextStyle(color: Colors.white),
+              ),
+            );
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: tealAccent),
+            );
+          }
           final docs = snapshot.data!.docs;
-          if (docs.isEmpty) return const Center(child: Text("You haven't posted any questions.", style: TextStyle(color: Colors.white38)));
+          if (docs.isEmpty) {
+            return const Center(
+              child: Text(
+                "You haven't posted any questions.",
+                style: TextStyle(color: Colors.white38),
+              ),
+            );
+          }
           return ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             physics: const BouncingScrollPhysics(),
@@ -418,7 +912,9 @@ class UserPostsView extends StatelessWidget {
             itemBuilder: (context, index) {
               final data = docs[index].data() as Map<String, dynamic>;
               final timestamp = data['createdAt'] as Timestamp?;
-              final timeStr = timestamp != null ? "${DateTime.now().difference(timestamp.toDate()).inMinutes}m ago" : "Just now";
+              final timeStr = timestamp != null
+                  ? "${DateTime.now().difference(timestamp.toDate()).inMinutes}m ago"
+                  : "Just now";
               return PostCard(
                 postId: docs[index].id,
                 authorId: data['authorId'] ?? "",
@@ -454,14 +950,64 @@ class UserAnswersView extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: backgroundColor,
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, centerTitle: true, leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20), onPressed: () => Navigator.pop(context)), title: const Text("My Contributions", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "My Contributions",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+      ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collectionGroup('comments').where('userId', isEqualTo: userId).orderBy('createdAt', descending: true).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collectionGroup('comments')
+            .where('userId', isEqualTo: userId)
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.white54)));
-          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: tealAccent));
+          if (snapshot.hasError) {
+            return Center(
+              child: const Text(
+                "Could not load your contributions right now.",
+                style: TextStyle(color: Colors.white54),
+              ),
+            );
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: tealAccent),
+            );
+          }
           final docs = snapshot.data!.docs;
-          if (docs.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.maps_ugc_rounded, color: Colors.white10, size: 80), SizedBox(height: 16), Text("No answers yet.\nHelp a peer to earn XP!", textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, fontSize: 16))]));
+          if (docs.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.maps_ugc_rounded, color: Colors.white10, size: 80),
+                  SizedBox(height: 16),
+                  Text(
+                    "No answers yet.\nHelp a peer to earn XP!",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white38, fontSize: 16),
+                  ),
+                ],
+              ),
+            );
+          }
           return ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             physics: const BouncingScrollPhysics(),
@@ -469,19 +1015,80 @@ class UserAnswersView extends StatelessWidget {
             itemBuilder: (context, index) {
               final data = docs[index].data() as Map<String, dynamic>;
               final timestamp = data['createdAt'] as Timestamp?;
-              final dateLabel = timestamp != null ? DateFormat('dd MMM yyyy').format(timestamp.toDate()) : "Recently";
+              final dateLabel = timestamp != null
+                  ? DateFormat('dd MMM yyyy').format(timestamp.toDate())
+                  : "Recently";
               return Container(
-                margin: const EdgeInsets.only(bottom: 15), padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: cardColor.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: tealAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: const Text("ANSWER", style: TextStyle(color: tealAccent, fontSize: 10, fontWeight: FontWeight.bold))), Text(dateLabel, style: const TextStyle(color: Colors.white24, fontSize: 11))]),
-                  const SizedBox(height: 12),
-                  Text(data['text'] ?? "", style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5)),
-                  const SizedBox(height: 12),
-                  const Divider(color: Colors.white10, thickness: 0.5),
-                  const SizedBox(height: 8),
-                  Row(children: [Icon(Icons.link_rounded, color: tealAccent.withValues(alpha: 0.5), size: 16), const SizedBox(width: 6), const Text("View original post", style: TextStyle(color: Colors.white38, fontSize: 12))]),
-                ]),
+                margin: const EdgeInsets.only(bottom: 15),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cardColor.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: tealAccent.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            "ANSWER",
+                            style: TextStyle(
+                              color: tealAccent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          dateLabel,
+                          style: const TextStyle(
+                            color: Colors.white24,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      data['text'] ?? "",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(color: Colors.white10, thickness: 0.5),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.link_rounded,
+                          color: tealAccent.withValues(alpha: 0.5),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          "View original post",
+                          style: TextStyle(color: Colors.white38, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               );
             },
           );
@@ -496,7 +1103,11 @@ class _ActivityButton extends StatefulWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
-  const _ActivityButton({required this.label, required this.icon, required this.onTap});
+  const _ActivityButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
 
   @override
   State<_ActivityButton> createState() => _ActivityButtonState();
@@ -516,8 +1127,31 @@ class _ActivityButtonState extends State<_ActivityButton> {
         duration: const Duration(milliseconds: 100),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 20),
-          decoration: BoxDecoration(color: _isPressed ? const Color(0xFF00C09E).withValues(alpha: 0.15) : const Color(0xFF1E243A).withValues(alpha: 0.5), borderRadius: BorderRadius.circular(20), border: Border.all(color: _isPressed ? const Color(0xFF00C09E).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05))),
-          child: Column(children: [Icon(widget.icon, color: const Color(0xFF00C09E), size: 26), const SizedBox(height: 10), Text(widget.label, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))]),
+          decoration: BoxDecoration(
+            color: _isPressed
+                ? const Color(0xFF00C09E).withValues(alpha: 0.15)
+                : const Color(0xFF1E243A).withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: _isPressed
+                  ? const Color(0xFF00C09E).withValues(alpha: 0.3)
+                  : Colors.white.withValues(alpha: 0.05),
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(widget.icon, color: const Color(0xFF00C09E), size: 26),
+              const SizedBox(height: 10),
+              Text(
+                widget.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -539,18 +1173,31 @@ class _SettingsButtonState extends State<_SettingsButton> {
       onTapDown: (_) => setState(() => _isPressed = true),
       onTapUp: (_) => setState(() => _isPressed = false),
       onTapCancel: () => setState(() => _isPressed = false),
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsView())),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const SettingsView()),
+      ),
       child: AnimatedScale(
         scale: _isPressed ? 0.90 : 1.0,
         duration: const Duration(milliseconds: 100),
         child: Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: _isPressed ? const Color(0xFF00C09E).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.1))),
-          child: const Icon(Icons.settings_suggest_rounded, color: Colors.white70, size: 22),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _isPressed
+                  ? const Color(0xFF00C09E).withValues(alpha: 0.3)
+                  : Colors.white.withValues(alpha: 0.1),
+            ),
+          ),
+          child: const Icon(
+            Icons.settings_suggest_rounded,
+            color: Colors.white70,
+            size: 22,
+          ),
         ),
       ),
     );
   }
 }
-
-

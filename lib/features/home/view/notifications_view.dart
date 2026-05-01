@@ -3,10 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:seshly/features/friends/messages/view/chat_room_view.dart';
 import 'package:seshly/features/friends/widgets/friend_requests_dialog.dart';
+import 'package:seshly/features/sesh/view/study_vault_view.dart';
 import '../widgets/notification_tile.dart';
 import 'question_detail_view.dart';
-import 'market_item_detail_view.dart';
-import 'market_order_detail_view.dart';
 import 'package:seshly/widgets/responsive.dart';
 import 'package:seshly/widgets/pressable_scale.dart';
 
@@ -20,6 +19,16 @@ class NotificationsView extends StatefulWidget {
 class _NotificationsViewState extends State<NotificationsView> {
   static const Color _backgroundColor = Color(0xFF0F142B);
   static const Color _tealAccent = Color(0xFF00C09E);
+
+  Map<String, dynamic> _asStringDynamicMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map(
+        (key, entryValue) => MapEntry(key.toString(), entryValue),
+      );
+    }
+    return <String, dynamic>{};
+  }
 
   Future<void> _markAllRead() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -73,8 +82,6 @@ class _NotificationsViewState extends State<NotificationsView> {
     final String? postId = data['postId'] as String?;
     final String? chatId = data['chatId'] as String?;
     final String? actorName = data['actorName'] as String?;
-    final String? itemId = data['itemId'] as String?;
-    final String? orderId = data['orderId'] as String?;
 
     switch (type) {
       case 'comment':
@@ -99,22 +106,13 @@ class _NotificationsViewState extends State<NotificationsView> {
           builder: (_) => const FriendRequestsDialog(),
         );
         break;
-      case 'market_order':
-        if (orderId != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => MarketOrderDetailView(orderId: orderId),
-            ),
-          );
-        } else if (itemId != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => MarketItemDetailView(itemId: itemId),
-            ),
-          );
-        }
+      case 'vault_purchase':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const StudyVaultView(),
+          ),
+        );
         break;
       default:
         break;
@@ -148,9 +146,8 @@ class _NotificationsViewState extends State<NotificationsView> {
       }
     } else {
       final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-      final Map<String, dynamic>? participantNames =
-          chatData['participantNames'] as Map<String, dynamic>?;
-      if (participantNames != null && currentUserId != null) {
+      final participantNames = _asStringDynamicMap(chatData['participantNames']);
+      if (participantNames.isNotEmpty && currentUserId != null) {
         for (final entry in participantNames.entries) {
           if (entry.key != currentUserId) {
             final String? name = entry.value as String?;
@@ -231,9 +228,9 @@ class _NotificationsViewState extends State<NotificationsView> {
           color: _tealAccent,
           initials: initials,
         );
-      case 'market_order':
+      case 'vault_purchase':
         return const _NotificationVisual(
-          icon: Icons.storefront_outlined,
+          icon: Icons.auto_stories_outlined,
           color: _tealAccent,
         );
       default:

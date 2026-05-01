@@ -1,0 +1,32 @@
+class Paths {
+  static const sessions = 'sessions';
+  static const participants = 'participants';
+  static const sessionState = 'sessionState';
+  static const boards = 'boards';
+  static const boardRoutes = 'boardRoutes';
+  static const tasks = 'tasks';
+  static const submissions = 'submissions';
+  static const boardEventChunks = 'boardEventChunks';
+  static const boardSnapshots = 'boardSnapshots';
+  static const boardCommands = 'boardCommands';
+  static const thumbnails = 'thumbnails';
+  static const aiJobs = 'aiJobs';
+  static const aiOutputs = 'aiOutputs';
+  static const aiMoments = 'aiMoments';
+  static const aiCaptureFrames = 'aiCaptureFrames';
+  static const aiMemoryJobs = 'aiMemoryJobs';
+  static const aiMemory = 'aiMemory';
+  static const spotlightHistory = 'spotlightHistory';
+  static const teachMarkers = 'teachMarkers';
+  static const tutorAnnotations = 'tutorAnnotations';
+  static const transcriptPointers = 'transcriptPointers';
+  static const reliabilityEvents = 'reliabilityEvents';
+  static const reliabilityMetrics = 'reliabilityMetrics';
+  static const templates = 'templates';
+  static const sessionEvents = 'sessionEvents';
+  static const orchestratorActions = 'orchestratorActions';
+  static const recordings = 'recordings';
+  static const voiceNotes = 'voiceNotes';
+  static const webrtcSignaling = 'webrtcSignaling';
+  static const laserEvents = 'laserEvents';
+}

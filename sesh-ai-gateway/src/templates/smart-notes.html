@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{TITLE}}</title>
+    <style>
+      :root {
+        --ink: #0f172a;
+        --muted: #475569;
+        --accent: #0ea5e9;
+        --accent-soft: rgba(14, 165, 233, 0.12);
+        --card: #ffffff;
+        --bg: #f8fafc;
+        --callout: #e0f2fe;
+        --mistake: #fef2f2;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+
+      header {
+        background: linear-gradient(120deg, #0ea5e9, #38bdf8);
+        color: white;
+        padding: 32px;
+      }
+
+      header h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+      }
+
+      header p {
+        margin: 0;
+        font-size: 14px;
+        opacity: 0.9;
+      }
+
+      .container {
+        padding: 28px 32px 40px;
+      }
+
+      .section {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 20px 22px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+      }
+
+      .section h2 {
+        margin: 0 0 12px;
+        font-size: 18px;
+        color: var(--ink);
+      }
+
+      .bullets {
+        margin: 0 0 12px;
+        padding-left: 18px;
+        color: var(--muted);
+      }
+
+      .callout {
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: var(--callout);
+        margin: 12px 0;
+      }
+
+      .mistakes {
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: var(--mistake);
+        margin: 12px 0;
+      }
+
+      .mini-quiz {
+        border-left: 3px solid var(--accent);
+        padding-left: 12px;
+        margin-top: 12px;
+      }
+
+      .diagram {
+        background: var(--accent-soft);
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+      }
+
+      .footer {
+        margin-top: 24px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>{{TITLE}}</h1>
+      <p>Subject: {{SUBJECT}}</p>
+    </header>
+    <div class="container">
+      {{SECTIONS}}
+      {{DIAGRAMS}}
+      <div class="footer">Generated on {{GENERATED_AT}}</div>
+    </div>
+  </body>
+</html>

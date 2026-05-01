@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{TITLE}}</title>
+    <style>
+      :root {
+        --bg: #f6f5f1;
+        --ink: #1f2421;
+        --muted: #5c615e;
+        --accent: #2f6f5d;
+        --accent-soft: #d7ebe4;
+        --card: #ffffff;
+        --border: #e2e0db;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+        padding: 36px;
+      }
+
+      .page {
+        max-width: 900px;
+        margin: 0 auto;
+        background: var(--card);
+        border-radius: 20px;
+        border: 1px solid var(--border);
+        padding: 36px 42px;
+        box-shadow: 0 20px 60px rgba(31, 36, 33, 0.08);
+      }
+
+      header {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 16px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 32px;
+        letter-spacing: -0.5px;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 10px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 12px;
+      }
+
+      section {
+        margin-top: 24px;
+      }
+
+      h2 {
+        font-size: 20px;
+        margin: 0 0 10px 0;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--ink);
+      }
+
+      li {
+        margin-bottom: 8px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .card {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        background: #fafaf8;
+      }
+
+      footer {
+        margin-top: 30px;
+        font-size: 12px;
+        color: var(--muted);
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <div class="pill">Session Summary</div>
+        <h1>{{TITLE}}</h1>
+        <div class="subtitle">Subject: {{SUBJECT}}</div>
+      </header>
+
+      <section>
+        <h2>Topics Covered</h2>
+        <ul>
+          {{TOPICS}}
+        </ul>
+      </section>
+
+      <section class="grid">
+        <div class="card">
+          <h2>Key Points</h2>
+          <ul>
+            {{KEY_POINTS}}
+          </ul>
+        </div>
+        <div class="card">
+          <h2>Definitions</h2>
+          <ul>
+            {{DEFINITIONS}}
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>Diagram Captions</h2>
+        <ul>
+          {{DIAGRAMS}}
+        </ul>
+      </section>
+
+      <section class="grid">
+        <div class="card">
+          <h2>Example Questions</h2>
+          <ul>
+            {{EXAMPLES}}
+          </ul>
+        </div>
+        <div class="card">
+          <h2>Practice Questions</h2>
+          <ul>
+            {{PRACTICE}}
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>Action Plan</h2>
+        <ul>
+          {{ACTION_PLAN}}
+        </ul>
+      </section>
+
+      <footer>Generated at {{GENERATED_AT}}</footer>
+    </div>
+  </body>
+</html>

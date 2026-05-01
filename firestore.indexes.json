@@ -1,0 +1,240 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "participantIds", "arrayConfig": "CONTAINS"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "participants",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "lastActivityAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "submissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "taskId", "order": "ASCENDING"},
+        {"fieldPath": "submittedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "aiJobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "p2pSignals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "to", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "boardSnapshots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "studentId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "boardEventChunks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "boardId", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "serverOrder", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_search_profiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "tutoringSearchVisible", "order": "ASCENDING"},
+        {"fieldPath": "subjects", "arrayConfig": "CONTAINS"},
+        {"fieldPath": "searchScore", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "participants", "arrayConfig": "CONTAINS"},
+        {"fieldPath": "lastMessageTime", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "friend_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "toUserID", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "friend_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "fromUserID", "order": "ASCENDING"},
+        {"fieldPath": "toUserID", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "isRead", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "authorId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "vault",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "userId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_session_reviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "tutorId", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_applications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "tutorApplicationStatus", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_payables",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "tutorId", "order": "ASCENDING"},
+        {"fieldPath": "scheduledPayoutDateKey", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_payables",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "scheduledPayoutDateKey", "order": "ASCENDING"},
+        {"fieldPath": "payableStatus", "order": "ASCENDING"},
+        {"fieldPath": "tutorId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_payables",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "disputeStatus", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_payables",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "scheduledPayoutDateKey", "order": "ASCENDING"},
+        {"fieldPath": "disputeStatus", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_payout_accounts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "payoutEnabled", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_payouts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "tutorId", "order": "ASCENDING"},
+        {"fieldPath": "payoutWeekKey", "order": "ASCENDING"},
+        {"fieldPath": "requestedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_payouts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "failedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_payouts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "tutorId", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "failedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_payouts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "tutorId", "order": "ASCENDING"},
+        {"fieldPath": "requestedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_payouts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "payoutWeekKey", "order": "ASCENDING"},
+        {"fieldPath": "requestedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tutor_payouts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "payoutWeekKey", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "requestedAt", "order": "DESCENDING"}
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:seshly/services/app_analytics_service.dart';
+import 'package:seshly/services/app_error_service.dart';
+import 'package:seshly/services/sesh_ai_api.dart';
 import 'package:seshly/widgets/pressable_scale.dart';
 
 class SeshAIHintModal extends StatefulWidget {
@@ -12,6 +15,9 @@ class _SeshAIHintModalState extends State<SeshAIHintModal> {
   final Color tealAccent = const Color(0xFF00C09E);
   final Color backgroundColor = const Color(0xFF0F142B);
   final Color cardColor = const Color(0xFF1E243A);
+  final _questionController = TextEditingController();
+  final _attemptController = TextEditingController();
+  final _api = SeshAiApi();
 
   int hintsRemaining = 2; // Rate-limited per practice session
   bool _isAnalyzing = false;
@@ -19,20 +25,63 @@ class _SeshAIHintModalState extends State<SeshAIHintModal> {
 
   void _requestHint() async {
     if (hintsRemaining <= 0) return;
+    final question = _questionController.text.trim();
+    final attempt = _attemptController.text.trim();
+    if (question.isEmpty || attempt.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add the question and your attempt first.')),
+      );
+      return;
+    }
 
     setState(() {
       _isAnalyzing = true;
       _currentHint = null;
     });
 
-    // Logic: Simulate Sesh AI looking at the student's board
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final response = await _api.practiceCoach(
+        questionId: DateTime.now().millisecondsSinceEpoch.toString(),
+        questionText: question,
+        studentAttemptText: attempt,
+      );
+      setState(() {
+        _isAnalyzing = false;
+        _currentHint = response['nextHint']?.toString();
+        hintsRemaining--;
+      });
+      await AppAnalyticsService.instance.trackAiUsage(
+        action: 'practice_hint',
+        status: 'success',
+      );
+    } catch (error, stackTrace) {
+      await AppAnalyticsService.instance.trackAiUsage(
+        action: 'practice_hint',
+        status: 'error',
+      );
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'ai',
+        source: 'practice_hint',
+      );
+      setState(() => _isAnalyzing = false);
+      if (!mounted) return;
+      AppErrorService.instance.showSnackBar(
+        context,
+        AppErrorService.instance.userMessageFor(
+          error,
+          fallback: 'Hint failed. Please try again.',
+        ),
+      );
+    }
+  }
 
-    setState(() {
-      _isAnalyzing = false;
-      _currentHint = "Try looking at the L'Hôpital's Rule. Since your numerator and denominator both approach 0, you can differentiate them separately.";
-      hintsRemaining--;
-    });
+  @override
+  void dispose() {
+    _questionController.dispose();
+    _attemptController.dispose();
+    super.dispose();
   }
 
   @override
@@ -114,6 +163,36 @@ class _SeshAIHintModalState extends State<SeshAIHintModal> {
     
     return Column(
       children: [
+        TextField(
+          controller: _questionController,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+          decoration: InputDecoration(
+            hintText: 'Paste the question here',
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 80)),
+            filled: true,
+            fillColor: backgroundColor.withValues(alpha: 120),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          minLines: 1,
+          maxLines: 3,
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _attemptController,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+          decoration: InputDecoration(
+            hintText: 'Describe your attempt',
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 80)),
+            filled: true,
+            fillColor: backgroundColor.withValues(alpha: 120),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          minLines: 1,
+          maxLines: 3,
+        ),
+        const SizedBox(height: 15),
         PressableScale(
           onTap: canRequest ? _requestHint : null,
           borderRadius: BorderRadius.circular(15),

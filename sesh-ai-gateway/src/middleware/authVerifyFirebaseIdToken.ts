@@ -16,7 +16,7 @@ export async function authVerifyFirebaseIdToken(
   }
 
   try {
-    const decoded = await getAuth().verifyIdToken(match[1]);
+    const decoded = await getAuth().verifyIdToken(match[1], true);
     req.user = decoded;
     next();
   } catch (error) {

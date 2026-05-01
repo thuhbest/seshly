@@ -1,0 +1,209 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const modelRouter_1 = require("../services/modelRouter");
+const aiThreadService_1 = require("../services/aiThreadService");
+const env_1 = require("../utils/env");
+const router = (0, express_1.Router)();
+function safeJsonParse(text) {
+    try {
+        return JSON.parse(text);
+    }
+    catch {
+        const match = text.match(/\{[\s\S]*\}/);
+        if (!match)
+            return null;
+        try {
+            return JSON.parse(match[0]);
+        }
+        catch {
+            return null;
+        }
+    }
+}
+function normalizeArray(value) {
+    if (!Array.isArray(value))
+        return [];
+    return value.map((item) => String(item)).filter((item) => item.trim().length > 0);
+}
+function ensureQuestion(text) {
+    const trimmed = text.trim();
+    if (!trimmed)
+        return 'What part of the problem is confusing or unclear right now?';
+    return trimmed.endsWith('?') ? trimmed : `${trimmed}?`;
+}
+function buildReplyText(output) {
+    const question = ensureQuestion(output.clarificationQuestion);
+    const hint = output.hint?.trim() || 'Try to identify the key concept and restate it in your own words.';
+    const tryStep = output.tryStep?.trim() || 'Work out the first small step and share what you get.';
+    return `Quick question: ${question}\nHint: ${hint}\nTry this step: ${tryStep}`;
+}
+function buildDefaultActions(subject) {
+    const base = [
+        'Tell me where you got stuck.',
+        'Show your last attempted step.',
+        'Share any relevant formulas or notes.',
+    ];
+    if (subject) {
+        base.unshift(`Confirm the topic/subject is ${subject}.`);
+    }
+    return base.slice(0, 3);
+}
+function parseModelOutput(raw) {
+    const parsed = safeJsonParse(raw) ?? {};
+    return {
+        clarificationQuestion: String(parsed.clarificationQuestion ?? ''),
+        hint: String(parsed.hint ?? ''),
+        tryStep: String(parsed.tryStep ?? ''),
+        suggestedNextActions: normalizeArray(parsed.suggestedNextActions),
+        tutorSearchQuery: parsed.tutorSearchQuery,
+    };
+}
+async function callPolicyGate(req, payload) {
+    const authHeader = req.header('authorization') || '';
+    const response = await fetch(`http://127.0.0.1:${env_1.config.port}/ai/policy/gate/practice`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+            authorization: authHeader,
+            'x-firebase-appcheck': req.header('x-firebase-appcheck') || req.header('x-firebase-app-check') || '',
+        },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Policy gate failed ${response.status}: ${text}`);
+    }
+    return (await response.json());
+}
+async function buildSocraticResponse(message, context) {
+    const provider = env_1.config.model.provider;
+    const model = provider === 'openai' ? env_1.config.model.openai.model : env_1.config.model.google.model;
+    const maxTokens = env_1.config.maxTokensPerEndpoint['POST /ai/chat/socratic'];
+    const system = [
+        'You are a Socratic tutor for students.',
+        'Return JSON only with keys:',
+        'clarificationQuestion, hint, tryStep, suggestedNextActions, tutorSearchQuery.',
+        'Never give final answers or full solutions.',
+        'Use exactly one clarification question, one hint, and one tryStep instruction.',
+        'Keep each field concise.',
+    ].join('\n');
+    const userPayload = {
+        message,
+        context: context ?? null,
+    };
+    const output = await (0, modelRouter_1.callTextModel)({
+        provider,
+        model,
+        jsonOnly: true,
+        temperature: 0.2,
+        maxTokens,
+        messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: JSON.stringify(userPayload) },
+        ],
+    });
+    return parseModelOutput(output);
+}
+router.post('/ai/chat/socratic', async (req, res) => {
+    const body = (req.body ?? {});
+    const message = typeof body.message === 'string' ? body.message.trim() : '';
+    const threadId = body.threadId?.trim();
+    if (!message || !threadId) {
+        res.status(400).json({ error: 'invalid_request', message: 'threadId and message are required.' });
+        return;
+    }
+    const authedUserId = req.user?.uid;
+    if (authedUserId && body.userId && body.userId !== authedUserId) {
+        res.status(403).json({ error: 'user_mismatch' });
+        return;
+    }
+    const userId = authedUserId || body.userId;
+    if (!userId) {
+        res.status(401).json({ error: 'missing_user' });
+        return;
+    }
+    const currentTurns = await (0, aiThreadService_1.getThreadTurns)(threadId);
+    const contentHint = JSON.stringify({
+        subject: body.context?.subject ?? null,
+        attachments: body.context?.attachments?.length ?? 0,
+        turnCount: currentTurns,
+    });
+    let policy;
+    try {
+        policy = await callPolicyGate(req, {
+            userId,
+            text: message,
+            contextType: 'practice',
+            contentHint,
+        });
+    }
+    catch (error) {
+        console.error('Policy gate error', error);
+        res.status(502).json({ error: 'policy_gate_unavailable' });
+        return;
+    }
+    if (!policy.allowed) {
+        const refusal = {
+            replyText: policy.nextStep ||
+                'I can only help with school-related questions. Please share a study topic or assignment.',
+            suggestedNextActions: policy.nextStep ? [policy.nextStep] : [],
+            recommendTutor: policy.recommendTutor,
+            turnsUsed: currentTurns,
+            turnsRemaining: Math.max(env_1.config.maxChatTurnsPerThread - currentTurns, 0),
+        };
+        res.json(refusal);
+        return;
+    }
+    const threadState = await (0, aiThreadService_1.incrementThreadTurns)(threadId, userId, message.slice(0, 120));
+    const turnsUsed = threadState.turnsUsed;
+    const turnsRemaining = Math.max(env_1.config.maxChatTurnsPerThread - turnsUsed, 0);
+    if (turnsUsed > env_1.config.maxChatTurnsPerThread) {
+        const cta = {
+            replyText: 'You’ve hit the max number of turns for this thread. A tutor can take you the rest of the way with a full walkthrough.',
+            suggestedNextActions: ['Request a tutor', 'Share the exact topic or course code'],
+            recommendTutor: true,
+            tutorSearchQuery: {
+                subject: body.context?.subject,
+            },
+            turnsUsed,
+            turnsRemaining: 0,
+        };
+        res.json(cta);
+        return;
+    }
+    let modelOutput;
+    try {
+        modelOutput = await buildSocraticResponse(message, body.context);
+    }
+    catch (error) {
+        const errText = String(error ?? '');
+        if (errText.includes('insufficient_quota') || errText.includes('OpenAI error 429')) {
+            res.status(429).json({
+                error: 'provider_quota',
+                message: 'AI quota exceeded. Please try again later.',
+                recommendTutor: true,
+            });
+            return;
+        }
+        res.status(502).json({
+            error: 'model_unavailable',
+            message: 'AI model is temporarily unavailable. Please try again.',
+        });
+        return;
+    }
+    const replyText = buildReplyText(modelOutput);
+    const suggestedNextActions = modelOutput.suggestedNextActions && modelOutput.suggestedNextActions.length > 0
+        ? modelOutput.suggestedNextActions
+        : buildDefaultActions(body.context?.subject);
+    const response = {
+        replyText,
+        suggestedNextActions,
+        recommendTutor: policy.recommendTutor,
+        tutorSearchQuery: modelOutput.tutorSearchQuery ?? (body.context?.subject ? { subject: body.context.subject } : undefined),
+        turnsUsed,
+        turnsRemaining,
+    };
+    res.json(response);
+});
+exports.default = router;

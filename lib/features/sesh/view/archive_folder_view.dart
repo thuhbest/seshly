@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:seshly/features/sesh/widgets/sesh_credit_widgets.dart';
+import 'package:seshly/services/sesh_credit_service.dart';
 import 'note_editor_view.dart';
 import 'package:seshly/widgets/pressable_scale.dart';
 
@@ -20,6 +22,7 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
   final Color tealAccent = const Color(0xFF00C09E);
   final Color backgroundColor = const Color(0xFF0F142B);
   final Color cardColor = const Color(0xFF1E243A);
+  final SeshCreditService _seshCreditService = SeshCreditService();
   bool _isCreating = false;
 
   Future<Uint8List?> _readFileBytes(PlatformFile file) async {
@@ -60,6 +63,7 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
       await noteRef.set({
         'title': 'New note',
         'type': 'canvas',
+        'noteMode': 'standard',
         'canvasHeight': 1400.0,
         'canvasWidth': baseWidth,
         'strokes': [],
@@ -77,6 +81,49 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isCreating = false);
+    }
+  }
+
+  Future<void> _createLectureNote(double baseWidth) async {
+    if (_isCreating) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => _isCreating = true);
+    try {
+      final noteRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('note_folders')
+          .doc(widget.folderId)
+          .collection('notes')
+          .doc();
+      await noteRef.set({
+        'title': 'Lecture capture',
+        'type': 'canvas',
+        'noteMode': 'lecture',
+        'lectureCaptureUnlocked': false,
+        'lectureSegments': [],
+        'lectureSegmentCount': 0,
+        'lectureTranscriptWordCount': 0,
+        'canvasHeight': 1600.0,
+        'canvasWidth': baseWidth,
+        'strokes': [],
+        'texts': [],
+        'images': [],
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      await _incrementNoteCount(1);
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => NoteEditorView(folderId: widget.folderId, noteId: noteRef.id),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isCreating = false);
     }
@@ -126,6 +173,7 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
       await noteRef.set({
         'title': fileName.replaceAll('.pdf', ''),
         'type': 'pdf',
+        'noteMode': 'annotate',
         'pdfUrl': url,
         'pdfName': fileName,
         'canvasWidth': baseWidth,
@@ -151,6 +199,23 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
     }
   }
 
+  Future<void> _openSeshCreditStore(int balance) async {
+    await showSeshCreditPurchaseSheet(
+      context: context,
+      currentBalance: balance,
+      onPurchase: (bundle) async {
+        final nextBalance = await _seshCreditService.purchaseCredits(
+          credits: bundle.credits,
+          source: 'archive_folder',
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${bundle.credits} SeshCredits added. Balance: $nextBalance.')),
+        );
+      },
+    );
+  }
+
   void _showCreateNoteSheet(double baseWidth) {
     showModalBottomSheet(
       context: context,
@@ -164,6 +229,16 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
           children: [
             const Text('Create note', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
             const SizedBox(height: 16),
+            _ActionCard(
+              icon: Icons.mic_external_on_outlined,
+              title: 'Lecture capture',
+              subtitle: '1 SeshCredit unlocks audio capture, live captions, and attached lecture segments.',
+              onTap: () {
+                Navigator.pop(context);
+                _createLectureNote(baseWidth);
+              },
+            ),
+            const SizedBox(height: 12),
             _ActionCard(
               icon: Icons.auto_stories_outlined,
               title: 'Blank notebook',
@@ -408,95 +483,138 @@ class _ArchiveFolderViewState extends State<ArchiveFolderView> {
                 return const Center(child: CircularProgressIndicator(color: Color(0xFF00C09E)));
               }
               final notes = snapshot.data!.docs;
-              if (notes.isEmpty) {
-                return Center(
-                  child: Text('No notes yet. Tap + to create one.', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
-                );
-              }
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(20),
-                itemCount: notes.length,
-                itemBuilder: (context, index) {
-                  final doc = notes[index];
-                  final data = doc.data() as Map<String, dynamic>;
-                  final title = (data['title'] ?? 'Note').toString();
-                  final type = (data['type'] ?? 'canvas').toString();
-                  final updatedAt = data['updatedAt'] as Timestamp?;
-                  final updatedLabel = updatedAt == null
-                      ? 'Just now'
-                      : DateFormat('dd MMM, HH:mm').format(updatedAt.toDate());
-
-                  return PressableScale(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => NoteEditorView(folderId: widget.folderId, noteId: doc.id),
-                      ),
+              return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+                builder: (context, userSnapshot) {
+                  final userData = userSnapshot.data?.data();
+                  final balance = _seshCreditService.balanceFrom(userData);
+                  final items = <Widget>[
+                    SeshCreditSummaryCard(
+                      balance: balance,
+                      title: 'SeshCredit for lecture notes',
+                      subtitle: 'Unlock a lecture note once, then record the whole session into polished study material.',
+                      footnote: '1 SeshCredit per lecture note unlock. Tutor wallet stays separate from note-taking.',
+                      onBuy: () => _openSeshCreditStore(balance),
                     ),
-                    borderRadius: BorderRadius.circular(18),
-                    pressedScale: 0.985,
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: cardColor.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    const SizedBox(height: 16),
+                  ];
+
+                  if (notes.isEmpty) {
+                    items.add(
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 60),
+                          child: Text(
+                            'No notes yet. Tap + to create one.',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                          ),
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: tealAccent.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              type == 'pdf' ? Icons.picture_as_pdf_rounded : Icons.menu_book_rounded,
-                              color: tealAccent,
-                            ),
+                    );
+                  } else {
+                    items.addAll(notes.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final title = (data['title'] ?? 'Note').toString();
+                      final type = (data['type'] ?? 'canvas').toString();
+                      final noteMode = (data['noteMode'] ?? 'standard').toString();
+                      final segmentCount = (data['lectureSegmentCount'] as num?)?.toInt() ?? 0;
+                      final transcriptWords = (data['lectureTranscriptWordCount'] as num?)?.toInt() ?? 0;
+                      final updatedAt = data['updatedAt'] as Timestamp?;
+                      final updatedLabel = updatedAt == null
+                          ? 'Just now'
+                          : DateFormat('dd MMM, HH:mm').format(updatedAt.toDate());
+                      final subtitle = noteMode == 'lecture'
+                          ? 'Lecture capture'
+                          : type == 'pdf'
+                              ? 'PDF annotation'
+                              : 'Notebook';
+
+                      return PressableScale(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => NoteEditorView(folderId: widget.folderId, noteId: doc.id),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  type == 'pdf' ? 'PDF annotation' : 'Notebook',
-                                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        pressedScale: 0.985,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: cardColor.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: tealAccent.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                const SizedBox(height: 6),
-                                Text('Updated $updatedLabel', style: const TextStyle(color: Colors.white30, fontSize: 11)),
-                              ],
-                            ),
-                          ),
-                          PopupMenuButton<String>(
-                            color: cardColor,
-                            icon: const Icon(Icons.more_vert, color: Colors.white70),
-                            onSelected: (value) {
-                              if (value == 'rename') {
-                                _renameNote(doc, title);
-                              } else if (value == 'delete') {
-                                _deleteNote(doc);
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'rename',
-                                child: Text('Rename', style: TextStyle(color: Colors.white)),
+                                child: Icon(
+                                  noteMode == 'lecture'
+                                      ? Icons.mic_external_on_outlined
+                                      : type == 'pdf'
+                                          ? Icons.picture_as_pdf_rounded
+                                          : Icons.menu_book_rounded,
+                                  color: tealAccent,
+                                ),
                               ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      subtitle,
+                                      style: const TextStyle(color: Colors.white38, fontSize: 12),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      noteMode == 'lecture'
+                                          ? '$segmentCount segments · $transcriptWords captured words'
+                                          : 'Updated $updatedLabel',
+                                      style: const TextStyle(color: Colors.white30, fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuButton<String>(
+                                color: cardColor,
+                                icon: const Icon(Icons.more_vert, color: Colors.white70),
+                                onSelected: (value) {
+                                  if (value == 'rename') {
+                                    _renameNote(doc, title);
+                                  } else if (value == 'delete') {
+                                    _deleteNote(doc);
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'rename',
+                                    child: Text('Rename', style: TextStyle(color: Colors.white)),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    }));
+                  }
+
+                  return ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: items,
                   );
                 },
               );

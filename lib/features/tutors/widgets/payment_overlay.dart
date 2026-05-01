@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
+import 'package:seshly/services/secure_entitlements_service.dart';
 
 class PaymentOverlay extends StatefulWidget {
   final String packageName;
@@ -19,36 +19,25 @@ class PaymentOverlay extends StatefulWidget {
 
 class _PaymentOverlayState extends State<PaymentOverlay> {
   bool _isProcessing = false;
+  final SecureEntitlementsService _secureEntitlements =
+      SecureEntitlementsService();
 
   void _processPayment() async {
     setState(() => _isProcessing = true);
     await Future.delayed(const Duration(seconds: 2)); // Mock delay
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please sign in to recharge.')),
-        );
-      }
-      return;
-    }
-
     try {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'seshMinutes': FieldValue.increment(widget.minutes),
-      }, SetOptions(merge: true));
+      await _secureEntitlements.purchaseSeshMinutes(minutes: widget.minutes);
       if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context);
       messenger.showSnackBar(
         SnackBar(content: Text('Added ${widget.minutes} Sesh Minutes.')),
       );
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         setState(() => _isProcessing = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Recharge failed. Please try again.')),
+          SnackBar(content: Text('Recharge failed: $error')),
         );
       }
     }

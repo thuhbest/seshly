@@ -1,0 +1,142 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function hasVerifiedEmail() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isOwner(userId) && hasVerifiedEmail();
+    }
+
+    function participantDoc(sessionId) {
+      return firestore.get(
+        /databases/(default)/documents/sessions/$(sessionId)/participants/$(request.auth.uid)
+      );
+    }
+
+    function isParticipant(sessionId) {
+      return isSignedIn() &&
+        participantDoc(sessionId).data.userId == request.auth.uid;
+    }
+
+    function isTutor(sessionId) {
+      return isParticipant(sessionId) &&
+        participantDoc(sessionId).data.role in ['primaryTutor', 'coTutor'];
+    }
+
+    function isChatParticipant(chatId) {
+      return isSignedIn() &&
+        request.auth.uid in firestore.get(
+          /databases/(default)/documents/chats/$(chatId)
+        ).data.participants;
+    }
+
+    function hasResourceMetadata() {
+      return request.resource != null &&
+        request.resource.size != null &&
+        request.resource.contentType != null;
+    }
+
+    function isSafeImageUpload(maxBytes) {
+      return hasResourceMetadata() &&
+        request.resource.size <= maxBytes &&
+        request.resource.contentType.matches('image/(png|jpeg|jpg|webp)');
+    }
+
+    function isSafeAudioUpload(maxBytes) {
+      return hasResourceMetadata() &&
+        request.resource.size <= maxBytes &&
+        request.resource.contentType.matches('audio/(mpeg|mp3|wav|aac|ogg|webm|mp4)');
+    }
+
+    function isSafeDocumentUpload(maxBytes) {
+      return hasResourceMetadata() &&
+        request.resource.size <= maxBytes &&
+        (
+          request.resource.contentType == 'application/pdf' ||
+          request.resource.contentType == 'text/plain' ||
+          request.resource.contentType.matches('image/(png|jpeg|jpg|webp)')
+        );
+    }
+
+    function isSafeUserUpload(maxBytes) {
+      return isSafeDocumentUpload(maxBytes) || isSafeAudioUpload(maxBytes);
+    }
+
+    match /sessions/{sessionId}/boardSnapshots/{allPaths=**} {
+      allow read: if isParticipant(sessionId);
+      allow write: if isParticipant(sessionId) && isSafeImageUpload(10 * 1024 * 1024);
+    }
+
+    match /sessions/{sessionId}/thumbnails/{allPaths=**} {
+      allow read: if isTutor(sessionId);
+      allow write: if isTutor(sessionId) && isSafeImageUpload(3 * 1024 * 1024);
+    }
+
+    match /sessions/{sessionId}/voiceNotes/{userId}/{allPaths=**} {
+      allow read: if isParticipant(sessionId);
+      allow write: if (isTutor(sessionId) || isOwner(userId)) &&
+        isSafeAudioUpload(25 * 1024 * 1024);
+    }
+
+    match /users/{userId}/ai/sessions/{sessionId}/{allPaths=**} {
+      allow read: if isVerifiedOwner(userId);
+      allow write: if isVerifiedOwner(userId) &&
+        isSafeDocumentUpload(15 * 1024 * 1024);
+    }
+
+    match /users/{userId}/{allPaths=**} {
+      allow read: if isVerifiedOwner(userId);
+      allow write: if isVerifiedOwner(userId) &&
+        isSafeUserUpload(25 * 1024 * 1024);
+    }
+
+    match /notes/{userId}/{allPaths=**} {
+      allow read: if isVerifiedOwner(userId);
+      allow write: if isVerifiedOwner(userId) &&
+        isSafeUserUpload(25 * 1024 * 1024);
+    }
+
+    match /profile_pics/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if hasVerifiedEmail() &&
+        fileName == request.auth.uid + '.jpg' &&
+        isSafeImageUpload(5 * 1024 * 1024);
+    }
+
+    match /chat_voice_notes/{chatId}/{fileName} {
+      allow read: if isChatParticipant(chatId);
+      allow write: if hasVerifiedEmail() &&
+        isChatParticipant(chatId) &&
+        fileName.matches('^.*_' + request.auth.uid + '\\.(m4a|mp4|aac|ogg|webm|mp3|wav)$') &&
+        isSafeAudioUpload(25 * 1024 * 1024);
+    }
+
+    match /study_vault/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if hasVerifiedEmail() &&
+        fileName.matches('^' + request.auth.uid + '_.*\\.pdf$') &&
+        isSafeDocumentUpload(30 * 1024 * 1024);
+    }
+
+    match /post_attachments/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if hasVerifiedEmail() &&
+        fileName.matches('^' + request.auth.uid + '_.*\\.(jpg|jpeg|png|webp)$') &&
+        isSafeImageUpload(10 * 1024 * 1024);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "seshly-thumbnail-worker",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.14.0",
+    "express": "^4.19.2"
+  }
+}

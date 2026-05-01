@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'package:seshly/services/app_error_service.dart';
+import 'package:seshly/services/community_backend_service.dart';
+
 class EditProfileView extends StatefulWidget {
   const EditProfileView({super.key});
 
@@ -22,6 +25,7 @@ class _EditProfileViewState extends State<EditProfileView> {
   String? _selectedLevel;
   bool _isLoading = true;
   bool _isSaving = false;
+  final CommunityBackendService _backend = CommunityBackendService.instance;
 
   final List<String> _levels = ["1st Year", "2nd Year", "3rd Year", "Honours", "Masters", "PhD"];
 
@@ -92,15 +96,34 @@ class _EditProfileViewState extends State<EditProfileView> {
 
   Future<void> _saveProfile() async {
     setState(() => _isSaving = true);
-    final user = FirebaseAuth.instance.currentUser;
-    await FirebaseFirestore.instance.collection('users').doc(user!.uid).update({
-      'fullName': _nameController.text.trim(),
-      'middleName': _middleNameController.text.trim(),
-      'age': int.tryParse(_ageController.text) ?? 0,
-      'major': _majorController.text.trim(),
-      'levelOfStudy': _selectedLevel,
-    });
-    if (mounted) Navigator.pop(context);
+    try {
+      await _backend.updateProfile(
+        fullName: _nameController.text.trim(),
+        middleName: _middleNameController.text.trim(),
+        age: int.tryParse(_ageController.text) ?? 0,
+        major: _majorController.text.trim(),
+        levelOfStudy: _selectedLevel,
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'profile',
+        source: 'edit_profile',
+      );
+      if (mounted) {
+        AppErrorService.instance.showSnackBar(
+          context,
+          AppErrorService.instance.userMessageFor(
+            error,
+            fallback: 'Could not save your profile right now.',
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   Widget _buildField(String label, TextEditingController controller, {bool isNumber = false}) {

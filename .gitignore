@@ -98,6 +98,28 @@ linux/flutter/ephemeral/
 
 # VS Code
 .vscode/
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+gcloud.env
+firebase_options.dart
+key.properties
+*.pem
+*.key
+.firebase/
+
+# Node
+node_modules/
+npm-debug.log
+package-lock.json
+yarn.lock
+
+# Configuration files with credentials
+.env*
+!.env.example
+!gcloud.env.example
 .history/
 
 # IntelliJ / Android Studio
@@ -124,3 +146,7 @@ app.*.map.json
 .env
 .env.*
 .sensitive/
+node_modules
+
+# Keep iOS dependency lockfile trackable for reproducible pod installs.
+!ios/Podfile.lock

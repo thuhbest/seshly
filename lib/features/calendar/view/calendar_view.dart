@@ -17,6 +17,7 @@ class CalendarView extends StatefulWidget {
 
 class _CalendarViewState extends State<CalendarView> {
   bool isMonthView = true;
+  String _eventTypeFilter = 'All';
 
   late DateTime currentMonth;
   late int selectedDay;
@@ -31,7 +32,7 @@ class _CalendarViewState extends State<CalendarView> {
     currentMonth = DateTime(now.year, now.month, 1);
     selectedDay = now.day;
     _repo = CalendarRepository();
-    _importer = TimetablePdfImporter(_repo);
+    _importer = TimetablePdfImporter();
   }
 
   @override
@@ -68,12 +69,29 @@ class _CalendarViewState extends State<CalendarView> {
                       ),
                     ],
                   ),
-                  TextButton(
-                    onPressed: () => setState(() => isMonthView = !isMonthView),
-                    child: Text(
-                      isMonthView ? "List View" : "Month View",
-                      style: const TextStyle(color: tealAccent, fontWeight: FontWeight.bold),
-                    ),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          final now = DateTime.now();
+                          setState(() {
+                            currentMonth = DateTime(now.year, now.month, 1);
+                            selectedDay = now.day;
+                          });
+                        },
+                        child: const Text(
+                          "Today",
+                          style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => setState(() => isMonthView = !isMonthView),
+                        child: Text(
+                          isMonthView ? "List View" : "Month View",
+                          style: const TextStyle(color: tealAccent, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -110,6 +128,20 @@ class _CalendarViewState extends State<CalendarView> {
                 ],
               ),
               const SizedBox(height: 30),
+              StreamBuilder<List<CalendarEvent>>(
+                stream: _repo.streamUpcomingEvents(daysAhead: 14),
+                builder: (context, snapshot) {
+                  final events = snapshot.data ?? const <CalendarEvent>[];
+                  final now = DateTime.now();
+                  final upcoming = events.where((e) => e.start.isAfter(now)).toList();
+                  upcoming.sort((a, b) => a.start.compareTo(b.start));
+                  final next = upcoming.isEmpty ? null : upcoming.first;
+                  return _buildFocusStrip(next, upcoming.length);
+                },
+              ),
+              const SizedBox(height: 14),
+              _buildEventTypeFilters(),
+              const SizedBox(height: 14),
 
               Expanded(
                 child: SingleChildScrollView(
@@ -157,7 +189,7 @@ class _CalendarViewState extends State<CalendarView> {
                         StreamBuilder<List<CalendarEvent>>(
                           stream: _repo.streamEventsForDay(DateTime(currentMonth.year, currentMonth.month, selectedDay)),
                           builder: (context, snap) {
-                            final events = snap.data ?? const <CalendarEvent>[];
+                            final events = _filterByType(snap.data ?? const <CalendarEvent>[]);
 
                             if (events.isEmpty) {
                               return const Padding(
@@ -195,7 +227,7 @@ class _CalendarViewState extends State<CalendarView> {
                             DateTime(currentMonth.year, currentMonth.month, selectedDay),
                           ),
                           builder: (context, snap) {
-                            final events = snap.data ?? const <CalendarEvent>[];
+                            final events = _filterByType(snap.data ?? const <CalendarEvent>[]);
 
                             if (events.isEmpty) {
                               return const Padding(
@@ -282,6 +314,94 @@ class _CalendarViewState extends State<CalendarView> {
   String _formatTimeRange(DateTime start, DateTime end) {
     final fmt = DateFormat('h:mm a');
     return '${fmt.format(start)} - ${fmt.format(end)}';
+  }
+
+  Widget _buildFocusStrip(CalendarEvent? nextEvent, int upcomingCount) {
+    const Color tealAccent = Color(0xFF00C09E);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E243A).withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: tealAccent.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.bolt_rounded, color: tealAccent, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Mission Focus: $upcomingCount upcoming events",
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  nextEvent == null
+                      ? "No upcoming events in the next 14 days."
+                      : "Next: ${nextEvent.title} • ${DateFormat('EEE, MMM d · h:mm a').format(nextEvent.start)}",
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white60, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEventTypeFilters() {
+    const filters = ['All', 'Tutoring', 'Exam', 'Assignment', 'Class', 'Deadline'];
+    return SizedBox(
+      height: 34,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: filters.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final label = filters[index];
+          final selected = _eventTypeFilter == label;
+          return InkWell(
+            onTap: () => setState(() => _eventTypeFilter = label),
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: selected ? const Color(0xFF00C09E) : Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: selected ? const Color(0xFF00C09E) : Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: selected ? const Color(0xFF0F142B) : Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  List<CalendarEvent> _filterByType(List<CalendarEvent> events) {
+    if (_eventTypeFilter == 'All') return events;
+    final selected = _eventTypeFilter.toLowerCase();
+    return events.where((e) => e.type.toLowerCase() == selected).toList();
   }
 
   Future<void> _scanAndImportPdf() async {

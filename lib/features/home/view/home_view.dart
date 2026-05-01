@@ -3,24 +3,23 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:seshly/access/app_access.dart';
+import 'package:seshly/access/access_controller.dart';
+import 'package:seshly/features/sesh/view/study_vault_view.dart';
 import 'package:seshly/services/sesh_focus_service.dart';
 import 'package:seshly/widgets/responsive.dart';
 import 'package:seshly/widgets/pressable_scale.dart';
 import '../widgets/post_card.dart';
 import '../widgets/category_selector.dart';
 import '../controllers/home_controller.dart';
-import '../widgets/sesh_focus_dialog.dart'; 
-import '../VIEW/notifications_view.dart'; 
-import '../VIEW/marketplace_view.dart'; 
+import '../widgets/sesh_focus_dialog.dart';
+import '../VIEW/notifications_view.dart';
 import '../VIEW/new_question_view.dart';
 
 class HomeView extends StatefulWidget {
   final ValueListenable<int>? refreshSignal;
 
-  const HomeView({
-    super.key,
-    this.refreshSignal,
-  });
+  const HomeView({super.key, this.refreshSignal});
 
   @override
   State<HomeView> createState() => _HomeViewState();
@@ -37,14 +36,18 @@ class _HomeViewState extends State<HomeView> {
   void initState() {
     super.initState();
     _homeController = HomeController(context);
-    _postsStream = _homeController.getRankedPosts(_homeController.selectedCategory);
+    _postsStream = _homeController.getRankedPosts(
+      _homeController.selectedCategory,
+    );
     widget.refreshSignal?.addListener(_handleExternalRefresh);
-    
+
     // 🔥 Listen to scroll to hide/show the "What are you stuck on" button
     _scrollController.addListener(() {
-      if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
+      if (_scrollController.position.userScrollDirection ==
+          ScrollDirection.reverse) {
         if (_isHeaderVisible) setState(() => _isHeaderVisible = false);
-      } else if (_scrollController.position.userScrollDirection == ScrollDirection.forward) {
+      } else if (_scrollController.position.userScrollDirection ==
+          ScrollDirection.forward) {
         if (!_isHeaderVisible) setState(() => _isHeaderVisible = true);
       }
     });
@@ -59,7 +62,11 @@ class _HomeViewState extends State<HomeView> {
   Future<void> _refreshPosts() async {
     // Optional: Scroll to top when refreshing
     if (_scrollController.hasClients) {
-      await _scrollController.animateTo(0, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+      await _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
     }
     await Future.delayed(const Duration(milliseconds: 200));
   }
@@ -98,16 +105,32 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Widget _buildFocusButton() {
+    if (!AccessController.can(context, AppCapability.useSeshFocus)) {
+      return HeaderIconButton(
+        icon: Icons.lock_outline,
+        onTap: () => AccessController.guard(
+          context,
+          capability: AppCapability.useSeshFocus,
+        ),
+      );
+    }
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       return HeaderIconButton(
         icon: Icons.lock_outline,
-        onTap: () => showDialog(context: context, builder: (_) => const SeshFocusDialog()),
+        onTap: () => showDialog(
+          context: context,
+          builder: (_) => const SeshFocusDialog(),
+        ),
       );
     }
 
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
       builder: (context, snapshot) {
         final data = snapshot.data?.data() as Map<String, dynamic>? ?? {};
         final bool isActiveFlag = data['seshFocusActive'] == true;
@@ -125,7 +148,9 @@ class _HomeViewState extends State<HomeView> {
           }
         }
 
-        final Color iconColor = isActive ? Colors.redAccent : const Color(0xFF00C09E);
+        final Color iconColor = isActive
+            ? Colors.redAccent
+            : const Color(0xFF00C09E);
         final Color backgroundColor = isActive
             ? Colors.redAccent.withValues(alpha: 0.15)
             : Colors.white.withValues(alpha: 0.1);
@@ -138,7 +163,10 @@ class _HomeViewState extends State<HomeView> {
           iconColor: iconColor,
           backgroundColor: backgroundColor,
           pressedBackgroundColor: pressedBackgroundColor,
-          onTap: () => showDialog(context: context, builder: (_) => const SeshFocusDialog()),
+          onTap: () => showDialog(
+            context: context,
+            builder: (_) => const SeshFocusDialog(),
+          ),
         );
       },
     );
@@ -162,7 +190,23 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    final bool isInstantTutorMode = AccessController.isInstantTutorModeFor(
+      context,
+    );
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final bool canUseStudyVault =
+        currentUser != null && !currentUser.isAnonymous
+        ? true
+        : AccessController.can(context, AppCapability.viewStudyVault);
+    final bool canViewNotifications = AccessController.can(
+      context,
+      AppCapability.viewNotifications,
+    );
+    final bool canPostQuestion = AccessController.can(
+      context,
+      AppCapability.postQuestion,
+    );
+    final currentUserId = currentUser?.uid;
     return SafeArea(
       child: Padding(
         padding: pagePadding(context),
@@ -180,21 +224,61 @@ class _HomeViewState extends State<HomeView> {
                   child: const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("Home", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                      Text("Discover academic questions", style: TextStyle(color: Colors.white54)),
+                      Text(
+                        "Home",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        "Discover academic questions",
+                        style: TextStyle(color: Colors.white54),
+                      ),
                     ],
                   ),
                 ),
                 Row(
                   children: [
                     HeaderIconButton(
-                      icon: Icons.shopping_basket_outlined,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceView())),
+                      icon: Icons.auto_stories_outlined,
+                      onTap: () {
+                        if (!canUseStudyVault) {
+                          AccessController.guard(
+                            context,
+                            capability: AppCapability.viewStudyVault,
+                          );
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const StudyVaultView(),
+                          ),
+                        );
+                      },
                     ),
-                    if (currentUserId == null)
+                    if (!canViewNotifications ||
+                        currentUserId == null ||
+                        isInstantTutorMode)
                       HeaderIconButton(
                         icon: Icons.notifications_none,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsView())),
+                        onTap: () {
+                          if (!canViewNotifications) {
+                            AccessController.guard(
+                              context,
+                              capability: AppCapability.viewNotifications,
+                            );
+                            return;
+                          }
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const NotificationsView(),
+                            ),
+                          );
+                        },
                       )
                     else
                       StreamBuilder<QuerySnapshot>(
@@ -208,27 +292,52 @@ class _HomeViewState extends State<HomeView> {
                           final unreadCount = snapshot.data?.docs.length ?? 0;
                           return HeaderIconButton(
                             icon: Icons.notifications_none,
-                            count: unreadCount > 0 ? unreadCount.toString() : null,
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsView())),
+                            count: unreadCount > 0
+                                ? unreadCount.toString()
+                                : null,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const NotificationsView(),
+                              ),
+                            ),
                           );
                         },
                       ),
                     _buildFocusButton(),
                   ],
-                )
+                ),
               ],
             ),
-
             // 🔥 DISAPPEARING SEARCH BUTTON
             AnimatedCrossFade(
               duration: const Duration(milliseconds: 300),
-              crossFadeState: _isHeaderVisible ? CrossFadeState.showFirst : CrossFadeState.showSecond,
-              secondChild: const SizedBox(width: double.infinity), // Hidden state
+              crossFadeState: _isHeaderVisible
+                  ? CrossFadeState.showFirst
+                  : CrossFadeState.showSecond,
+              secondChild: const SizedBox(
+                width: double.infinity,
+              ), // Hidden state
               firstChild: Column(
                 children: [
                   const SizedBox(height: 25),
                   SearchPlaceholderButton(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NewQuestionView())),
+                    isLocked: !canPostQuestion,
+                    onTap: () {
+                      if (!canPostQuestion) {
+                        AccessController.guard(
+                          context,
+                          capability: AppCapability.postQuestion,
+                        );
+                        return;
+                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const NewQuestionView(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -240,7 +349,7 @@ class _HomeViewState extends State<HomeView> {
               onCategorySelected: _setCategory,
             ),
             const SizedBox(height: 25),
-            
+
             // 🔥 POSTS LIST
             Expanded(
               child: RefreshIndicator(
@@ -251,7 +360,11 @@ class _HomeViewState extends State<HomeView> {
                   stream: _postsStream,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator(color: Color(0xFF00C09E)));
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF00C09E),
+                        ),
+                      );
                     }
                     final posts = snapshot.data ?? [];
                     if (posts.isEmpty) {
@@ -260,14 +373,21 @@ class _HomeViewState extends State<HomeView> {
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: const [
                           SizedBox(height: 140),
-                          Center(child: Text("No posts found", style: TextStyle(color: Colors.white38))),
+                          Center(
+                            child: Text(
+                              "No posts found",
+                              style: TextStyle(color: Colors.white38),
+                            ),
+                          ),
                         ],
                       );
                     }
 
                     return ListView.builder(
                       controller: _scrollController, // Attach controller
-                      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                      physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      ),
                       itemCount: posts.length,
                       itemBuilder: (context, index) {
                         final data = posts[index];
@@ -281,7 +401,7 @@ class _HomeViewState extends State<HomeView> {
                           author: data['author'] ?? "Anonymous",
                           likes: data['likes'] ?? 0,
                           comments: data['comments'] ?? 0,
-                          attachmentUrl: data['attachmentUrl'], 
+                          attachmentUrl: data['attachmentUrl'],
                           link: data['link'],
                           repostOf: data['repostOf'] as Map<String, dynamic>?,
                           repostText: data['repostText'] as String?,
@@ -327,8 +447,10 @@ class _HeaderIconButtonState extends State<HeaderIconButton> {
   @override
   Widget build(BuildContext context) {
     final double scale = _isPressed ? 0.9 : 1.0;
-    final Color baseBackground = widget.backgroundColor ?? Colors.white.withValues(alpha: 0.1);
-    final Color pressedBackground = widget.pressedBackgroundColor ?? Colors.white.withValues(alpha: 0.2);
+    final Color baseBackground =
+        widget.backgroundColor ?? Colors.white.withValues(alpha: 0.1);
+    final Color pressedBackground =
+        widget.pressedBackgroundColor ?? Colors.white.withValues(alpha: 0.2);
     final Color iconColor = widget.iconColor ?? const Color(0xFF00C09E);
 
     return GestureDetector(
@@ -348,11 +470,7 @@ class _HeaderIconButtonState extends State<HeaderIconButton> {
                 color: _isPressed ? pressedBackground : baseBackground,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                widget.icon,
-                color: iconColor,
-                size: 22,
-              ),
+              child: Icon(widget.icon, color: iconColor, size: 22),
             ),
             if (widget.count != null)
               Positioned(
@@ -373,7 +491,7 @@ class _HeaderIconButtonState extends State<HeaderIconButton> {
                     ),
                   ),
                 ),
-              )
+              ),
           ],
         ),
       ),
@@ -383,14 +501,17 @@ class _HeaderIconButtonState extends State<HeaderIconButton> {
 
 class SearchPlaceholderButton extends StatefulWidget {
   final VoidCallback onTap;
+  final bool isLocked;
 
   const SearchPlaceholderButton({
     super.key,
-    required this.onTap,  // Fixed: Added required onTap parameter
+    required this.onTap,
+    this.isLocked = false,
   });
 
   @override
-  State<SearchPlaceholderButton> createState() => _SearchPlaceholderButtonState();
+  State<SearchPlaceholderButton> createState() =>
+      _SearchPlaceholderButtonState();
 }
 
 class _SearchPlaceholderButtonState extends State<SearchPlaceholderButton> {
@@ -413,17 +534,32 @@ class _SearchPlaceholderButtonState extends State<SearchPlaceholderButton> {
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
             border: Border.all(
-              color: _isPressed ? Colors.white.withValues(alpha: 0.2) : Colors.white12,
+              color: _isPressed
+                  ? Colors.white.withValues(alpha: 0.2)
+                  : Colors.white12,
             ),
             borderRadius: BorderRadius.circular(15),
-            color: _isPressed 
-                ? Colors.white.withValues(alpha: 0.1) 
+            color: _isPressed
+                ? Colors.white.withValues(alpha: 0.1)
                 : Colors.white.withValues(alpha: 0.05),
           ),
-          child: const Center(
-            child: Text(
-              "What are you stuck on today?",
-              style: TextStyle(color: Colors.white70, fontSize: 16),
+          child: Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (widget.isLocked) ...[
+                  const Icon(
+                    Icons.lock_outline,
+                    color: Colors.white38,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                const Text(
+                  "What are you stuck on today?",
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                ),
+              ],
             ),
           ),
         ),

@@ -1,0 +1,213 @@
+{
+  "info": {
+    "name": "sesh-ai-gateway",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Sample requests for sesh-ai-gateway"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://sesh-ai-gateway-620223347958.europe-west2.run.app"
+    },
+    {
+      "key": "idToken",
+      "value": "YOUR_FIREBASE_ID_TOKEN"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      }
+    },
+    {
+      "name": "Version",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/version"
+      }
+    },
+    {
+      "name": "Policy Gate",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"text\": \"Explain photosynthesis\",\n  \"contextType\": \"practice\"\n}"
+        },
+        "url": "{{baseUrl}}/ai/policy/gate"
+      }
+    },
+    {
+      "name": "Policy Gate (context)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"text\": \"Explain photosynthesis\",\n  \"contextType\": \"practice\"\n}"
+        },
+        "url": "{{baseUrl}}/ai/policy/gate/practice"
+      }
+    },
+    {
+      "name": "Chat Socratic",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"threadId\": \"thread-1\",\n  \"message\": \"How do I factor x^2 - 5x + 6?\",\n  \"context\": {\n    \"subject\": \"Algebra\"\n  }\n}"
+        },
+        "url": "{{baseUrl}}/ai/chat/socratic"
+      }
+    },
+    {
+      "name": "Notes Enhance",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"pdfSignedUrl\": \"https://example.com/notes.pdf\",\n  \"subject\": \"Biology\"\n}"
+        },
+        "url": "{{baseUrl}}/ai/notes/enhance"
+      }
+    },
+    {
+      "name": "Practice Generate",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"sourceFileSignedUrl\": \"https://example.com/worksheet.pdf\",\n  \"subject\": \"Chemistry\",\n  \"difficultyCounts\": {\n    \"weak\": 2,\n    \"medium\": 2,\n    \"hard\": 1,\n    \"impossible\": 0\n  }\n}"
+        },
+        "url": "{{baseUrl}}/ai/practice/generate"
+      }
+    },
+    {
+      "name": "Practice Coach",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"questionId\": \"q1\",\n  \"questionText\": \"Solve for x: 2x + 5 = 15\",\n  \"studentAttemptText\": \"I subtracted 5 and got 2x = 8\"\n}"
+        },
+        "url": "{{baseUrl}}/ai/practice/coach"
+      }
+    },
+    {
+      "name": "Practice Coach (context)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"questionId\": \"q1\",\n  \"questionText\": \"Solve for x: 2x + 5 = 15\",\n  \"studentAttemptText\": \"I subtracted 5 and got 2x = 8\"\n}"
+        },
+        "url": "{{baseUrl}}/ai/practice/coach/practice"
+      }
+    },
+    {
+      "name": "Session Summarize",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"sessionId\": \"session-123\",\n  \"boardSnapshotSignedUrls\": [\"https://example.com/board1.png\"],\n  \"chatLog\": [\n    { \"senderId\": \"student1\", \"text\": \"I am stuck on step 2\", \"ts\": \"2026-01-20T10:00:00Z\" }\n  ],\n  \"subject\": \"Physics\",\n  \"participants\": [\n    { \"userId\": \"student1\", \"role\": \"student\" },\n    { \"userId\": \"tutor1\", \"role\": \"tutor\" }\n  ]\n}"
+        },
+        "url": "{{baseUrl}}/ai/session/summarize"
+      }
+    },
+    {
+      "name": "Calendar Import Timetable",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"timetablePdfSignedUrl\": \"https://example.com/timetable.pdf\",\n  \"termStartDate\": \"2026-02-01\",\n  \"timezone\": \"Africa/Johannesburg\"\n}"
+        },
+        "url": "{{baseUrl}}/ai/calendar/importTimetable"
+      }
+    },
+    {
+      "name": "Vault Check Duplicate",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"fileSignedUrl\": \"https://example.com/notes.pdf\",\n  \"claimedName\": \"BIO101 Week 3 Notes\"\n}"
+        },
+        "url": "{{baseUrl}}/ai/vault/checkDuplicate"
+      }
+    },
+    {
+      "name": "Affirmations Toggle",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"enabled\": true\n}"
+        },
+        "url": "{{baseUrl}}/ai/affirmations/toggle"
+      }
+    },
+    {
+      "name": "Tutor Match",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"request\": {\n    \"subject\": \"Mathematics\",\n    \"courseCode\": \"MATH101\",\n    \"topic\": \"Derivatives\",\n    \"level\": \"Undergraduate\",\n    \"budgetPerMin\": 2.5,\n    \"urgency\": \"high\",\n    \"preferredLanguage\": \"en\"\n  }\n}"
+        },
+        "url": "{{baseUrl}}/ai/tutors/match"
+      }
+    }
+  ]
+}

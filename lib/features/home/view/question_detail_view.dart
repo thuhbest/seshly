@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:seshly/access/app_access.dart';
+import 'package:seshly/access/access_controller.dart';
+import 'package:seshly/services/app_error_service.dart';
+import 'package:seshly/services/community_backend_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/comment_card.dart';
 import '../widgets/ai_tutor_help_view.dart';
@@ -16,7 +20,11 @@ class QuestionDetailView extends StatefulWidget {
 }
 
 class _ScrollBehavior extends ScrollBehavior {
-  Widget buildViewportChrome(BuildContext context, Widget child, AxisDirection axisDirection) => child;
+  Widget buildViewportChrome(
+    BuildContext context,
+    Widget child,
+    AxisDirection axisDirection,
+  ) => child;
 }
 
 class _QuestionDetailViewState extends State<QuestionDetailView> {
@@ -25,6 +33,7 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
   final TextEditingController _commentController = TextEditingController();
   final FocusNode _commentFocusNode = FocusNode();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final CommunityBackendService _backend = CommunityBackendService.instance;
 
   @override
   void initState() {
@@ -45,6 +54,9 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
   Widget build(BuildContext context) {
     const Color backgroundColor = Color(0xFF0F142B);
     const Color cardColor = Color(0xFF1E243A);
+    final bool isInstantTutorMode = AccessController.isInstantTutorModeFor(
+      context,
+    );
     final String? postId = widget.postId;
 
     if (postId == null) {
@@ -67,7 +79,9 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
           stream: _db.collection('posts').doc(postId).snapshots(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: Color(0xFF00C09E)));
+              return const Center(
+                child: CircularProgressIndicator(color: Color(0xFF00C09E)),
+              );
             }
             if (snapshot.hasError) {
               return _buildStatusMessage("Error loading question.");
@@ -77,10 +91,12 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
             }
 
             final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-            final String authorName = (data['author'] ?? data['authorName'] ?? "Student").toString();
+            final String authorName =
+                (data['author'] ?? data['authorName'] ?? "Student").toString();
             final String subject = (data['subject'] ?? "General").toString();
             final String question = (data['question'] ?? "").toString();
-            final String details = (data['details'] ?? data['body'] ?? "").toString();
+            final String details = (data['details'] ?? data['body'] ?? "")
+                .toString();
             final int likes = (data['likes'] as num?)?.toInt() ?? 0;
             final int commentCount = (data['comments'] as num?)?.toInt() ?? 0;
             final Timestamp? createdAt = data['createdAt'] as Timestamp?;
@@ -110,11 +126,18 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
                                 children: [
                                   Text(
                                     authorName,
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
                                   ),
                                   Text(
                                     timeLabel,
-                                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                                    style: const TextStyle(
+                                      color: Colors.white38,
+                                      fontSize: 12,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -124,17 +147,28 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
                           ),
                           const SizedBox(height: 20),
                           Text(
-                            question.isNotEmpty ? question : "Question details unavailable.",
-                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                            question.isNotEmpty
+                                ? question
+                                : "Question details unavailable.",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           if (details.isNotEmpty) ...[
                             const SizedBox(height: 12),
                             Text(
                               details,
-                              style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                                height: 1.5,
+                              ),
                             ),
                           ],
-                          if (safeAttachmentUrl != null && safeAttachmentUrl.isNotEmpty) ...[
+                          if (safeAttachmentUrl != null &&
+                              safeAttachmentUrl.isNotEmpty) ...[
                             const SizedBox(height: 16),
                             PressableScale(
                               onTap: () => _openUrl(safeAttachmentUrl),
@@ -147,7 +181,8 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
                                     : Image.network(
                                         safeAttachmentUrl,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => _buildAttachmentFallback(),
+                                        errorBuilder: (_, __, ___) =>
+                                            _buildAttachmentFallback(),
                                       ),
                               ),
                             ),
@@ -159,20 +194,32 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
                               borderRadius: BorderRadius.circular(12),
                               pressedScale: 0.98,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withValues(alpha: 13),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.white.withValues(alpha: 25)),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 25),
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.link, color: Color(0xFF00C09E), size: 18),
+                                    const Icon(
+                                      Icons.link,
+                                      color: Color(0xFF00C09E),
+                                      size: 18,
+                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
                                         link,
-                                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 13,
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -184,13 +231,27 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
                           const SizedBox(height: 20),
                           Row(
                             children: [
-                              const Icon(Icons.favorite_border, color: Colors.white38, size: 18),
+                              const Icon(
+                                Icons.favorite_border,
+                                color: Colors.white38,
+                                size: 18,
+                              ),
                               const SizedBox(width: 6),
-                              Text(likes.toString(), style: const TextStyle(color: Colors.white38)),
+                              Text(
+                                likes.toString(),
+                                style: const TextStyle(color: Colors.white38),
+                              ),
                               const SizedBox(width: 20),
-                              const Icon(Icons.chat_bubble_outline, color: Colors.white38, size: 18),
+                              const Icon(
+                                Icons.chat_bubble_outline,
+                                color: Colors.white38,
+                                size: 18,
+                              ),
                               const SizedBox(width: 6),
-                              Text(commentCount.toString(), style: const TextStyle(color: Colors.white38)),
+                              Text(
+                                commentCount.toString(),
+                                style: const TextStyle(color: Colors.white38),
+                              ),
                             ],
                           ),
                           const Divider(color: Colors.white10, height: 40),
@@ -202,19 +263,50 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
                             ),
                             child: Row(
                               children: [
-                                _tabButton("Answers ($commentCount)", !isAiView, () => setState(() => isAiView = false)),
-                                _tabButton("Ask Sesh", isAiView, () => setState(() => isAiView = true), icon: Icons.auto_awesome),
+                                _tabButton(
+                                  "Answers ($commentCount)",
+                                  !isAiView,
+                                  () => setState(() => isAiView = false),
+                                ),
+                                _tabButton("Ask Sesh", isAiView, () async {
+                                  if (!await AccessController.guard(
+                                    context,
+                                    capability: AppCapability.useSesh,
+                                  )) {
+                                    return;
+                                  }
+                                  if (!mounted) return;
+                                  setState(() => isAiView = true);
+                                }, icon: Icons.auto_awesome),
                               ],
                             ),
                           ),
                           const SizedBox(height: 25),
-                          isAiView ? const AiTutorHelpView() : _buildCommentsList(postId),
+                          isAiView
+                              ? (isInstantTutorMode
+                                    ? _buildInstantTutorLockPanel(
+                                        title:
+                                            'Sesh AI stays locked in Instant Tutor Mode',
+                                        description:
+                                            'Instant Tutor Mode supports browsing and tutor booking only. AI help, Archive, and the wider Sesh workspace require a verified student account.',
+                                      )
+                                    : AiTutorHelpView(
+                                        subject: subject,
+                                        question: question,
+                                        details: details,
+                                        attachmentUrl: safeAttachmentUrl,
+                                      ))
+                              : _buildCommentsList(postId),
                         ],
                       ),
                     ),
                   ),
                 ),
-                if (!isAiView) _buildCommentInput(postId),
+                if (!isAiView)
+                  _buildCommentInput(
+                    postId,
+                    isInstantTutorMode: isInstantTutorMode,
+                  ),
               ],
             );
           },
@@ -231,7 +323,10 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
         icon: const Icon(Icons.arrow_back, color: Colors.white),
         onPressed: () => Navigator.pop(context),
       ),
-      title: const Text("Question", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      title: const Text(
+        "Question",
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
       actions: [
         _headerCircleButton(Icons.share_outlined),
         _headerCircleButton(Icons.more_horiz),
@@ -256,7 +351,9 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFF00C09E)));
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF00C09E)),
+          );
         }
         if (snapshot.hasError) {
           return _buildStatusMessage("Error loading answers.");
@@ -273,7 +370,8 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
-            final String authorName = (data['authorName'] ?? data['author'] ?? "Student").toString();
+            final String authorName =
+                (data['authorName'] ?? data['author'] ?? "Student").toString();
             final String initials = _initialsFromName(authorName) ?? "S";
             final String text = (data['text'] ?? "").toString();
             final int likes = (data['likes'] as num?)?.toInt() ?? 0;
@@ -305,7 +403,8 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
             return StreamBuilder<DocumentSnapshot>(
               stream: _db.collection('users').doc(authorId).snapshots(),
               builder: (context, userSnap) {
-                final userData = userSnap.data?.data() as Map<String, dynamic>? ?? {};
+                final userData =
+                    userSnap.data?.data() as Map<String, dynamic>? ?? {};
                 final String? avatarUrl = userData['profilePic'] as String?;
                 return CommentCard(
                   author: authorName,
@@ -323,20 +422,70 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
     );
   }
 
-  Widget _buildCommentInput(String postId) {
+  Widget _buildCommentInput(String postId, {required bool isInstantTutorMode}) {
     final user = FirebaseAuth.instance.currentUser;
     final bool hasText = _commentController.text.trim().isNotEmpty;
     final bool canSend = hasText && !_isSubmittingComment;
     final bool isSignedIn = user != null;
-    final bool isReady = canSend && isSignedIn;
+    final bool isReady = canSend && isSignedIn && !isInstantTutorMode;
     final Color inputBorder = Colors.white.withValues(alpha: 0.08);
-    final Color inputFocusedBorder = const Color(0xFF00C09E).withValues(alpha: 0.6);
+    final Color inputFocusedBorder = const Color(
+      0xFF00C09E,
+    ).withValues(alpha: 0.6);
+
+    if (isInstantTutorMode) {
+      return Container(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          MediaQuery.of(context).padding.bottom + 12,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFF141B2F),
+          border: Border(
+            top: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+          ),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C2238),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Row(
+            children: const [
+              Icon(
+                Icons.lock_outline_rounded,
+                color: Color(0xFF00C09E),
+                size: 18,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Instant Tutor Mode is browsing only. Create an account to answer questions.',
+                  style: TextStyle(color: Colors.white60, height: 1.35),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 10),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        10,
+        20,
+        MediaQuery.of(context).padding.bottom + 10,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFF141B2F),
-        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+        ),
       ),
       child: Row(
         children: [
@@ -344,8 +493,11 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
             StreamBuilder<DocumentSnapshot>(
               stream: _db.collection('users').doc(user.uid).snapshots(),
               builder: (context, snapshot) {
-                final data = snapshot.data?.data() as Map<String, dynamic>? ?? {};
-                final String displayName = (data['fullName'] ?? data['displayName'] ?? "You").toString();
+                final data =
+                    snapshot.data?.data() as Map<String, dynamic>? ?? {};
+                final String displayName =
+                    (data['fullName'] ?? data['displayName'] ?? "You")
+                        .toString();
                 final String initials = _initialsFromName(displayName) ?? "Y";
                 final String? avatarUrl = data['profilePic'] as String?;
                 final String? trimmedAvatar = avatarUrl?.trim();
@@ -355,7 +507,9 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: const Color(0xFF1E243A),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.12),
+                    ),
                   ),
                   child: ClipOval(
                     child: trimmedAvatar != null && trimmedAvatar.isNotEmpty
@@ -365,14 +519,22 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
                             errorBuilder: (_, __, ___) => Center(
                               child: Text(
                                 initials,
-                                style: const TextStyle(color: Color(0xFF00C09E), fontSize: 11, fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  color: Color(0xFF00C09E),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           )
                         : Center(
                             child: Text(
                               initials,
-                              style: const TextStyle(color: Color(0xFF00C09E), fontSize: 11, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                color: Color(0xFF00C09E),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                   ),
@@ -390,12 +552,20 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
               textCapitalization: TextCapitalization.sentences,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: user == null ? "Sign in to answer..." : "Write an answer...",
+                hintText: user == null
+                    ? "Sign in to answer..."
+                    : "Write an answer...",
                 hintStyle: const TextStyle(color: Colors.white38),
                 filled: true,
                 fillColor: const Color(0xFF1C2238),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(22),
+                  borderSide: BorderSide.none,
+                ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(22),
                   borderSide: BorderSide(color: inputBorder),
@@ -433,10 +603,18 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0F142B)),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color(0xFF0F142B),
+                          ),
                         ),
                       )
-                    : Icon(Icons.send, color: isReady ? const Color(0xFF0F142B) : Colors.white54, size: 18),
+                    : Icon(
+                        Icons.send,
+                        color: isReady
+                            ? const Color(0xFF0F142B)
+                            : Colors.white54,
+                        size: 18,
+                      ),
               ),
             ),
           ),
@@ -449,6 +627,13 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
     final text = _commentController.text.trim();
     if (text.isEmpty || _isSubmittingComment) return;
 
+    if (!await AccessController.guard(
+      context,
+      capability: AppCapability.comment,
+    )) {
+      return;
+    }
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       _showSnack("Please sign in to comment.");
@@ -457,37 +642,25 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
 
     setState(() => _isSubmittingComment = true);
     try {
-      final userDoc = await _db.collection('users').doc(user.uid).get();
-      final userData = userDoc.data() ?? {};
-      final authorName = (userData['fullName'] ?? userData['displayName'] ?? "Student").toString();
-      final String? rawPhoto = (userData['profilePic'] ?? user.photoURL) as String?;
-      final String? authorPhoto = rawPhoto?.trim().isNotEmpty == true ? rawPhoto!.trim() : null;
-
-      final postRef = _db.collection('posts').doc(postId);
-      final commentRef = postRef.collection('comments').doc();
-
-      final commentData = <String, dynamic>{
-        'text': text,
-        'userId': user.uid,
-        'authorName': authorName,
-        'createdAt': FieldValue.serverTimestamp(),
-        'likes': 0,
-      };
-      if (authorPhoto != null) {
-        commentData['authorPhoto'] = authorPhoto;
-      }
-
-      await _db.runTransaction((transaction) async {
-        transaction.set(commentRef, commentData);
-        transaction.update(postRef, {'comments': FieldValue.increment(1)});
-      });
+      await _backend.createComment(postId: postId, text: text);
 
       _commentController.clear();
       if (mounted) {
         FocusScope.of(context).unfocus();
       }
-    } catch (_) {
-      _showSnack("Could not post your answer.");
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'community',
+        source: 'create_comment',
+      );
+      _showSnack(
+        AppErrorService.instance.userMessageFor(
+          error,
+          fallback: "Could not post your answer.",
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isSubmittingComment = false);
@@ -498,7 +671,10 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
   Future<void> _openUrl(String url) async {
     final uri = Uri.tryParse(url.trim());
     if (uri == null) return;
-    final bool launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final bool launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
     if (!launched && mounted) {
       _showSnack("Could not open link.");
     }
@@ -507,7 +683,9 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
   bool _isVideoAttachment(String? url) {
     if (url == null || url.isEmpty) return false;
     final lower = url.toLowerCase();
-    return lower.contains('.mp4') || lower.contains('.mov') || lower.contains('.webm');
+    return lower.contains('.mp4') ||
+        lower.contains('.mov') ||
+        lower.contains('.webm');
   }
 
   Widget _buildVideoAttachment() {
@@ -525,16 +703,20 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
       height: 180,
       color: Colors.white.withValues(alpha: 13),
       child: const Center(
-        child: Icon(Icons.broken_image_outlined, color: Colors.white54, size: 40),
+        child: Icon(
+          Icons.broken_image_outlined,
+          color: Colors.white54,
+          size: 40,
+        ),
       ),
     );
   }
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _timeAgo(Timestamp? timestamp) {
@@ -562,27 +744,54 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
   Widget _headerCircleButton(IconData icon) {
     return Container(
       margin: const EdgeInsets.only(left: 8),
-      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 13), shape: BoxShape.circle),
-      child: IconButton(icon: Icon(icon, color: const Color(0xFF00C09E), size: 20), onPressed: () {}),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 13),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: const Color(0xFF00C09E), size: 20),
+        onPressed: () {},
+      ),
     );
   }
 
   Widget _avatar(String text) {
     return CircleAvatar(
       backgroundColor: const Color(0xFF00C09E).withValues(alpha: 25),
-      child: Text(text, style: const TextStyle(color: Color(0xFF00C09E), fontWeight: FontWeight.bold)),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFF00C09E),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
   Widget _tag(String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 13), borderRadius: BorderRadius.circular(20)),
-      child: Text(label, style: const TextStyle(color: Color(0xFF00C09E), fontSize: 11, fontWeight: FontWeight.bold)),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 13),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFF00C09E),
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
-  Widget _tabButton(String label, bool isSelected, VoidCallback onTap, {IconData? icon}) {
+  Widget _tabButton(
+    String label,
+    bool isSelected,
+    VoidCallback onTap, {
+    IconData? icon,
+  }) {
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -594,20 +803,84 @@ class _QuestionDetailViewState extends State<QuestionDetailView> {
             decoration: BoxDecoration(
               color: isSelected ? const Color(0xFF1E243A) : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
-              border: isSelected ? Border.all(color: Colors.white.withValues(alpha: 25)) : null,
+              border: isSelected
+                  ? Border.all(color: Colors.white.withValues(alpha: 25))
+                  : null,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (icon != null) ...[
-                  Icon(icon, color: isSelected ? const Color(0xFF00C09E) : Colors.white38, size: 16),
+                  Icon(
+                    icon,
+                    color: isSelected
+                        ? const Color(0xFF00C09E)
+                        : Colors.white38,
+                    size: 16,
+                  ),
                   const SizedBox(width: 8),
                 ],
-                Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.white38, fontWeight: FontWeight.bold)),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white38,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildInstantTutorLockPanel({
+    required String title,
+    required String description,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E243A),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.lock_outline_rounded,
+                color: Color(0xFF00C09E),
+                size: 18,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Instant Tutor Mode',
+                style: TextStyle(
+                  color: Color(0xFF00C09E),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
+            style: const TextStyle(color: Colors.white60, height: 1.45),
+          ),
+        ],
       ),
     );
   }
