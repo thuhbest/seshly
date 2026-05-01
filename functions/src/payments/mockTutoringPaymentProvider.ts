@@ -1,6 +1,8 @@
 import {createHash} from "node:crypto";
 import {HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import * as functions from "firebase-functions";
+import {getPaystackTutoringProvider} from "./paystackTutoringProvider";
 import {
   type BuildStoredPaymentMethodParams,
   type TutoringAuthorizationParams,
@@ -363,7 +365,15 @@ export const mockTutoringPaymentProvider: TutoringPaymentProvider = {
 };
 
 export function getTutoringPaymentProvider(): TutoringPaymentProvider {
-  // TODO(paystack): Swap the mock tutoring adapter for a live Paystack adapter
-  // once provider approval and secrets are available.
+  const config = functions.config as any;
+
+  if (config.paystack?.secret) {
+    return getPaystackTutoringProvider();
+  }
+
+  return mockTutoringPaymentProvider;
+}
+
+export function getMockTutoringPaymentProvider(): TutoringPaymentProvider {
   return mockTutoringPaymentProvider;
 }

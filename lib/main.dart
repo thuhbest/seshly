@@ -32,6 +32,7 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await AuthService.ensureWebPersistenceConfigured();
   } on UnsupportedError {
     firebaseReady = false;
   } on MissingPluginException {
@@ -116,14 +117,8 @@ class AuthWrapper extends StatelessWidget {
 
         if (user != null && !user.isAnonymous) {
           unawaited(AppErrorService.instance.setUserContext(user.uid));
-          if (!user.emailVerified) {
-            return _EmailVerificationGate(user: user);
-          }
-          debugPrint(
-            'AuthWrapper: entering full-account session for uid=${user.uid}.',
-          );
-          return _AuthenticatedSession(
-            key: ValueKey('session-${user.uid}-full'),
+          return _SignedInAccountRouter(
+            key: ValueKey('signed-in-router-${user.uid}'),
             user: user,
           );
         }
@@ -145,6 +140,93 @@ class AuthWrapper extends StatelessWidget {
           'AuthWrapper: no authenticated user, showing StartPageView.',
         );
         return const StartPageView();
+      },
+    );
+  }
+}
+
+class _SignedInAccountRouter extends StatefulWidget {
+  const _SignedInAccountRouter({super.key, required this.user});
+
+  final User user;
+
+  @override
+  State<_SignedInAccountRouter> createState() => _SignedInAccountRouterState();
+}
+
+class _SignedInAccountRouterState extends State<_SignedInAccountRouter> {
+  final AuthService _authService = AuthService();
+  late Future<bool> _verificationFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _verificationFuture = _resolveVerification();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SignedInAccountRouter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user.uid != widget.user.uid ||
+        oldWidget.user.emailVerified != widget.user.emailVerified) {
+      _verificationFuture = _resolveVerification();
+    }
+  }
+
+  Future<bool> _resolveVerification() async {
+    final traceId =
+        'route-${widget.user.uid}-${DateTime.now().microsecondsSinceEpoch}';
+    debugPrint(
+      'AuthWrapper: verification route check start uid=${widget.user.uid} trace=$traceId',
+    );
+    final verified = await _authService.refreshVerificationStatus(
+      widget.user,
+      traceId: traceId,
+    );
+    debugPrint(
+      'AuthWrapper: verification route check complete uid=${widget.user.uid} trace=$traceId verified=$verified',
+    );
+    return verified;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: _verificationFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const _SessionLoadingView();
+        }
+
+        if (snapshot.hasError) {
+          debugPrint(
+            'AuthWrapper: verification route check failed for uid=${widget.user.uid}: ${snapshot.error}',
+          );
+          unawaited(
+            AppErrorService.instance.recordError(
+              snapshot.error!,
+              StackTrace.current,
+              category: 'auth',
+              source: 'AuthWrapper.verificationRoute',
+            ),
+          );
+        }
+
+        final verified = snapshot.hasData
+            ? snapshot.data == true
+            : widget.user.emailVerified;
+        debugPrint(
+          'AuthWrapper: final route decision uid=${widget.user.uid} verified=$verified',
+        );
+
+        if (!verified) {
+          return _EmailVerificationGate(user: widget.user);
+        }
+
+        return _AuthenticatedSession(
+          key: ValueKey('session-${widget.user.uid}-full'),
+          user: widget.user,
+        );
       },
     );
   }
@@ -185,19 +267,24 @@ class _AuthenticatedSessionState extends State<_AuthenticatedSession> {
   }
 
   Future<void> _bootstrapUser() {
+    final traceId =
+        'session-${widget.user.uid}-${DateTime.now().microsecondsSinceEpoch}';
     if (widget.user.isAnonymous) {
-      _authService.ensureInstantTutorModeProfile(widget.user).catchError((
-        error,
-        stackTrace,
-      ) {
-        debugPrint('Instant Tutor bootstrap sync failed: $error');
-        if (stackTrace is StackTrace) {
-          debugPrintStack(stackTrace: stackTrace);
-        }
-      });
+      unawaited(
+        _authService.ensureInstantTutorModeProfile(
+          widget.user,
+          traceId: traceId,
+        ),
+      );
       return Future.value();
     }
-    return _authService.ensureVerifiedStudentAccessProfile(widget.user);
+    unawaited(
+      _authService.ensureVerifiedStudentAccessProfile(
+        widget.user,
+        traceId: traceId,
+      ),
+    );
+    return Future.value();
   }
 
   @override
@@ -279,17 +366,60 @@ class _EmailVerificationGateState extends State<_EmailVerificationGate> {
   final AuthService _authService = AuthService();
   bool _isSending = false;
   bool _isRefreshing = false;
+  String? _statusMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _statusMessage =
+        'Verify your email to continue. If you did not receive an email, you can resend it below.';
+    unawaited(_maybeSendVerificationEmailOnEntry());
+  }
+
+  Future<void> _maybeSendVerificationEmailOnEntry() async {
+    try {
+      final result = await _authService.maybeSendVerificationEmail(
+        widget.user,
+        reason: 'verification_gate_entry',
+      );
+      if (!mounted) return;
+      setState(() {
+        if (result.status == VerificationEmailDispatchStatus.sent ||
+            result.status == VerificationEmailDispatchStatus.cooldown) {
+          _statusMessage =
+              'Verify your email to continue. We sent a verification email to ${widget.user.email ?? 'your address'}.';
+        }
+      });
+    } catch (error, stackTrace) {
+      await AppErrorService.instance.recordError(
+        error,
+        stackTrace,
+        category: 'verification',
+        source: 'verification_gate_entry',
+      );
+    }
+  }
 
   Future<void> _resendVerification() async {
     if (_isSending) return;
     setState(() => _isSending = true);
     try {
-      await _authService.resendVerificationEmail(widget.user);
+      final result = await _authService.maybeSendVerificationEmail(
+        widget.user,
+        reason: 'manual_resend',
+      );
       if (!mounted) return;
+      setState(() {
+        _statusMessage = result.sent
+            ? 'Verify your email to continue. We sent a verification email to ${widget.user.email ?? 'your address'}.'
+            : 'Verify your email to continue. ${result.userMessage}';
+      });
       AppErrorService.instance.showSnackBar(
         context,
-        'Verification email sent. Check your inbox.',
-        backgroundColor: const Color(0xFF00C09E),
+        result.userMessage,
+        backgroundColor: result.sent
+            ? const Color(0xFF00C09E)
+            : const Color(0xFF1E243A),
       );
     } catch (error, stackTrace) {
       await AppErrorService.instance.recordError(
@@ -301,10 +431,13 @@ class _EmailVerificationGateState extends State<_EmailVerificationGate> {
       if (!mounted) return;
       AppErrorService.instance.showSnackBar(
         context,
-        AppErrorService.instance.userMessageFor(
-          error,
-          fallback: 'Could not send another verification email right now.',
-        ),
+        error is AuthFlowException
+            ? error.userMessage
+            : AppErrorService.instance.userMessageFor(
+                error,
+                fallback:
+                    'Could not send another verification email right now.',
+              ),
       );
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -315,16 +448,18 @@ class _EmailVerificationGateState extends State<_EmailVerificationGate> {
     if (_isRefreshing) return;
     setState(() => _isRefreshing = true);
     try {
-      await widget.user.reload();
-      final refreshed = FirebaseAuth.instance.currentUser;
-      await refreshed?.getIdToken(true);
-      await CommunityBackendService.instance.syncAccessProfile();
-      final verified = refreshed?.emailVerified == true;
+      final verified = await _authService.refreshVerificationStatus(
+        widget.user,
+      );
       await AppAnalyticsService.instance.trackVerification(
         action: 'email_verification',
         status: verified ? 'confirmed' : 'pending',
       );
       if (!verified && mounted) {
+        setState(() {
+          _statusMessage =
+              'Your email is still unverified. Open the email link, then retry.';
+        });
         AppErrorService.instance.showSnackBar(
           context,
           'Your email is still unverified. Open the email link, then retry.',
@@ -341,10 +476,12 @@ class _EmailVerificationGateState extends State<_EmailVerificationGate> {
       if (!mounted) return;
       AppErrorService.instance.showSnackBar(
         context,
-        AppErrorService.instance.userMessageFor(
-          error,
-          fallback: 'Could not refresh verification status.',
-        ),
+        error is AuthFlowException
+            ? error.userMessage
+            : AppErrorService.instance.userMessageFor(
+                error,
+                fallback: 'Could not refresh verification status.',
+              ),
       );
     } finally {
       if (mounted) setState(() => _isRefreshing = false);
@@ -392,11 +529,9 @@ class _EmailVerificationGateState extends State<_EmailVerificationGate> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Seshly requires email verification before full-account features are unlocked. We sent a verification email to ${widget.user.email ?? 'your address'}.',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      height: 1.45,
-                    ),
+                    _statusMessage ??
+                        'Seshly requires email verification before full-account features are unlocked.',
+                    style: const TextStyle(color: Colors.white70, height: 1.45),
                   ),
                   const SizedBox(height: 20),
                   SizedBox(

@@ -1,6 +1,6 @@
 import * as admin from "firebase-admin";
 import {HttpsError, onCall} from "./callable";
-import {getMockPaystackProvider} from "./payments/mockPaystack";
+import {getActivePaymentProvider} from "./payments/providerSelector";
 import {buildPayoutProfileSchemaFields} from "./tutoringFirestoreSchema";
 import {deriveTutorApprovalSnapshot} from "./tutorApprovalState";
 import {
@@ -266,7 +266,7 @@ export const verifyTutorPayoutProfile = onCall(
       );
     }
 
-    const provider = getMockPaystackProvider();
+    const provider = getActivePaymentProvider();
     const bankCode =
       toTrimmedString(profileData.bankCode) ||
       toTrimmedString(profileData.branchCode);

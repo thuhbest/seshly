@@ -8,7 +8,7 @@ import {
 import {SecretManagerServiceClient} from "@google-cloud/secret-manager";
 import {AccessToken, RoomServiceClient} from "livekit-server-sdk";
 import {type TutoringPaymentProvider} from "./payments/tutoringPaymentProvider";
-import {getTutoringPaymentProvider} from "./payments/mockTutoringPaymentProvider";
+import {getActiveTutoringPaymentProvider} from "./payments/tutorPaymentProviderSelector";
 import {forceEndRoom} from "./tutorRoomControl";
 import {assertTutorEligibleForTutoring} from "./tutorApprovalState";
 import {
@@ -319,7 +319,7 @@ function timestampToDate(value: unknown): Date | null {
 
 function getPaymentProviderContext(): PaymentProviderContext {
   return {
-    provider: getTutoringPaymentProvider(),
+    provider: getActiveTutoringPaymentProvider(),
   };
 }
 

@@ -1,7 +1,12 @@
 import * as admin from "firebase-admin";
 import {HttpsError} from "firebase-functions/v2/https";
 
-import {readTrimmedString, requireObjectPayload, secureOnCall} from "./security";
+import {
+  readTrimmedString,
+  recordMonitoringEvent,
+  requireObjectPayload,
+  secureOnCall,
+} from "./security";
 
 const db = admin.firestore();
 const REGION = "europe-west1";
@@ -181,6 +186,70 @@ function buildInstantTutorDefaults(uid: string, existing: JsonMap): JsonMap {
   };
 }
 
+function readJsonMap(value: unknown): JsonMap {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as JsonMap;
+  }
+  return {};
+}
+
+function buildVerifiedStudentSyncUpdate(params: {
+  uid: string;
+  email: string;
+  emailVerified: boolean;
+  existing: JsonMap;
+  tokenName: string;
+}): JsonMap {
+  const fullName =
+    readTrimmedString(params.existing.fullName, 120) || params.tokenName;
+
+  const update: JsonMap = {
+    uid: params.uid,
+    accountType: "student",
+    accessTier: "verified_student",
+    instantTutorAccess: false,
+    accessMode: "verifiedStudent",
+    email: params.email,
+    emailLowercase: params.email.toLowerCase(),
+    emailVerified: params.emailVerified,
+    ecosystemProfile: {
+      ...readJsonMap(params.existing.ecosystemProfile),
+      student: true,
+    },
+    createdAt: params.existing.createdAt ?? nowServerTs(),
+    lastLoginAt: nowServerTs(),
+    updatedAt: nowServerTs(),
+  };
+
+  if (fullName) {
+    update.fullName = fullName;
+    update.fullNameLowercase = fullName.toLowerCase();
+  }
+
+  return update;
+}
+
+function buildVerifiedStudentSyncFallback(params: {
+  uid: string;
+  email: string;
+  emailVerified: boolean;
+  existing: JsonMap;
+}): JsonMap {
+  return {
+    uid: params.uid,
+    accountType: "student",
+    accessTier: "verified_student",
+    instantTutorAccess: false,
+    accessMode: "verifiedStudent",
+    email: params.email,
+    emailLowercase: params.email.toLowerCase(),
+    emailVerified: params.emailVerified,
+    createdAt: params.existing.createdAt ?? nowServerTs(),
+    lastLoginAt: nowServerTs(),
+    updatedAt: nowServerTs(),
+  };
+}
+
 export const initializeAccountProfile = secureOnCall<JsonMap, {initialized: true}>(
   {
     region: REGION,
@@ -247,36 +316,98 @@ export const syncAccessProfile = secureOnCall<JsonMap, {synced: true}>(
     const profileRef = db.collection("users").doc(request.auth.uid);
     const existingSnap = await profileRef.get();
     const existing = (existingSnap.data() ?? {}) as JsonMap;
+    const email = (request.auth.token.email ?? "").toString();
+    const emailVerified = request.auth.token.email_verified === true;
+
+    await recordMonitoringEvent({
+      action: "auth.sync_profile",
+      severity: "info",
+      actorUid: request.auth.uid,
+      message: "syncAccessProfile start",
+      metadata: {
+        signInProvider:
+          request.auth.token.firebase?.sign_in_provider?.toString() ?? "",
+        hasExistingProfile: existingSnap.exists,
+        emailVerified,
+      },
+    });
+
     if (request.auth.token.firebase?.sign_in_provider === "anonymous") {
       await profileRef.set(
         buildInstantTutorDefaults(request.auth.uid, existing),
         {merge: true}
       );
+      await recordMonitoringEvent({
+        action: "auth.sync_profile",
+        severity: "info",
+        actorUid: request.auth.uid,
+        message: "syncAccessProfile success",
+        metadata: {
+          accountMode: "instant_tutor",
+        },
+      });
       return {synced: true};
     }
 
-    await profileRef.set({
+    const fullUpdate = buildVerifiedStudentSyncUpdate({
       uid: request.auth.uid,
-      accountType: "student",
-      accessTier: "verified_student",
-      instantTutorAccess: false,
-      accessMode: "verifiedStudent",
-      email: (request.auth.token.email ?? "").toString(),
-      emailLowercase: (request.auth.token.email ?? "").toString().toLowerCase(),
-      emailVerified: request.auth.token.email_verified === true,
-      fullName: readTrimmedString(existing.fullName, 120) ||
-        readTrimmedString(request.auth.token.name, 120),
-      fullNameLowercase:
-        (readTrimmedString(existing.fullName, 120) ||
-          readTrimmedString(request.auth.token.name, 120)).toLowerCase(),
-      ecosystemProfile: {
-        ...((existing.ecosystemProfile as JsonMap | undefined) ?? {}),
-        student: true,
+      email,
+      emailVerified,
+      existing,
+      tokenName: readTrimmedString(request.auth.token.name, 120),
+    });
+
+    try {
+      await profileRef.set(fullUpdate, {merge: true});
+    } catch {
+      await recordMonitoringEvent({
+        action: "auth.sync_profile",
+        severity: "warning",
+        actorUid: request.auth.uid,
+        message: "syncAccessProfile full write failed; retrying minimal sync",
+        metadata: {
+          hasFullName: typeof fullUpdate.fullName === "string" &&
+            fullUpdate.fullName.length > 0,
+        },
+      });
+      try {
+        await profileRef.set(
+          buildVerifiedStudentSyncFallback({
+            uid: request.auth.uid,
+            email,
+            emailVerified,
+            existing,
+          }),
+          {merge: true}
+        );
+      } catch {
+        await recordMonitoringEvent({
+          action: "auth.sync_profile",
+          severity: "critical",
+          actorUid: request.auth.uid,
+          message: "syncAccessProfile failed",
+          metadata: {
+            stage: "fallback_write",
+            hasExistingProfile: existingSnap.exists,
+          },
+        });
+        throw new HttpsError(
+          "internal",
+          "Account sync is temporarily unavailable."
+        );
+      }
+    }
+
+    await recordMonitoringEvent({
+      action: "auth.sync_profile",
+      severity: "info",
+      actorUid: request.auth.uid,
+      message: "syncAccessProfile success",
+      metadata: {
+        accountMode: "verified_student",
+        emailVerified,
       },
-      createdAt: existing.createdAt ?? nowServerTs(),
-      lastLoginAt: nowServerTs(),
-      updatedAt: nowServerTs(),
-    }, {merge: true});
+    });
 
     return {synced: true};
   }

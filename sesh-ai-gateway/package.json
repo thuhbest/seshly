@@ -19,6 +19,7 @@
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "firebase-admin": "^12.5.0",
+    "openai": "^4.15.0",
     "pdfjs-dist": "^4.2.67",
     "playwright": "^1.49.1",
     "pngjs": "^7.0.0"

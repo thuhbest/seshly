@@ -1,4 +1,9 @@
+import OpenAI from 'openai';
 import { config, type ModelProvider } from '../utils/env';
+
+const openaiClient = new OpenAI({
+  apiKey: config.model.openai.apiKey,
+});
 
 export type ModelMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -39,41 +44,52 @@ async function fetchWithTimeout(input: string, init: RequestInit): Promise<Respo
   }
 }
 
+function extractText(response: any): string {
+  if (!response) return '';
+
+  const firstOutput = Array.isArray(response.output) ? response.output[0] : undefined;
+  const firstContent = Array.isArray(firstOutput?.content) ? firstOutput.content[0] : undefined;
+
+  if (typeof firstContent === 'string') {
+    return firstContent;
+  }
+
+  if (typeof firstContent?.text === 'string') {
+    return firstContent.text;
+  }
+
+  if (typeof response.output_text === 'string') {
+    return response.output_text;
+  }
+
+  return '';
+}
+
 async function callOpenAi(options: CallTextModelOptions): Promise<string> {
   const apiKey = config.model.openai.apiKey;
   assertApiKey('openai', apiKey);
-  const baseUrl = config.model.openai.baseUrl.replace(/\/+$/, '');
 
-  const body: Record<string, unknown> = {
+  const input = options.messages.map((message) => ({
+    role: message.role,
+    content: message.content,
+  }));
+
+  const payload: Record<string, unknown> = {
     model: options.model,
-    messages: options.messages,
+    input,
     temperature: options.temperature ?? 0,
   };
 
   if (typeof options.maxTokens === 'number') {
-    body.max_tokens = options.maxTokens;
+    payload.max_output_tokens = options.maxTokens;
   }
 
   if (options.jsonOnly) {
-    body.response_format = { type: 'json_object' };
+    payload.response_format = { type: 'json_object' };
   }
 
-  const response = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`OpenAI error ${response.status}: ${text}`);
-  }
-
-  const data = await response.json();
-  return data?.choices?.[0]?.message?.content?.trim() ?? '';
+  const response = await openaiClient.responses.create(payload);
+  return extractText(response).trim();
 }
 
 async function callGoogle(options: CallTextModelOptions): Promise<string> {

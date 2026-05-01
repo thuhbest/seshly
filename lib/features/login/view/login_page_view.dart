@@ -854,11 +854,15 @@ class _LoginPageViewState extends State<LoginPageView> {
 
               const SizedBox(height: 20),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 4,
+                runSpacing: 4,
                 children: [
                   const Text(
-                    "Don't have an account? ",
+                    "Don't have an account?",
+                    textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white70),
                   ),
                   MouseRegion(
@@ -1004,6 +1008,31 @@ class _LoginPageViewState extends State<LoginPageView> {
   }
 
   Widget _buildInstantTutorModeCard({required Color primaryColor}) {
+    return LoginInstantTutorModeCard(
+      primaryColor: primaryColor,
+      isDisabled: _isLoading || _isInstantTutorLoading,
+      isBusy: _isInstantTutorLoading,
+      onPressed: _handleInstantTutorModeTap,
+    );
+  }
+}
+
+class LoginInstantTutorModeCard extends StatelessWidget {
+  const LoginInstantTutorModeCard({
+    super.key,
+    required this.primaryColor,
+    required this.isDisabled,
+    required this.isBusy,
+    required this.onPressed,
+  });
+
+  final Color primaryColor;
+  final bool isDisabled;
+  final bool isBusy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -1014,12 +1043,15 @@ class _LoginPageViewState extends State<LoginPageView> {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final bool stacked = constraints.maxWidth < 420;
+          final bool stacked = constraints.maxWidth < 460;
+          final buttonLabel = isBusy
+              ? 'Opening...'
+              : 'Continue in Instant Tutor Mode';
+
           final details = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -1034,12 +1066,17 @@ class _LoginPageViewState extends State<LoginPageView> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
-                    'Instant Tutor Mode',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
+                  const Expanded(
+                    child: Text(
+                      'Instant Tutor Mode',
+                      maxLines: 2,
+                      softWrap: true,
+                      overflow: TextOverflow.visible,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
                 ],
@@ -1054,37 +1091,46 @@ class _LoginPageViewState extends State<LoginPageView> {
 
           final cta = SizedBox(
             width: stacked ? double.infinity : null,
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: (_isLoading || _isInstantTutorLoading)
-                  ? null
-                  : _handleInstantTutorModeTap,
+            child: OutlinedButton(
+              onPressed: isDisabled ? null : onPressed,
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
                 backgroundColor: Colors.white.withValues(alpha: 0.03),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
+                minimumSize: const Size(0, 48),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 14,
                 ),
               ),
-              icon: _isInstantTutorLoading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(Icons.bolt_rounded, color: primaryColor),
-              label: Text(
-                _isInstantTutorLoading
-                    ? 'Opening...'
-                    : 'Continue in Instant Tutor Mode',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Row(
+                mainAxisSize: stacked ? MainAxisSize.max : MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  isBusy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(Icons.bolt_rounded, color: primaryColor),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      buttonLabel,
+                      maxLines: stacked ? 2 : 1,
+                      softWrap: stacked,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           );

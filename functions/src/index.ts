@@ -652,6 +652,7 @@ export {
   submitTutorPayoutDetails,
   verifyTutorPayoutProfile,
 } from "./tutorPayoutOnboarding";
+export {paystackWebhook} from "./paystackWebhookReceiver";
 export {onorganizationmemberwritten} from "./organizationMembershipMirror";
 export {
   ensureSeshCreditBootstrap,

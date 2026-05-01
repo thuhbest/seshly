@@ -6,7 +6,7 @@ import {
   MOCK_TUTORING_PROVIDER_NAME,
   type TutoringPaymentProvider,
 } from "./payments/tutoringPaymentProvider";
-import {getTutoringPaymentProvider} from "./payments/mockTutoringPaymentProvider";
+import {getActiveTutoringPaymentProvider} from "./payments/tutorPaymentProviderSelector";
 import {forceEndRoom} from "./tutorRoomControl";
 import {
   buildCaptureSchemaFields,
@@ -411,7 +411,7 @@ function buildProviderResponseSnapshot(
 
 function getPaymentProviderContext(): PaymentProviderContext {
   return {
-    provider: getTutoringPaymentProvider(),
+    provider: getActiveTutoringPaymentProvider(),
   };
 }
 

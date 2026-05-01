@@ -12,7 +12,7 @@ import {
   toMoney,
   toTrimmedString,
 } from "./payments/tutoringPaymentProvider";
-import {getTutoringPaymentProvider} from "./payments/mockTutoringPaymentProvider";
+import {getActiveTutoringPaymentProvider} from "./payments/tutorPaymentProviderSelector";
 import {assertTutorEligibleForTutoring} from "./tutorApprovalState";
 import {
   assertGuestTutoringCustomerPaymentReady,
@@ -160,7 +160,7 @@ async function setupTutoringPaymentMethodHandler(
     );
   }
 
-  const provider = getTutoringPaymentProvider();
+  const provider = getActiveTutoringPaymentProvider();
   const providerStatus = buildTutoringPaymentProviderStatus(provider);
   const studentRef = db.collection("users").doc(request.auth.uid);
   const guestRef = guestTutoringCustomerRef(request.auth.uid);
@@ -506,7 +506,7 @@ async function releaseDeclinedAuthorization(params: {
   if (!authorizationSnap.exists) return;
 
   const authorizationData = authorizationSnap.data() ?? {};
-  const provider = getTutoringPaymentProvider();
+  const provider = getActiveTutoringPaymentProvider();
   const amountZar = toMoney(Math.max(
     0,
     Number(authorizationData.amountZar ?? 0) -
@@ -617,7 +617,7 @@ export const startTutoringPreauth = onCall(
       throw new HttpsError("invalid-argument", "bookingId is required.");
     }
 
-    const provider = getTutoringPaymentProvider();
+    const provider = getActiveTutoringPaymentProvider();
     const studentId = request.auth.uid;
     const bookingRef = db.collection("tutor_requests").doc(bookingId);
     const authorizationId = authorizationIdForBooking(bookingId);

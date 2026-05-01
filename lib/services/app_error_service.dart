@@ -66,6 +66,12 @@ class AppErrorService {
       if (error.code == 'unauthenticated') {
         return 'Please sign in and try again.';
       }
+      if (error.code == 'unavailable') {
+        return 'The service is temporarily unavailable. Please try again.';
+      }
+      if (error.code == 'internal') {
+        return 'Something went wrong on our side. Please try again.';
+      }
       if (error.code == 'failed-precondition') {
         return error.message?.trim().isNotEmpty == true
             ? error.message!.trim()
@@ -125,7 +131,9 @@ class AppErrorService {
       return 'Network error. Check your connection and retry.';
     }
     final rawMessage = error.toString();
-    if (rawMessage.contains('Please wait a moment before requesting another email')) {
+    if (rawMessage.contains(
+      'Please wait a moment before requesting another email',
+    )) {
       return 'Please wait a moment before requesting another verification email.';
     }
     if (rawMessage.contains('rate_limited') || rawMessage.contains('429')) {
@@ -143,7 +151,10 @@ class AppErrorService {
   }) async {
     debugPrint('[$category][$source] $error');
     try {
-      await FirebaseCrashlytics.instance.setCustomKey('error_category', category);
+      await FirebaseCrashlytics.instance.setCustomKey(
+        'error_category',
+        category,
+      );
       await FirebaseCrashlytics.instance.setCustomKey('error_source', source);
       await FirebaseCrashlytics.instance.recordError(
         error,

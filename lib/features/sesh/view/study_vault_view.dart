@@ -22,6 +22,7 @@ class StudyVaultView extends StatefulWidget {
 class _StudyVaultViewState extends State<StudyVaultView> {
   String _filterMode = 'all';
   String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
   final SecureEntitlementsService _secureEntitlements =
       SecureEntitlementsService();
 
@@ -35,6 +36,12 @@ class _StudyVaultViewState extends State<StudyVaultView> {
       return true;
     }
     return AccessController.can(context, AppCapability.viewStudyVault);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -98,197 +105,230 @@ class _StudyVaultViewState extends State<StudyVaultView> {
       );
     }
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
+    return Scaffold(
+      backgroundColor: _backgroundColor,
+      appBar: AppBar(
+        backgroundColor: _backgroundColor,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.maybePop(context),
+          icon: const Icon(Icons.arrow_back),
+        ),
+        title: const Text('StudyVault'),
+      ),
+      body: SafeArea(
+        top: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final contentWidth = constraints.maxWidth > 1180
+                ? 1180.0
+                : constraints.maxWidth;
+            final bool isCompact = contentWidth < 760;
+            final double horizontalPadding = contentWidth >= 900 ? 28 : 20;
+            final int crossAxisCount = contentWidth >= 1080
+                ? 3
+                : (contentWidth >= 760 ? 2 : 1);
+
+            return Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1180),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    12,
+                    horizontalPadding,
+                    32,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeroSection(isCompact: isCompact),
+                      const SizedBox(height: 12),
+                      _buildDiscoveryPanel(),
+                      const SizedBox(height: 20),
+                      _buildMaterialList(crossAxisCount: crossAxisCount),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroSection({required bool isCompact}) {
+    final heading = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: const [
+        _StudyVaultHeroChip(label: 'Academic resources', accent: _tealAccent),
+        SizedBox(height: 10),
+        Text(
+          'StudyVault',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          'Upload and discover academic resources.',
+          style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.35),
+        ),
+      ],
+    );
+
+    final uploadButton = SizedBox(
+      width: isCompact ? double.infinity : null,
+      child: StudyVaultActionButton(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const StudyVaultUploadView()),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+          decoration: BoxDecoration(
+            color: _tealAccent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.upload_file_rounded,
+                size: 18,
+                color: _backgroundColor,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Upload resource',
+                style: TextStyle(
+                  color: _backgroundColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return Material(
+      color: _cardColor.withValues(alpha: 0.84),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
       child: Padding(
-        padding: EdgeInsets.zero,
+        padding: const EdgeInsets.all(18),
+        child: isCompact
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [heading, const SizedBox(height: 14), uploadButton],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: heading),
+                  const SizedBox(width: 16),
+                  uploadButton,
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildDiscoveryPanel() {
+    return Material(
+      color: _cardColor.withValues(alpha: 0.84),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 20),
-            _buildHeroSection(),
-            const SizedBox(height: 18),
-            _buildDiscoveryPanel(),
-            const SizedBox(height: 24),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                final crossAxisCount = width >= 1150
-                    ? 3
-                    : (width >= 780 ? 2 : 1);
-                return _buildMaterialList(crossAxisCount: crossAxisCount);
-              },
+            const Text(
+              'Discover resources',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
             ),
-            const SizedBox(height: 100),
+            const SizedBox(height: 8),
+            const Text(
+              'Search by title, module, institute, or resource type.',
+              style: TextStyle(
+                color: Colors.white60,
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildSearchBar(),
+            const SizedBox(height: 14),
+            _buildFilterRow(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeroSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF14243F), Color(0xFF111A2E), Color(0xFF0D1626)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _StudyVaultHeroChip(
-                      label: 'Academic resources only',
-                      accent: _tealAccent,
-                    ),
-                    SizedBox(height: 14),
-                    Text(
-                      'StudyVault',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Find clean academic notes, books, exam packs, and study material without the old marketplace clutter.',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        height: 1.45,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              StudyVaultActionButton(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const StudyVaultUploadView(),
-                  ),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _tealAccent,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.upload_file_rounded,
-                        size: 18,
-                        color: _backgroundColor,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Upload resource',
-                        style: TextStyle(
-                          color: _backgroundColor,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: const [
-              _StudyVaultStatCard(
-                title: 'Free + paid',
-                value: 'One lane',
-                subtitle: 'Notes, books, and academic packs.',
-              ),
-              _StudyVaultStatCard(
-                title: 'Paid resources',
-                value: 'One price',
-                subtitle: 'Learners see the final public price only.',
-              ),
-              _StudyVaultStatCard(
-                title: 'Best for',
-                value: 'Study depth',
-                subtitle: 'Module revision, reference, and practice.',
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDiscoveryPanel() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _cardColor.withValues(alpha: 0.75),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Discover resources',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Search by subject, module, institute, or resource type. Filter fast instead of digging through clutter.',
-            style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.4),
-          ),
-          const SizedBox(height: 16),
-          _buildSearchBar(),
-          const SizedBox(height: 16),
-          _buildFilterRow(),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSearchBar() {
     return TextField(
+      controller: _searchController,
       onChanged: (value) =>
           setState(() => _searchQuery = value.toLowerCase().trim()),
+      textInputAction: TextInputAction.search,
+      cursorColor: _tealAccent,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
-        hintText:
-            'Search by title, institute, module, course, or resource type...',
-        hintStyle: const TextStyle(color: Colors.white24),
-        prefixIcon: const Icon(Icons.search, color: Colors.white24, size: 20),
+        hintText: 'Search title, institute, module, course, or type',
+        hintStyle: const TextStyle(color: Colors.white38),
+        prefixIcon: const Icon(Icons.search, color: Colors.white54, size: 20),
+        suffixIcon: _searchQuery.isEmpty
+            ? null
+            : IconButton(
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white54,
+                  size: 18,
+                ),
+              ),
         filled: true,
-        fillColor: _cardColor,
+        fillColor: Colors.white.withValues(alpha: 0.05),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: _tealAccent.withValues(alpha: 0.72),
+            width: 1.3,
+          ),
         ),
       ),
     );
@@ -315,17 +355,21 @@ class _StudyVaultViewState extends State<StudyVaultView> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? _tealAccent : _cardColor,
+          color: selected
+              ? _tealAccent.withValues(alpha: 0.18)
+              : Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? Colors.transparent : Colors.white10,
+            color: selected
+                ? _tealAccent.withValues(alpha: 0.42)
+                : Colors.white10,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? _backgroundColor : Colors.white70,
-            fontWeight: FontWeight.bold,
+            color: selected ? Colors.white : Colors.white70,
+            fontWeight: FontWeight.w700,
             fontSize: 13,
           ),
         ),
@@ -393,45 +437,47 @@ class _StudyVaultViewState extends State<StudyVaultView> {
             });
 
         if (docs.isEmpty) {
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-              color: _cardColor.withValues(alpha: 0.6),
+          return Material(
+            color: _cardColor.withValues(alpha: 0.78),
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white10),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
             ),
-            child: const Column(
-              children: [
-                Icon(
-                  Icons.auto_stories_outlined,
-                  color: Colors.white24,
-                  size: 42,
-                ),
-                SizedBox(height: 12),
-                Text(
-                  'No StudyVault resources found.',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.bold,
+            child: const Padding(
+              padding: EdgeInsets.all(28),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.auto_stories_outlined,
+                    color: Colors.white24,
+                    size: 42,
                   ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Try another search term or publish the first resource in this lane.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white38, fontSize: 12),
-                ),
-              ],
+                  SizedBox(height: 12),
+                  Text(
+                    'No StudyVault resources found.',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Try another search term or publish the first resource in this lane.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
           );
         }
 
         if (crossAxisCount <= 1) {
-          return ListView.builder(
+          return ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: docs.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 16),
             itemBuilder: (context, index) {
               final data = docs[index].data() as Map<String, dynamic>;
               return _buildStudyVaultCard(docs[index].id, data);
@@ -444,9 +490,9 @@ class _StudyVaultViewState extends State<StudyVaultView> {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: crossAxisCount == 3 ? 1.2 : 1.05,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: crossAxisCount == 3 ? 0.97 : 0.88,
           ),
           itemCount: docs.length,
           itemBuilder: (context, index) {
@@ -488,220 +534,192 @@ class _StudyVaultViewState extends State<StudyVaultView> {
     final String description =
         (data['description'] ?? data['previewText'] ?? '').toString();
     final stars = (data['stars'] as num?)?.toInt() ?? 0;
+    final secondaryLine = [
+      moduleCode,
+      moduleName.isEmpty ? courseName : moduleName,
+    ].where((part) => part.trim().isNotEmpty).join(' • ');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _cardColor.withValues(alpha: 0.62),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white10),
+    return Material(
+      color: _cardColor.withValues(alpha: 0.74),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: _tealAccent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  _iconForResourceType(resourceType),
-                  color: _tealAccent,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      institute,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: _tealAccent,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              _accessBadge(isPaid: isPaid, priceZar: priceZar),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _StudyVaultMetaChip(label: resourceType),
-              if (moduleCode.trim().isNotEmpty)
-                _StudyVaultMetaChip(label: moduleCode),
-              _StudyVaultMetaChip(label: 'Year $year'),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            moduleName.isEmpty
-                ? '$moduleCode • $courseName'
-                : '$moduleCode • $moduleName',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-          if (description.trim().isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              description,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white54,
-                fontSize: 12,
-                height: 1.4,
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: Row(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                const Icon(
-                  Icons.storefront_outlined,
-                  color: Colors.white54,
-                  size: 16,
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _tealAccent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    _iconForResourceType(resourceType),
+                    color: _tealAccent,
+                    size: 22,
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    isPaid
-                        ? 'Paid resource. The listed price is the final learner price.'
-                        : 'Free resource. Open instantly and keep moving.',
+                    institute,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 11.5,
-                      height: 1.35,
+                      color: _tealAccent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
+                const SizedBox(width: 10),
+                _accessBadge(isPaid: isPaid, priceZar: priceZar),
               ],
             ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              StudyVaultActionButton(
-                onTap: () => _toggleStar(docId, isStarred),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isStarred
-                            ? Icons.star_rounded
-                            : Icons.star_outline_rounded,
-                        color: isStarred ? Colors.amber : Colors.white38,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '$stars',
-                        style: TextStyle(
-                          color: isStarred ? Colors.amber : Colors.white38,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+                height: 1.3,
+              ),
+            ),
+            if (secondaryLine.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                secondaryLine,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _StudyVaultMetaChip(label: resourceType),
+                if (moduleCode.trim().isNotEmpty)
+                  _StudyVaultMetaChip(label: moduleCode),
+                _StudyVaultMetaChip(label: 'Year $year'),
+              ],
+            ),
+            if (description.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                description,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white60,
+                  fontSize: 12,
+                  height: 1.45,
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: StudyVaultActionButton(
-                  onTap: () => canAccess
-                      ? _openResource(data)
-                      : _unlockPaidResource(docId, data),
+            ],
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                StudyVaultActionButton(
+                  onTap: () => _toggleStar(docId, isStarred),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
+                      horizontal: 12,
+                      vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: canAccess
-                          ? _tealAccent
-                          : Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: canAccess ? Colors.transparent : Colors.white10,
-                      ),
+                      color: Colors.white.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white10),
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          canAccess
-                              ? Icons.download_for_offline_rounded
-                              : Icons.lock_open_rounded,
-                          color: canAccess ? _backgroundColor : Colors.white,
+                          isStarred
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          color: isStarred ? Colors.amber : Colors.white38,
                           size: 18,
                         ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            canAccess
-                                ? 'Open resource'
-                                : 'Unlock for R$priceZar',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: canAccess
-                                  ? _backgroundColor
-                                  : Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$stars',
+                          style: TextStyle(
+                            color: isStarred ? Colors.amber : Colors.white38,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: StudyVaultActionButton(
+                    onTap: () => canAccess
+                        ? _openResource(data)
+                        : _unlockPaidResource(docId, data),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: canAccess
+                            ? _tealAccent
+                            : Colors.white.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: canAccess
+                              ? Colors.transparent
+                              : Colors.white10,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            canAccess
+                                ? Icons.download_for_offline_rounded
+                                : Icons.lock_open_rounded,
+                            color: canAccess ? _backgroundColor : Colors.white,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              canAccess
+                                  ? 'Open resource'
+                                  : 'Unlock for R$priceZar',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: canAccess
+                                    ? _backgroundColor
+                                    : Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -716,6 +734,7 @@ class _StudyVaultViewState extends State<StudyVaultView> {
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: foreground.withValues(alpha: 0.18)),
       ),
       child: Text(
         isPaid ? 'Paid R$priceZar' : 'Free',
@@ -925,57 +944,6 @@ class _StudyVaultHeroChip extends StatelessWidget {
   }
 }
 
-class _StudyVaultStatCard extends StatelessWidget {
-  const _StudyVaultStatCard({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-  });
-
-  final String title;
-  final String value;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 170,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(color: Colors.white54, fontSize: 11),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              color: Colors.white60,
-              fontSize: 11,
-              height: 1.35,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _StudyVaultMetaChip extends StatelessWidget {
   const _StudyVaultMetaChip({required this.label});
 
@@ -984,10 +952,11 @@ class _StudyVaultMetaChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Text(
         label,
