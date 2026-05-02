@@ -13,8 +13,8 @@ import '../widgets/post_card.dart';
 import '../widgets/category_selector.dart';
 import '../controllers/home_controller.dart';
 import '../widgets/sesh_focus_dialog.dart';
-import '../VIEW/notifications_view.dart';
-import '../VIEW/new_question_view.dart';
+import '../view/notifications_view.dart';
+import '../view/new_question_view.dart';
 
 class HomeView extends StatefulWidget {
   final ValueListenable<int>? refreshSignal;
