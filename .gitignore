@@ -48,6 +48,10 @@ app.*.map.json
 # Flutter stuff
 .dart_tool/
 .packages
+
+# Keystore and temporary files
+upload-keystore.jks
+tmp.txt
 .pub-cache/
 .pub/
 build/
