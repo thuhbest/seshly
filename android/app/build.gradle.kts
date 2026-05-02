@@ -39,22 +39,26 @@ android {
 
     signingConfigs {
         create("release") {
-            // Priority 1: Environment Variables (GitHub Actions)
-            // Priority 2: key.properties file (Local PC)
-            keyAlias = System.getenv("KEY_ALIAS") ?: (keystoreProperties["keyAlias"] as String?)
-            keyPassword = System.getenv("KEY_PASSWORD") ?: (keystoreProperties["keyPassword"] as String?)
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: (keystoreProperties["storePassword"] as String?)
+            // 1. Get values from GitHub Environment OR local key.properties
+            val alias = System.getenv("KEY_ALIAS") ?: keystoreProperties.getProperty("keyAlias")
+            val keyPass = System.getenv("KEY_PASSWORD") ?: keystoreProperties.getProperty("keyPassword")
+            val storePass = System.getenv("KEYSTORE_PASSWORD") ?: keystoreProperties.getProperty("storePassword")
             
-            val storePath = System.getenv("KEYSTORE_FILE") ?: (keystoreProperties["storeFile"] as String?)
-            if (storePath != null) {
-                storeFile = file(storePath)
+            // 2. Set the path to the keystore file
+            // On GitHub, this will be "upload-keystore.jks"
+            val storePath = System.getenv("KEYSTORE_FILE") ?: keystoreProperties.getProperty("storeFile")
+
+            if (alias != null && keyPass != null && storePass != null && storePath != null) {
+                keyAlias = alias
+                keyPassword = keyPass
+                storePassword = storePass
+                storeFile = file(storePath) 
             }
         }
     }
 
     buildTypes {
         getByName("release") {
-            // Connects the build type to the signing config defined above
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             isShrinkResources = false
