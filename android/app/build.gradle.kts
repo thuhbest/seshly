@@ -64,6 +64,7 @@ android {
             isShrinkResources = false
         }
     }
+
 }
 
 flutter {
