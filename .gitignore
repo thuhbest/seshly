@@ -110,6 +110,7 @@ linux/flutter/ephemeral/
 gcloud.env
 firebase_options.dart
 key.properties
+encoded_keystore.txt
 *.pem
 *.key
 .firebase/
