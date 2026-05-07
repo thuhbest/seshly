@@ -69,8 +69,8 @@ dependencies:
   file_picker: ^8.0.0
   crypto: ^3.0.3
   speech_to_text: ^6.6.0
-  syncfusion_flutter_pdf: ^27.2.14
-  syncfusion_flutter_pdfviewer: ^27.2.14
+  syncfusion_flutter_pdf: ^27.1.0
+  syncfusion_flutter_pdfviewer: ^27.1.0
   record: ^5.1.2
   audioplayers: ^5.2.1
   cross_file: ^0.3.4
