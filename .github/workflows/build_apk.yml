@@ -53,4 +53,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: seshly-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apkS
+          path: build/app/outputs/flutter-apk/app-release.apk
