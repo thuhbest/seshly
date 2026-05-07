@@ -1,9 +1,9 @@
 name: seshly
-description: "A new Flutter project."
+description: "Seshly is a cross-campus academic platform designed to help students learn smarter, collaborate better, and access academic support instantly. Built with Flutter and Firebase, Seshly combines AI-powered learning tools, real-time collaboration, a tutor marketplace, and a student community — all in one app."
 
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.9.0
@@ -20,69 +20,67 @@ dependencies:
   # ----------------------------
   # FIREBASE CORE
   # ----------------------------
-  firebase_core: ^3.4.0
+  firebase_core: ^3.13.0
 
   # ----------------------------
   # AUTHENTICATION
   # ----------------------------
-  firebase_auth: ^5.2.0
-  google_sign_in: ^6.2.1 # optional, future social login
+  firebase_auth: ^5.5.0
+  google_sign_in: ^6.2.1
 
   # ----------------------------
   # DATABASE
   # ----------------------------
-  cloud_firestore: ^5.4.0
-  cloud_functions: ^5.0.1
+  cloud_firestore: ^5.6.0
+  cloud_functions: ^5.3.0
 
   # ----------------------------
-  # ANALYTICS / GROWTH (FUTURE)
+  # ANALYTICS / GROWTH
   # ----------------------------
-  firebase_analytics: ^11.3.0
-  firebase_crashlytics: ^4.1.0
+  firebase_analytics: ^11.4.0
+  firebase_crashlytics: ^4.3.0
 
   # ----------------------------
-  # STORAGE (FUTURE: PROFILE PICS, NOTES)
+  # STORAGE
   # ----------------------------
-  firebase_storage: ^12.2.0
+  firebase_storage: ^12.4.0
 
   # ----------------------------
-  # NOTIFICATIONS (FUTURE)
+  # NOTIFICATIONS
   # ----------------------------
-  firebase_messaging: ^15.1.0
+  firebase_messaging: ^15.2.0
 
   # ----------------------------
-  # STATE MANAGEMENT (LIKELY)
+  # STATE MANAGEMENT
   # ----------------------------
   provider: ^6.1.2
 
   # ----------------------------
   # UTILITIES
   # ----------------------------
-  intl: ^0.19.0        # date / time formatting
-  uuid: ^4.4.0        # ids for sessions, notes, etc
+  intl: ^0.20.1
+  uuid: ^4.5.1
   flutter_speed_dial: ^7.0.0
-  image_picker: ^1.0.0
-  video_player: ^2.8.1
-  url_launcher: ^6.2.1
-  path_provider: ^2.1.1
-  flutter_svg: ^2.0.9
-  file_picker: ^8.0.0
-  crypto: ^3.0.3
-  speech_to_text: ^6.6.0
-  syncfusion_flutter_pdf: ^27.1.0
-  syncfusion_flutter_pdfviewer: ^27.1.0
+  image_picker: ^1.1.2
+  video_player: ^2.9.2
+  url_launcher: ^6.3.1
+  path_provider: ^2.1.5
+  flutter_svg: ^2.0.17
+  file_picker: ^8.1.7
+  crypto: ^3.0.6
+  speech_to_text: ^7.0.0
+  syncfusion_flutter_pdf: ^28.2.7
+  syncfusion_flutter_pdfviewer: ^28.2.7
   record: ^5.1.2
-  audioplayers: ^5.2.1
-  cross_file: ^0.3.4
+  audioplayers: ^6.1.0
+  cross_file: ^0.3.4+2
   http: ^1.2.2
   google_fonts: ^6.2.1
-  flutter_markdown: ^0.7.3
-  flutter_webrtc: ^0.10.8
-  livekit_client: ^2.0.4
+  flutter_markdown: ^0.7.4
+  flutter_webrtc: ^0.14.1
+  livekit_client: ^2.4.3
 
 dependency_overrides:
-  dart_webrtc:
-    path: third_party/dart_webrtc
   record_windows:
     path: third_party/record_windows
   record_linux:
@@ -91,7 +89,6 @@ dependency_overrides:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^5.0.0
 
 flutter:
